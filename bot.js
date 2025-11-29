@@ -514,6 +514,40 @@ app.post('/api/form-webhook', async (req, res) => {
 });
 
 // =====================================================
+// DEBUG ENDPOINT
+// =====================================================
+
+app.get('/api/debug-topic', async (req, res) => {
+    const question = req.query.q || "How do I find square roots?";
+
+    try {
+        // Detect topic
+        const topicInfo = await detectTopic(question, null);
+
+        // Find teaching method
+        const teachingMethod = await findTeachingMethod(
+            topicInfo.subject,
+            topicInfo.class,
+            topicInfo.chapter
+        );
+
+        // Get all methods
+        const allMethods = await db.getAllTeachingMethods();
+
+        res.json({
+            question,
+            detectedTopic: topicInfo,
+            foundMethod: teachingMethod ? 'YES' : 'NO',
+            teachingMethod: teachingMethod,
+            allKeys: Object.keys(allMethods),
+            searchedKey: `${topicInfo.subject?.toLowerCase()}-${topicInfo.class}-${topicInfo.chapter?.toLowerCase().replace(/\s+/g, '-')}`
+        });
+    } catch (error) {
+        res.json({ error: error.message, stack: error.stack });
+    }
+});
+
+// =====================================================
 // ANALYTICS ENDPOINTS (for demo dashboard)
 // =====================================================
 
