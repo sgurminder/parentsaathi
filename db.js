@@ -23,17 +23,15 @@ class Database {
 
     async initializeVercelKV() {
         try {
-            const { createClient } = require('@vercel/kv');
-            this.kv = createClient({
-                url: config.database.kvUrl,
-                token: config.database.kvToken,
-            });
-            console.log('✅ Connected to Vercel KV');
+            // Use @vercel/kv which works with Upstash Redis
+            const { kv } = require('@vercel/kv');
+            this.kv = kv;
+            console.log('✅ Connected to Upstash Redis via Vercel KV');
 
             // Load data from KV to cache
             await this.loadFromKV();
         } catch (error) {
-            console.error('❌ Failed to connect to Vercel KV:', error);
+            console.error('❌ Failed to connect to Redis:', error);
             console.log('Falling back to in-memory storage');
             this.type = 'memory';
         }
