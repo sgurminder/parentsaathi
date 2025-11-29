@@ -5,6 +5,8 @@
 // Uses: Twilio WhatsApp Sandbox + OpenAI GPT-4 Vision
 // =====================================================
 
+require('dotenv').config();
+
 const express = require('express');
 const { MessagingResponse } = require('twilio').twiml;
 const OpenAI = require('openai');
@@ -128,13 +130,19 @@ async function detectTopic(question, imageUrl = null) {
             role: "system",
             content: `You are a topic classifier for Indian school curriculum (CBSE).
             Given a homework question, identify:
-            1. Subject (Math, Science, English, etc.)
+            1. Subject - Use "Mathematics" for math, "Science" for science questions
             2. Class level (1-12)
-            3. Chapter name
+            3. Chapter name - Be specific (e.g., "Linear Equations", "Quadratic Equations", "Photosynthesis")
             4. Specific topic
-            
-            Respond in JSON format:
-            {"subject": "...", "class": ..., "chapter": "...", "topic": "..."}`
+
+            IMPORTANT: Always respond with valid JSON only, no extra text.
+            Format: {"subject": "Mathematics", "class": 8, "chapter": "Linear Equations", "topic": "Solving linear equations"}
+
+            Common chapters (use exact names):
+            - Math: Linear Equations, Quadratic Equations, Square Roots, Polynomials, Trigonometry, Algebra
+            - Science: Photosynthesis, Chemical Reactions, Force and Motion, Electricity
+
+            Note: Use singular form (e.g., "Square Roots" not "Squares and Square Roots")`
         }
     ];
 
@@ -156,19 +164,38 @@ async function detectTopic(question, imageUrl = null) {
     const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: messages,
-        max_tokens: 200
+        max_tokens: 100,
+        response_format: { type: "json_object" }
     });
 
     try {
-        return JSON.parse(response.choices[0].message.content);
-    } catch {
+        const parsed = JSON.parse(response.choices[0].message.content);
+        console.log('Topic detection raw response:', response.choices[0].message.content);
+        return parsed;
+    } catch (e) {
+        console.error('Failed to parse topic detection:', e);
         return { subject: "unknown", class: 8, chapter: "unknown", topic: "unknown" };
     }
 }
 
 // Find matching teaching method
 function findTeachingMethod(subject, classLevel, chapter) {
-    const key = `${subject.toLowerCase()}-${classLevel}-${chapter.toLowerCase().replace(/\s+/g, '-')}`;
+    // Handle null/undefined values
+    if (!subject || !chapter) {
+        console.log('Subject or chapter is null/undefined, cannot find teaching method');
+        return null;
+    }
+
+    // Normalize subject names
+    let normalizedSubject = subject.toLowerCase();
+    if (normalizedSubject === 'mathematics' || normalizedSubject === 'maths') {
+        normalizedSubject = 'math';
+    }
+
+    const key = `${normalizedSubject}-${classLevel}-${chapter.toLowerCase().replace(/\s+/g, '-')}`;
+    console.log('Looking for teaching method with key:', key);
+    console.log('Available keys:', Object.keys(teachingMethods));
+
     return teachingMethods[key] || null;
 }
 
@@ -218,7 +245,7 @@ Instructions:
     const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: messages,
-        max_tokens: 500
+        max_tokens: 300
     });
 
     return response.choices[0].message.content;
@@ -226,17 +253,20 @@ Instructions:
 
 // Generate generic response (when no teacher method found)
 async function generateGenericResponse(question, topicInfo, imageUrl = null) {
+    const subject = topicInfo.subject || 'this';
+    const classLevel = topicInfo.class || 8;
+
     const systemPrompt = `You are a friendly homework helper for Indian school students.
-    
-Explain this ${topicInfo.subject} concept for Class ${topicInfo.class} students.
+
+Explain this ${subject} concept for Class ${classLevel} students.
 
 Instructions:
 1. Use simple, clear language
-2. Give step-by-step explanation
-3. Include a real-life example
-4. Mention common mistakes to avoid
-5. Keep response under 300 words
-6. End with: "Note: I'll notify your teacher to add their specific method for this topic!"`;
+2. Give step-by-step explanation (max 3-4 steps)
+3. Include ONE brief real-life example
+4. Keep response VERY SHORT - under 600 characters total
+5. Be concise and to the point
+6. End with: "Note: I'll notify your teacher to add their method!"`;
 
     const messages = [{ role: "system", content: systemPrompt }];
 
@@ -258,7 +288,7 @@ Instructions:
     const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: messages,
-        max_tokens: 500
+        max_tokens: 200
     });
 
     return response.choices[0].message.content;
@@ -350,12 +380,16 @@ Now send me any homework question or photo, and I'll explain it the way your tea
 
                 let response;
                 if (teachingMethod) {
+                    console.log('Found teaching method, generating response...');
                     // Generate response using teacher's method
                     response = await generateResponse(body, teachingMethod, mediaUrl);
                     response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
+                    console.log('Response generated with teacher method');
                 } else {
+                    console.log('No teaching method found, generating generic response...');
                     // Generate generic response
                     response = await generateGenericResponse(body, topicInfo, mediaUrl);
+                    console.log('Generic response generated');
                 }
 
                 // Store query for analytics
@@ -366,6 +400,9 @@ Now send me any homework question or photo, and I'll explain it the way your tea
                     timestamp: new Date()
                 };
 
+                console.log('Sending response to WhatsApp...');
+                console.log('Response length:', response.length, 'characters');
+                console.log('Response preview:', response.substring(0, 100) + '...');
                 twiml.message(response);
             }
         }
@@ -375,7 +412,9 @@ Now send me any homework question or photo, and I'll explain it the way your tea
     }
 
     res.type('text/xml');
-    res.send(twiml.toString());
+    const twimlString = twiml.toString();
+    console.log('Sending TwiML response:', twimlString.substring(0, 200) + '...');
+    res.send(twimlString);
 });
 
 // =====================================================
@@ -440,8 +479,14 @@ app.post('/api/form-webhook', (req, res) => {
         tips: formData.tips || formData['Tips for parents']
     };
 
+    // Normalize subject name (same logic as findTeachingMethod)
+    let normalizedSubject = teachingMethod.subject.toLowerCase();
+    if (normalizedSubject === 'mathematics' || normalizedSubject === 'maths') {
+        normalizedSubject = 'math';
+    }
+
     // Store it
-    const key = `${teachingMethod.subject.toLowerCase()}-${teachingMethod.classLevel}-${teachingMethod.chapter.toLowerCase().replace(/\s+/g, '-')}`;
+    const key = `${normalizedSubject}-${teachingMethod.classLevel}-${teachingMethod.chapter.toLowerCase().replace(/\s+/g, '-')}`;
     teachingMethods[key] = {
         ...teachingMethod,
         class: teachingMethod.classLevel,
