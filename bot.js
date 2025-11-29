@@ -10,6 +10,7 @@ require('dotenv').config();
 const express = require('express');
 const { MessagingResponse } = require('twilio').twiml;
 const OpenAI = require('openai');
+const db = require('./db');
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -179,7 +180,7 @@ async function detectTopic(question, imageUrl = null) {
 }
 
 // Find matching teaching method
-function findTeachingMethod(subject, classLevel, chapter) {
+async function findTeachingMethod(subject, classLevel, chapter) {
     // Handle null/undefined values
     if (!subject || !chapter) {
         console.log('Subject or chapter is null/undefined, cannot find teaching method');
@@ -194,9 +195,16 @@ function findTeachingMethod(subject, classLevel, chapter) {
 
     const key = `${normalizedSubject}-${classLevel}-${chapter.toLowerCase().replace(/\s+/g, '-')}`;
     console.log('Looking for teaching method with key:', key);
-    console.log('Available keys:', Object.keys(teachingMethods));
 
-    return teachingMethods[key] || null;
+    // Get from database
+    const method = await db.getTeachingMethod(key);
+    console.log('Found method:', method ? 'YES' : 'NO');
+
+    // Also log all available keys for debugging
+    const allMethods = await db.getAllTeachingMethods();
+    console.log('Available keys:', Object.keys(allMethods));
+
+    return method;
 }
 
 // Generate response using teacher's method
@@ -372,7 +380,7 @@ Now send me any homework question or photo, and I'll explain it the way your tea
                 console.log('Detected topic:', topicInfo);
 
                 // Find teacher's method
-                const teachingMethod = findTeachingMethod(
+                const teachingMethod = await findTeachingMethod(
                     topicInfo.subject,
                     topicInfo.class,
                     topicInfo.chapter
@@ -422,21 +430,21 @@ Now send me any homework question or photo, and I'll explain it the way your tea
 // =====================================================
 
 // Add teaching method (from Google Form webhook or admin panel)
-app.post('/api/teaching-method', (req, res) => {
-    const { 
-        teacher, 
-        subject, 
-        classLevel, 
-        chapter, 
-        method, 
-        example, 
-        commonMistakes, 
-        tips 
+app.post('/api/teaching-method', async (req, res) => {
+    const {
+        teacher,
+        subject,
+        classLevel,
+        chapter,
+        method,
+        example,
+        commonMistakes,
+        tips
     } = req.body;
 
     const key = `${subject.toLowerCase()}-${classLevel}-${chapter.toLowerCase().replace(/\s+/g, '-')}`;
-    
-    teachingMethods[key] = {
+
+    const teachingMethodData = {
         teacher,
         subject,
         class: classLevel,
@@ -448,13 +456,17 @@ app.post('/api/teaching-method', (req, res) => {
         createdAt: new Date()
     };
 
-    console.log(`Added teaching method: ${key}`);
+    // Save to database
+    await db.saveTeachingMethod(key, teachingMethodData);
+
+    console.log(`Added teaching method to database: ${key}`);
     res.json({ success: true, key });
 });
 
 // Get all teaching methods (for admin)
-app.get('/api/teaching-methods', (req, res) => {
-    res.json(teachingMethods);
+app.get('/api/teaching-methods', async (req, res) => {
+    const methods = await db.getAllTeachingMethods();
+    res.json(methods);
 });
 
 // =====================================================
@@ -462,12 +474,12 @@ app.get('/api/teaching-methods', (req, res) => {
 // =====================================================
 
 // This endpoint receives data from Google Form via Zapier/Make
-app.post('/api/form-webhook', (req, res) => {
+app.post('/api/form-webhook', async (req, res) => {
     console.log('Received form submission:', req.body);
-    
+
     // Map Google Form fields to our schema
     const formData = req.body;
-    
+
     const teachingMethod = {
         teacher: formData.teacher_name || formData['Teacher Name'],
         subject: formData.subject || formData['Subject'],
@@ -487,13 +499,17 @@ app.post('/api/form-webhook', (req, res) => {
 
     // Store it
     const key = `${normalizedSubject}-${teachingMethod.classLevel}-${teachingMethod.chapter.toLowerCase().replace(/\s+/g, '-')}`;
-    teachingMethods[key] = {
+
+    const teachingMethodData = {
         ...teachingMethod,
         class: teachingMethod.classLevel,
         createdAt: new Date()
     };
 
-    console.log(`Added from form: ${key}`);
+    // Save to database
+    await db.saveTeachingMethod(key, teachingMethodData);
+
+    console.log(`Added from form to database: ${key}`);
     res.json({ success: true, key });
 });
 
