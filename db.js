@@ -129,6 +129,21 @@ class Database {
         }
     }
 
+    async markUserFirstContact(phoneNumber) {
+        const userInfo = await this.getUserInfo(phoneNumber);
+        if (userInfo && !userInfo.firstContactAt) {
+            userInfo.firstContactAt = new Date().toISOString();
+            userInfo.lastMessageAt = new Date().toISOString();
+            await this.saveUserInfo(phoneNumber, userInfo);
+            return true; // First time
+        } else if (userInfo) {
+            userInfo.lastMessageAt = new Date().toISOString();
+            await this.saveUserInfo(phoneNumber, userInfo);
+            return false; // Not first time
+        }
+        return false;
+    }
+
     async getUserInfo(phoneNumber) {
         if (this.type === 'vercel-kv') {
             return await this.kv.get(`user:${phoneNumber}`);

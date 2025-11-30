@@ -333,12 +333,27 @@ app.post('/webhook', async (req, res) => {
         // Get user info
         const userInfo = await db.getUserInfo(from);
 
+        // Check if first time contacting
+        const isFirstTime = await db.markUserFirstContact(from);
+
         // Handle welcome/help message
         if (body.toLowerCase().includes('hi') || body.toLowerCase().includes('hello') || body.toLowerCase().includes('start')) {
             let welcomeMsg = '';
 
             if (userInfo && userInfo.role === 'teacher') {
-                welcomeMsg = `Welcome back, ${userInfo.name}! 👩‍🏫
+                if (isFirstTime) {
+                    welcomeMsg = `🎉 Welcome to ${config.school.name}, ${userInfo.name}! 👩‍🏫
+
+You've been added as a teacher to our homework helper bot!
+
+As a teacher, you can:
+📚 Test the bot with any question
+✏️ Add/edit teaching methods via the form
+🎯 See how students will receive your explanations
+
+Send any math question to test how students will experience your teaching methods!`;
+                } else {
+                    welcomeMsg = `Welcome back, ${userInfo.name}! 👩‍🏫
 
 As a ${config.school.shortName} teacher, you can:
 📚 Test the bot with any question
@@ -346,11 +361,28 @@ As a ${config.school.shortName} teacher, you can:
 🎯 See how students will receive your explanations
 
 Send any math question to test!`;
+                }
             } else if (userInfo) {
-                welcomeMsg = `Welcome back, ${userInfo.name}! 🎓
+                if (isFirstTime) {
+                    welcomeMsg = `🎉 Welcome to ${config.school.name}, ${userInfo.name}! 🎓
+
+You've been enrolled in our 24/7 homework helper bot!
+
+📚 Class ${userInfo.class}
+🏫 ${config.school.shortName}
+
+You can now:
+✏️ Send any homework question (text or photo)
+📸 Get explanations using YOUR teacher's methods
+🎯 Get help anytime, anywhere!
+
+Try asking me a question now!`;
+                } else {
+                    welcomeMsg = `Welcome back, ${userInfo.name}! 🎓
 Class ${userInfo.class} - ${config.school.shortName}
 
 Send me any homework question or photo, and I'll explain it using your teacher's methods! 📸`;
+                }
             } else {
                 welcomeMsg = `Welcome to ${config.school.name}! 🎓
 
