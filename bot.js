@@ -594,6 +594,29 @@ app.get('/api/user/:phoneNumber', async (req, res) => {
     res.json({ phoneNumber, ...userInfo });
 });
 
+// Generate WhatsApp activation link for a user
+app.get('/api/activation-link/:phoneNumber', async (req, res) => {
+    const phoneNumber = req.params.phoneNumber;
+    const userInfo = await db.getUserInfo(phoneNumber);
+
+    if (!userInfo) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Generate WhatsApp click-to-chat link
+    const botNumber = config.bot.whatsappNumber.replace('+', '');
+    const message = encodeURIComponent('Hi');
+    const whatsappLink = `https://wa.me/${botNumber}?text=${message}`;
+
+    res.json({
+        phoneNumber,
+        userName: userInfo.name,
+        whatsappLink,
+        message: `Send this link to ${userInfo.name} to activate their account`,
+        instructions: `When they click this link, it will open WhatsApp with "Hi" pre-filled. They just need to send it!`
+    });
+});
+
 // =====================================================
 // AI PREFILL FOR TEACHER FORM
 // =====================================================
@@ -1010,16 +1033,16 @@ app.get('/admin', (req, res) => {
         function showSuccess(message) {
             const success = document.getElementById('success');
             const error = document.getElementById('error');
-            success.textContent = message;
+            success.innerHTML = message;
             success.style.display = 'block';
             error.style.display = 'none';
-            setTimeout(() => success.style.display = 'none', 5000);
+            setTimeout(() => success.style.display = 'none', 10000); // 10s for activation link
         }
 
         function showError(message) {
             const error = document.getElementById('error');
             const success = document.getElementById('success');
-            error.textContent = message;
+            error.innerHTML = message;
             error.style.display = 'block';
             success.style.display = 'none';
             setTimeout(() => error.style.display = 'none', 5000);
@@ -1061,7 +1084,19 @@ app.get('/admin', (req, res) => {
                 const result = await response.json();
 
                 if (result.success) {
-                    showSuccess('✅ User added successfully!');
+                    // Fetch activation link
+                    const linkResponse = await fetch(`/api/activation-link/${data.phoneNumber}`);
+                    const linkData = await linkResponse.json();
+
+                    // Show success with activation link
+                    const successMsg = `✅ User added successfully!<br><br>
+                        📲 <strong>WhatsApp Activation Link:</strong><br>
+                        <a href="${linkData.whatsappLink}" target="_blank" style="color: white; text-decoration: underline;">
+                            ${linkData.whatsappLink}
+                        </a><br><br>
+                        <small>Send this link to ${data.name}. When they click it, WhatsApp will open with "Hi" ready to send!</small>`;
+
+                    showSuccess(successMsg);
                     document.getElementById('addUserForm').reset();
                     updateStats();
                 } else {

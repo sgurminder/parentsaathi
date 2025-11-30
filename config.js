@@ -17,6 +17,8 @@ module.exports = {
     // Bot Settings
     bot: {
         name: 'Springfield Study Buddy',
+        whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886', // Twilio sandbox number
+
         welcomeMessage: `Welcome to Springfield Study Buddy! 🎓
 
 I help Springfield students with homework using YOUR teacher's exact methods.
