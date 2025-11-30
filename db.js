@@ -105,7 +105,7 @@ class Database {
         return null;
     }
 
-    // ==================== AUTHORIZED NUMBERS ====================
+    // ==================== USER MANAGEMENT ====================
 
     async isAuthorized(phoneNumber) {
         // Demo mode: allow demo numbers
@@ -119,21 +119,57 @@ class Database {
         return this.cache.authorizedNumbers.has(phoneNumber);
     }
 
-    async authorizeNumber(phoneNumber, studentInfo = {}) {
+    async saveUserInfo(phoneNumber, userInfo) {
+        // userInfo: { name, class, role ('student'|'teacher'), school }
         this.cache.authorizedNumbers.add(phoneNumber);
 
         if (this.type === 'vercel-kv') {
             await this.kv.sadd('authorized:numbers', phoneNumber);
-            // Store student info
-            await this.kv.set(`student:${phoneNumber}`, studentInfo);
+            await this.kv.set(`user:${phoneNumber}`, userInfo);
         }
     }
 
-    async getStudentInfo(phoneNumber) {
+    async getUserInfo(phoneNumber) {
         if (this.type === 'vercel-kv') {
-            return await this.kv.get(`student:${phoneNumber}`);
+            return await this.kv.get(`user:${phoneNumber}`);
         }
         return null;
+    }
+
+    async unauthorizeNumber(phoneNumber) {
+        this.cache.authorizedNumbers.delete(phoneNumber);
+
+        if (this.type === 'vercel-kv') {
+            await this.kv.srem('authorized:numbers', phoneNumber);
+            await this.kv.del(`user:${phoneNumber}`);
+        }
+    }
+
+    async getAllAuthorizedUsers() {
+        if (this.type === 'vercel-kv') {
+            const numbers = await this.kv.smembers('authorized:numbers');
+            const users = [];
+            for (const number of numbers) {
+                const info = await this.kv.get(`user:${number}`);
+                if (info) {
+                    users.push({ phoneNumber: number, ...info });
+                }
+            }
+            return users;
+        }
+        return Array.from(this.cache.authorizedNumbers).map(num => ({ phoneNumber: num }));
+    }
+
+    // Legacy methods for backward compatibility
+    async authorizeNumber(phoneNumber, studentInfo = {}) {
+        return await this.saveUserInfo(phoneNumber, {
+            ...studentInfo,
+            role: studentInfo.role || 'student'
+        });
+    }
+
+    async getStudentInfo(phoneNumber) {
+        return await this.getUserInfo(phoneNumber);
     }
 
     // ==================== CHILDREN (Multi-child support) ====================

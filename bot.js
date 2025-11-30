@@ -318,51 +318,45 @@ app.post('/webhook', async (req, res) => {
         console.log(`Message from ${from}: ${body}`);
         if (mediaUrl) console.log(`Media URL: ${mediaUrl}`);
 
-        // Initialize or get user session
-        if (!userSessions[from]) {
-            userSessions[from] = {
-                registered: false,
-                school: null,
-                class: null,
-                lastQuery: null
-            };
+        // Check if user is authorized
+        const isAuthorized = await db.isAuthorized(from);
+
+        if (!isAuthorized) {
+            const config = require('./config');
+            twiml.message(config.bot.notAuthorizedMessage);
+            res.type('text/xml');
+            res.send(twiml.toString());
+            return;
         }
 
-        const session = userSessions[from];
+        // Get user info
+        const userInfo = await db.getUserInfo(from);
 
-        // Handle registration flow
-        if (!session.registered) {
-            if (body.toLowerCase().includes('hi') || body.toLowerCase().includes('hello') || body.toLowerCase().includes('start')) {
-                const welcomeMsg = `Welcome to ParentSaathi! 🎓
+        // Handle welcome/help message
+        if (body.toLowerCase().includes('hi') || body.toLowerCase().includes('hello') || body.toLowerCase().includes('start')) {
+            let welcomeMsg = '';
 
-I help with homework using YOUR teacher's methods.
+            if (userInfo && userInfo.role === 'teacher') {
+                welcomeMsg = `Welcome back, ${userInfo.name}! 👩‍🏫
 
-To get started, please tell me:
-1. Your school name
-2. Your class (e.g., Class 8)
+As a ${config.school.shortName} teacher, you can:
+📚 Test the bot with any question
+✏️ Add/edit teaching methods via the form
+🎯 See how students will receive your explanations
 
-Example: "Demo Public School, Class 8"`;
-                
-                twiml.message(welcomeMsg);
-            } 
-            else if (body.toLowerCase().includes('demo') || body.toLowerCase().includes('class')) {
-                // Simple registration for demo
-                session.registered = true;
-                session.school = 'demo-school';
-                session.class = 8; // Default to class 8 for demo
-                
-                const regMsg = `Great! You're registered! ✅
+Send any math question to test!`;
+            } else if (userInfo) {
+                welcomeMsg = `Welcome back, ${userInfo.name}! 🎓
+Class ${userInfo.class} - ${config.school.shortName}
 
-School: Demo Public School
-Class: 8
+Send me any homework question or photo, and I'll explain it using your teacher's methods! 📸`;
+            } else {
+                welcomeMsg = `Welcome to ${config.school.name}! 🎓
 
-Now send me any homework question or photo, and I'll explain it the way your teachers do! 📸`;
-                
-                twiml.message(regMsg);
+Send me any homework question or photo, and I'll help you! 📸`;
             }
-            else {
-                twiml.message(`Please say "Hi" to start, or send your school name and class.`);
-            }
+
+            twiml.message(welcomeMsg);
         }
         // Handle homework queries
         else {
@@ -514,6 +508,119 @@ app.post('/api/form-webhook', async (req, res) => {
 });
 
 // =====================================================
+// USER MANAGEMENT ENDPOINTS
+// =====================================================
+
+// Add authorized user
+app.post('/api/authorize', async (req, res) => {
+    const { phoneNumber, name, classLevel, role, subject } = req.body;
+
+    if (!phoneNumber || !name) {
+        return res.status(400).json({ error: 'phoneNumber and name are required' });
+    }
+
+    const userInfo = {
+        name,
+        class: classLevel || null,
+        role: role || 'student', // 'student' or 'teacher'
+        subject: subject || null, // For teachers
+        school: require('./config').school.name,
+        createdAt: new Date().toISOString()
+    };
+
+    await db.saveUserInfo(phoneNumber, userInfo);
+
+    console.log(`✅ Authorized: ${phoneNumber} - ${name} (${role || 'student'})`);
+    res.json({ success: true, phoneNumber, userInfo });
+});
+
+// Remove authorized user
+app.post('/api/unauthorize', async (req, res) => {
+    const { phoneNumber } = req.body;
+
+    if (!phoneNumber) {
+        return res.status(400).json({ error: 'phoneNumber is required' });
+    }
+
+    await db.unauthorizeNumber(phoneNumber);
+
+    console.log(`❌ Unauthorized: ${phoneNumber}`);
+    res.json({ success: true, phoneNumber });
+});
+
+// Get all authorized users
+app.get('/api/authorized', async (req, res) => {
+    const users = await db.getAllAuthorizedUsers();
+    res.json({ count: users.length, users });
+});
+
+// Get specific user info
+app.get('/api/user/:phoneNumber', async (req, res) => {
+    const phoneNumber = req.params.phoneNumber;
+    const userInfo = await db.getUserInfo(phoneNumber);
+
+    if (!userInfo) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ phoneNumber, ...userInfo });
+});
+
+// =====================================================
+// AI PREFILL FOR TEACHER FORM
+// =====================================================
+
+app.post('/api/prefill-teaching-method', async (req, res) => {
+    const { topic, subject, classLevel } = req.body;
+
+    if (!topic) {
+        return res.status(400).json({ error: 'topic is required' });
+    }
+
+    try {
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [{
+                role: 'system',
+                content: `You are a helpful assistant that generates teaching method templates for teachers.
+
+Given a topic, generate a structured teaching method including:
+1. Teaching Method: Step-by-step explanation approach
+2. Real-life Example: Relatable example for students
+3. Common Mistakes: What students typically get wrong
+4. Tips for Parents: How parents can help at home
+
+Be specific, practical, and tailored to the class level.`
+            }, {
+                role: 'user',
+                content: `Generate a teaching method for:
+Topic: ${topic}
+Subject: ${subject || 'Mathematics'}
+Class: ${classLevel || '8'}
+
+Return as JSON with keys: method, example, commonMistakes, tips`
+            }],
+            response_format: { type: 'json_object' },
+            temperature: 0.7,
+            max_tokens: 800
+        });
+
+        const result = JSON.parse(completion.choices[0].message.content);
+
+        res.json({
+            success: true,
+            topic,
+            subject: subject || 'Mathematics',
+            classLevel: classLevel || 8,
+            ...result
+        });
+    } catch (error) {
+        console.error('AI prefill error:', error);
+        res.status(500).json({ error: 'Failed to generate teaching method', details: error.message });
+    }
+});
+
+// =====================================================
 // DEBUG ENDPOINT
 // =====================================================
 
@@ -570,6 +677,274 @@ app.get('/api/stats', (req, res) => {
         satisfaction: 4.7,
         teachersCoverage: '78%'
     });
+});
+
+// =====================================================
+// TEACHER FORM
+// =====================================================
+
+app.get('/teacher-form', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Form - Add Teaching Method</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        .success {
+            background: #4caf50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 Teacher Form</h1>
+        <p class="subtitle">Add or edit your teaching method. Start with a topic and let AI help!</p>
+
+        <form id="teacherForm">
+            <div class="form-group">
+                <label for="teacher_name">Your Name *</label>
+                <input type="text" id="teacher_name" name="teacher_name" required placeholder="e.g., Mrs. Sharma">
+            </div>
+
+            <div class="form-group">
+                <label for="subject">Subject *</label>
+                <select id="subject" name="subject" required>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Science">Science</option>
+                    <option value="English">English</option>
+                    <option value="Social Studies">Social Studies</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="class">Class Level *</label>
+                <input type="number" id="class" name="class" min="1" max="12" required placeholder="e.g., 8">
+            </div>
+
+            <div class="form-group">
+                <label for="chapter">Chapter/Topic Name *</label>
+                <input type="text" id="chapter" name="chapter" required placeholder="e.g., Quadratic Equations">
+            </div>
+
+            <button type="button" class="btn btn-secondary" id="prefillBtn">✨ AI Prefill</button>
+
+            <div class="loading" id="loading">
+                <p>🤖 Generating teaching method...</p>
+            </div>
+
+            <div class="form-group">
+                <label for="explanation">How do you explain this topic? *</label>
+                <textarea id="explanation" name="explanation" required placeholder="Your step-by-step teaching method..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="example">Your favorite real-life example *</label>
+                <textarea id="example" name="example" required placeholder="A relatable example for students..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="mistakes">Common mistakes students make</label>
+                <textarea id="mistakes" name="mistakes" placeholder="What students typically get wrong..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="tips">Tips for parents</label>
+                <textarea id="tips" name="tips" placeholder="How parents can help at home..."></textarea>
+            </div>
+
+            <button type="submit" class="btn">💾 Save Teaching Method</button>
+        </form>
+
+        <div class="success" id="success"></div>
+        <div class="error" id="error"></div>
+    </div>
+
+    <script>
+        const prefillBtn = document.getElementById('prefillBtn');
+        const loading = document.getElementById('loading');
+        const form = document.getElementById('teacherForm');
+        const success = document.getElementById('success');
+        const error = document.getElementById('error');
+
+        prefillBtn.addEventListener('click', async () => {
+            const topic = document.getElementById('chapter').value;
+            const subject = document.getElementById('subject').value;
+            const classLevel = document.getElementById('class').value;
+
+            if (!topic) {
+                alert('Please enter a chapter/topic name first!');
+                return;
+            }
+
+            prefillBtn.disabled = true;
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/prefill-teaching-method', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic, subject, classLevel })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('explanation').value = data.method || '';
+                    document.getElementById('example').value = data.example || '';
+                    document.getElementById('mistakes').value = data.commonMistakes || '';
+                    document.getElementById('tips').value = data.tips || '';
+                    alert('✅ AI generated! Please review and edit as needed.');
+                } else {
+                    alert('❌ Failed to generate. Please try again.');
+                }
+            } catch (err) {
+                alert('❌ Error: ' + err.message);
+            } finally {
+                prefillBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                teacher_name: document.getElementById('teacher_name').value,
+                subject: document.getElementById('subject').value,
+                class: document.getElementById('class').value,
+                chapter: document.getElementById('chapter').value,
+                explanation: document.getElementById('explanation').value,
+                example: document.getElementById('example').value,
+                mistakes: document.getElementById('mistakes').value,
+                tips: document.getElementById('tips').value
+            };
+
+            try {
+                const response = await fetch('/api/form-webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    success.textContent = '✅ Teaching method saved successfully! Key: ' + data.key;
+                    success.style.display = 'block';
+                    error.style.display = 'none';
+                    form.reset();
+                    window.scrollTo(0, 0);
+                } else {
+                    throw new Error('Save failed');
+                }
+            } catch (err) {
+                error.textContent = '❌ Failed to save: ' + err.message;
+                error.style.display = 'block';
+                success.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>`);
 });
 
 // =====================================================
