@@ -323,6 +323,22 @@ app.post('/webhook', async (req, res) => {
         const isAuthorized = await db.isAuthorized(from);
 
         if (!isAuthorized) {
+            // Check if rate limited
+            const isRateLimited = await db.isRateLimited(from);
+
+            if (isRateLimited) {
+                // Silently ignore - no response to prevent Twilio cost abuse
+                console.log(`⚠️ Rate limited unauthorized attempt from ${from}`);
+                res.type('text/xml');
+                res.send('<Response></Response>'); // Empty response
+                return;
+            }
+
+            // Track unauthorized attempt
+            const attempts = await db.trackUnauthorizedAttempt(from);
+            console.log(`⚠️ Unauthorized attempt ${attempts}/3 from ${from}`);
+
+            // Send rejection message (first 3 attempts only)
             const config = require('./config');
             twiml.message(config.bot.notAuthorizedMessage);
             res.type('text/xml');

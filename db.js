@@ -260,6 +260,38 @@ class Database {
 
         return this.cache[key] || 0;
     }
+
+    // ==================== RATE LIMITING ====================
+
+    async trackUnauthorizedAttempt(phoneNumber) {
+        const key = `unauthorized:${phoneNumber}`;
+
+        if (this.type === 'vercel-kv') {
+            const count = await this.kv.incr(key);
+            await this.kv.expire(key, 3600); // Expire after 1 hour
+            return count;
+        }
+
+        // In-memory count
+        if (!this.cache[key]) this.cache[key] = 0;
+        return ++this.cache[key];
+    }
+
+    async getUnauthorizedAttempts(phoneNumber) {
+        const key = `unauthorized:${phoneNumber}`;
+
+        if (this.type === 'vercel-kv') {
+            return (await this.kv.get(key)) || 0;
+        }
+
+        return this.cache[key] || 0;
+    }
+
+    async isRateLimited(phoneNumber) {
+        const attempts = await this.getUnauthorizedAttempts(phoneNumber);
+        // Block after 3 unauthorized attempts per hour
+        return attempts >= 3;
+    }
 }
 
 // Export singleton instance
