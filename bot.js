@@ -680,6 +680,462 @@ app.get('/api/stats', (req, res) => {
 });
 
 // =====================================================
+// ADMIN PANEL
+// =====================================================
+
+app.get('/admin', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Manage Users</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-danger {
+            background: #f44336;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+        }
+        tr:hover {
+            background: #f9f9f9;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-student {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .badge-teacher {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        .success {
+            background: #4caf50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 Admin Panel</h1>
+        <p class="subtitle">Manage authorized users for ParentSaathi</p>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalUsers">-</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalStudents">-</div>
+                <div class="stat-label">Students</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalTeachers">-</div>
+                <div class="stat-label">Teachers</div>
+            </div>
+        </div>
+
+        <div class="success" id="success"></div>
+        <div class="error" id="error"></div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('add')">➕ Add User</button>
+            <button class="tab" onclick="switchTab('view')">👥 View All Users</button>
+        </div>
+
+        <div id="addTab" class="tab-content active">
+            <form id="addUserForm">
+                <div class="form-group">
+                    <label for="phoneNumber">Phone Number (with country code) *</label>
+                    <input type="tel" id="phoneNumber" placeholder="+91XXXXXXXXXX" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="name">Name *</label>
+                    <input type="text" id="name" placeholder="e.g., Rahul Sharma" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="role">Role *</label>
+                    <select id="role" required onchange="toggleSubject()">
+                        <option value="student">Student</option>
+                        <option value="teacher">Teacher</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="classLevel">Class Level *</label>
+                    <input type="number" id="classLevel" min="1" max="12" placeholder="e.g., 8" required>
+                </div>
+
+                <div class="form-group" id="subjectGroup" style="display: none;">
+                    <label for="subject">Subject (for teachers)</label>
+                    <select id="subject">
+                        <option value="">Select Subject</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Science">Science</option>
+                        <option value="English">English</option>
+                        <option value="Social Studies">Social Studies</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn">✅ Add User</button>
+            </form>
+        </div>
+
+        <div id="viewTab" class="tab-content">
+            <div class="loading" id="loading">Loading users...</div>
+            <div class="table-container" id="tableContainer" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone Number</th>
+                            <th>Role</th>
+                            <th>Class</th>
+                            <th>Subject</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            if (tab === 'add') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('addTab').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('viewTab').classList.add('active');
+                loadUsers();
+            }
+        }
+
+        function toggleSubject() {
+            const role = document.getElementById('role').value;
+            const subjectGroup = document.getElementById('subjectGroup');
+            subjectGroup.style.display = role === 'teacher' ? 'block' : 'none';
+        }
+
+        function showSuccess(message) {
+            const success = document.getElementById('success');
+            const error = document.getElementById('error');
+            success.textContent = message;
+            success.style.display = 'block';
+            error.style.display = 'none';
+            setTimeout(() => success.style.display = 'none', 5000);
+        }
+
+        function showError(message) {
+            const error = document.getElementById('error');
+            const success = document.getElementById('success');
+            error.textContent = message;
+            error.style.display = 'block';
+            success.style.display = 'none';
+            setTimeout(() => error.style.display = 'none', 5000);
+        }
+
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const name = document.getElementById('name').value;
+            const role = document.getElementById('role').value;
+            const classLevel = parseInt(document.getElementById('classLevel').value);
+            const subject = document.getElementById('subject').value;
+
+            // Format phone number
+            let formattedPhone = phoneNumber.trim();
+            if (!formattedPhone.startsWith('whatsapp:')) {
+                formattedPhone = 'whatsapp:' + formattedPhone;
+            }
+
+            const data = {
+                phoneNumber: formattedPhone,
+                name,
+                role,
+                classLevel
+            };
+
+            if (role === 'teacher' && subject) {
+                data.subject = subject;
+            }
+
+            try {
+                const response = await fetch('/api/authorize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess('✅ User added successfully!');
+                    document.getElementById('addUserForm').reset();
+                    updateStats();
+                } else {
+                    showError('❌ Failed to add user: ' + (result.error || 'Unknown error'));
+                }
+            } catch (err) {
+                showError('❌ Error: ' + err.message);
+            }
+        });
+
+        async function loadUsers() {
+            const loading = document.getElementById('loading');
+            const tableContainer = document.getElementById('tableContainer');
+            const usersTable = document.getElementById('usersTable');
+
+            loading.style.display = 'block';
+            tableContainer.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/authorized');
+                const data = await response.json();
+
+                usersTable.innerHTML = '';
+
+                if (data.users && data.users.length > 0) {
+                    data.users.forEach(user => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = \`
+                            <td>\${user.name || 'N/A'}</td>
+                            <td>\${user.phoneNumber}</td>
+                            <td><span class="badge badge-\${user.role}">\${user.role || 'student'}</span></td>
+                            <td>Class \${user.class || 'N/A'}</td>
+                            <td>\${user.subject || '-'}</td>
+                            <td>
+                                <button class="btn btn-danger" onclick="deleteUser('\${user.phoneNumber}')">🗑️ Delete</button>
+                            </td>
+                        \`;
+                        usersTable.appendChild(row);
+                    });
+
+                    tableContainer.style.display = 'block';
+                } else {
+                    usersTable.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: #999;">No users found. Add your first user!</td></tr>';
+                    tableContainer.style.display = 'block';
+                }
+            } catch (err) {
+                showError('❌ Failed to load users: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        async function deleteUser(phoneNumber) {
+            if (!confirm('Are you sure you want to remove this user?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/unauthorize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess('✅ User removed successfully!');
+                    loadUsers();
+                    updateStats();
+                } else {
+                    showError('❌ Failed to remove user');
+                }
+            } catch (err) {
+                showError('❌ Error: ' + err.message);
+            }
+        }
+
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/authorized');
+                const data = await response.json();
+
+                const students = data.users.filter(u => u.role === 'student').length;
+                const teachers = data.users.filter(u => u.role === 'teacher').length;
+
+                document.getElementById('totalUsers').textContent = data.count || 0;
+                document.getElementById('totalStudents').textContent = students;
+                document.getElementById('totalTeachers').textContent = teachers;
+            } catch (err) {
+                console.error('Failed to update stats:', err);
+            }
+        }
+
+        // Load stats on page load
+        updateStats();
+    </script>
+</body>
+</html>`);
+});
+
+// =====================================================
 // TEACHER FORM
 // =====================================================
 
