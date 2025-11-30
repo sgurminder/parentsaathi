@@ -1085,16 +1085,16 @@ app.get('/admin', (req, res) => {
 
                 if (result.success) {
                     // Fetch activation link
-                    const linkResponse = await fetch(`/api/activation-link/${data.phoneNumber}`);
+                    const linkResponse = await fetch('/api/activation-link/' + data.phoneNumber);
                     const linkData = await linkResponse.json();
 
                     // Show success with activation link
-                    const successMsg = `✅ User added successfully!<br><br>
-                        📲 <strong>WhatsApp Activation Link:</strong><br>
-                        <a href="${linkData.whatsappLink}" target="_blank" style="color: white; text-decoration: underline;">
-                            ${linkData.whatsappLink}
-                        </a><br><br>
-                        <small>Send this link to ${data.name}. When they click it, WhatsApp will open with "Hi" ready to send!</small>`;
+                    const successMsg = '✅ User added successfully!<br><br>' +
+                        '📲 <strong>WhatsApp Activation Link:</strong><br>' +
+                        '<a href="' + linkData.whatsappLink + '" target="_blank" style="color: white; text-decoration: underline;">' +
+                            linkData.whatsappLink +
+                        '</a><br><br>' +
+                        '<small>Send this link to ' + data.name + '. When they click it, WhatsApp will open with "Hi" ready to send!</small>';
 
                     showSuccess(successMsg);
                     document.getElementById('addUserForm').reset();
