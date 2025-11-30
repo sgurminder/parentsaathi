@@ -395,13 +395,8 @@ Send me any homework question or photo, and I'll help you! 📸`;
                     console.log('Generic response generated');
                 }
 
-                // Store query for analytics
-                session.lastQuery = {
-                    question: body,
-                    topic: topicInfo,
-                    hasImage: !!mediaUrl,
-                    timestamp: new Date()
-                };
+                // Track query for analytics
+                await db.incrementQueryCount(from);
 
                 console.log('Sending response to WhatsApp...');
                 console.log('Response length:', response.length, 'characters');
