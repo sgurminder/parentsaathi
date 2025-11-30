@@ -11,6 +11,7 @@ const express = require('express');
 const { MessagingResponse } = require('twilio').twiml;
 const OpenAI = require('openai');
 const db = require('./db');
+const config = require('./config');
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
