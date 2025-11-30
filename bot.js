@@ -341,26 +341,35 @@ app.post('/webhook', async (req, res) => {
             let welcomeMsg = '';
 
             if (userInfo && userInfo.role === 'teacher') {
+                // Build teaching assignments list
+                let teachingList = '';
+                if (userInfo.teaches && userInfo.teaches.length > 0) {
+                    teachingList = '\n\n📖 Your Teaching Assignments:\n';
+                    userInfo.teaches.forEach(t => {
+                        teachingList += `   • ${t.subject} - Class ${t.class}\n`;
+                    });
+                }
+
                 if (isFirstTime) {
                     welcomeMsg = `🎉 Welcome to ${config.school.name}, ${userInfo.name}! 👩‍🏫
 
-You've been added as a teacher to our homework helper bot!
+You've been added as a teacher to our homework helper bot!${teachingList}
 
 As a teacher, you can:
 📚 Test the bot with any question
 ✏️ Add/edit teaching methods via the form
 🎯 See how students will receive your explanations
 
-Send any math question to test how students will experience your teaching methods!`;
+Send any question to test how students will experience your teaching methods!`;
                 } else {
-                    welcomeMsg = `Welcome back, ${userInfo.name}! 👩‍🏫
+                    welcomeMsg = `Welcome back, ${userInfo.name}! 👩‍🏫${teachingList}
 
 As a ${config.school.shortName} teacher, you can:
 📚 Test the bot with any question
 ✏️ Add/edit teaching methods via the form
 🎯 See how students will receive your explanations
 
-Send any math question to test!`;
+Send any question to test!`;
                 }
             } else if (userInfo) {
                 if (isFirstTime) {
@@ -541,7 +550,7 @@ app.post('/api/form-webhook', async (req, res) => {
 
 // Add authorized user
 app.post('/api/authorize', async (req, res) => {
-    const { phoneNumber, name, classLevel, role, subject } = req.body;
+    const { phoneNumber, name, classLevel, role, subject, teaches } = req.body;
 
     if (!phoneNumber || !name) {
         return res.status(400).json({ error: 'phoneNumber and name are required' });
@@ -549,12 +558,28 @@ app.post('/api/authorize', async (req, res) => {
 
     const userInfo = {
         name,
-        class: classLevel || null,
         role: role || 'student', // 'student' or 'teacher'
-        subject: subject || null, // For teachers
         school: require('./config').school.name,
         createdAt: new Date().toISOString()
     };
+
+    // For students: single class
+    if (role === 'student') {
+        userInfo.class = classLevel || null;
+    }
+
+    // For teachers: multiple subject-class combinations
+    if (role === 'teacher') {
+        if (teaches && Array.isArray(teaches)) {
+            // New format: array of {subject, class} objects
+            userInfo.teaches = teaches;
+        } else if (subject && classLevel) {
+            // Backward compatibility: single subject/class
+            userInfo.teaches = [{ subject, class: classLevel }];
+        } else {
+            userInfo.teaches = [];
+        }
+    }
 
     await db.saveUserInfo(phoneNumber, userInfo);
 
@@ -968,20 +993,15 @@ app.get('/admin', (req, res) => {
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="studentClassGroup">
                     <label for="classLevel">Class Level *</label>
-                    <input type="number" id="classLevel" min="1" max="12" placeholder="e.g., 8" required>
+                    <input type="number" id="classLevel" min="1" max="12" placeholder="e.g., 8">
                 </div>
 
-                <div class="form-group" id="subjectGroup" style="display: none;">
-                    <label for="subject">Subject (for teachers)</label>
-                    <select id="subject">
-                        <option value="">Select Subject</option>
-                        <option value="Mathematics">Mathematics</option>
-                        <option value="Science">Science</option>
-                        <option value="English">English</option>
-                        <option value="Social Studies">Social Studies</option>
-                    </select>
+                <div id="teacherAssignments" style="display: none;">
+                    <label>Teaching Assignments</label>
+                    <div id="assignmentsList"></div>
+                    <button type="button" class="btn" onclick="addAssignment()" style="background: #4caf50;">➕ Add Subject-Class</button>
                 </div>
 
                 <button type="submit" class="btn">✅ Add User</button>
@@ -1024,10 +1044,82 @@ app.get('/admin', (req, res) => {
             }
         }
 
+        let assignmentCounter = 0;
+
         function toggleSubject() {
             const role = document.getElementById('role').value;
-            const subjectGroup = document.getElementById('subjectGroup');
-            subjectGroup.style.display = role === 'teacher' ? 'block' : 'none';
+            const studentClassGroup = document.getElementById('studentClassGroup');
+            const teacherAssignments = document.getElementById('teacherAssignments');
+            const classLevelInput = document.getElementById('classLevel');
+
+            if (role === 'teacher') {
+                studentClassGroup.style.display = 'none';
+                teacherAssignments.style.display = 'block';
+                classLevelInput.removeAttribute('required');
+                // Add one default assignment
+                if (document.getElementById('assignmentsList').children.length === 0) {
+                    addAssignment();
+                }
+            } else {
+                studentClassGroup.style.display = 'block';
+                teacherAssignments.style.display = 'none';
+                classLevelInput.setAttribute('required', 'required');
+                document.getElementById('assignmentsList').innerHTML = '';
+                assignmentCounter = 0;
+            }
+        }
+
+        function addAssignment() {
+            const assignmentsList = document.getElementById('assignmentsList');
+            const id = assignmentCounter++;
+
+            const assignmentDiv = document.createElement('div');
+            assignmentDiv.id = 'assignment-' + id;
+            assignmentDiv.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; padding: 10px; background: #f5f5f5; border-radius: 8px;';
+
+            assignmentDiv.innerHTML = '<select id="subject-' + id + '" style="flex: 2; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" required>' +
+                '<option value="">Select Subject</option>' +
+                '<option value="Mathematics">Mathematics</option>' +
+                '<option value="Science">Science</option>' +
+                '<option value="Physics">Physics</option>' +
+                '<option value="Chemistry">Chemistry</option>' +
+                '<option value="Biology">Biology</option>' +
+                '<option value="English">English</option>' +
+                '<option value="Hindi">Hindi</option>' +
+                '<option value="Social Studies">Social Studies</option>' +
+                '<option value="History">History</option>' +
+                '<option value="Geography">Geography</option>' +
+            '</select>' +
+            '<input type="number" id="class-' + id + '" min="1" max="12" placeholder="Class" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" required>' +
+            '<button type="button" onclick="removeAssignment(' + id + ')" style="padding: 10px 15px; background: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer;">🗑️</button>';
+
+            assignmentsList.appendChild(assignmentDiv);
+        }
+
+        function removeAssignment(id) {
+            const assignment = document.getElementById('assignment-' + id);
+            if (assignment) {
+                assignment.remove();
+            }
+        }
+
+        function getTeachingAssignments() {
+            const assignments = [];
+            const assignmentsList = document.getElementById('assignmentsList');
+
+            for (let i = 0; i < assignmentCounter; i++) {
+                const subjectEl = document.getElementById('subject-' + i);
+                const classEl = document.getElementById('class-' + i);
+
+                if (subjectEl && classEl && subjectEl.value && classEl.value) {
+                    assignments.push({
+                        subject: subjectEl.value,
+                        class: parseInt(classEl.value)
+                    });
+                }
+            }
+
+            return assignments;
         }
 
         function showSuccess(message) {
@@ -1054,8 +1146,6 @@ app.get('/admin', (req, res) => {
             const phoneNumber = document.getElementById('phoneNumber').value;
             const name = document.getElementById('name').value;
             const role = document.getElementById('role').value;
-            const classLevel = parseInt(document.getElementById('classLevel').value);
-            const subject = document.getElementById('subject').value;
 
             // Format phone number
             let formattedPhone = phoneNumber.trim();
@@ -1066,12 +1156,19 @@ app.get('/admin', (req, res) => {
             const data = {
                 phoneNumber: formattedPhone,
                 name,
-                role,
-                classLevel
+                role
             };
 
-            if (role === 'teacher' && subject) {
-                data.subject = subject;
+            if (role === 'teacher') {
+                const teaches = getTeachingAssignments();
+                if (teaches.length === 0) {
+                    showError('❌ Please add at least one subject-class assignment for the teacher');
+                    return;
+                }
+                data.teaches = teaches;
+            } else {
+                const classLevel = parseInt(document.getElementById('classLevel').value);
+                data.classLevel = classLevel;
             }
 
             try {
@@ -1098,6 +1195,9 @@ app.get('/admin', (req, res) => {
 
                     showSuccess(successMsg);
                     document.getElementById('addUserForm').reset();
+                    document.getElementById('assignmentsList').innerHTML = '';
+                    assignmentCounter = 0;
+                    toggleSubject(); // Reset form visibility
                     updateStats();
                 } else {
                     showError('❌ Failed to add user: ' + (result.error || 'Unknown error'));
@@ -1123,13 +1223,24 @@ app.get('/admin', (req, res) => {
 
                 if (data.users && data.users.length > 0) {
                     data.users.forEach(user => {
+                        // Build class/subject display
+                        let classDisplay, subjectDisplay;
+                        if (user.role === 'teacher' && user.teaches && user.teaches.length > 0) {
+                            const assignments = user.teaches.map(t => t.subject + ' (' + t.class + ')').join(', ');
+                            classDisplay = user.teaches.map(t => t.class).join(', ');
+                            subjectDisplay = assignments;
+                        } else {
+                            classDisplay = user.class || 'N/A';
+                            subjectDisplay = user.subject || '-';
+                        }
+
                         const row = document.createElement('tr');
                         row.innerHTML = \`
                             <td>\${user.name || 'N/A'}</td>
                             <td>\${user.phoneNumber}</td>
                             <td><span class="badge badge-\${user.role}">\${user.role || 'student'}</span></td>
-                            <td>Class \${user.class || 'N/A'}</td>
-                            <td>\${user.subject || '-'}</td>
+                            <td>\${classDisplay}</td>
+                            <td>\${subjectDisplay}</td>
                             <td>
                                 <button class="btn btn-danger" onclick="deleteUser('\${user.phoneNumber}')">🗑️ Delete</button>
                             </td>
