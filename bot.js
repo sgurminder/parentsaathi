@@ -158,18 +158,22 @@ If INVALID, return:
 If VALID, identify:
 1. Subject - Use "Mathematics" for math, "Science" for science questions
 2. Class level (1-12)${studentClass ? ` - Student is in class ${studentClass}, use this unless question clearly indicates different class` : ''}
-3. Chapter name - Be SPECIFIC, use the exact topic name from the question (e.g., "Pythagoras Theorem", not just "Geometry")
+3. Chapter name - Extract the EXACT specific topic/concept from the question
+   - If question mentions "Pythagoras theorem" → chapter: "Pythagoras Theorem" (NOT "Geometry")
+   - If question mentions "multiply binomials" → chapter: "Multiply Two Binomials" (NOT "Algebra")
+   - If question mentions "photosynthesis" → chapter: "Photosynthesis" (NOT just "Biology")
+   - Use the MOST SPECIFIC concept mentioned, avoid broad categories
 4. Specific topic
 
             IMPORTANT: Always respond with valid JSON only, no extra text.
             Format for VALID: {"valid": true, "subject": "Mathematics", "class": 8, "chapter": "Linear Equations", "topic": "Solving linear equations"}
             Format for INVALID: {"valid": false, "subject": "N/A", "class": 0, "chapter": "N/A", "topic": "N/A"}
 
-            Common chapters (use exact names, be specific):
-            - Math: Linear Equations, Quadratic Equations, Square Roots, Pythagoras Theorem, Polynomials, Trigonometry, Algebra, Geometry
-            - Science: Photosynthesis, Chemical Reactions, Force and Motion, Electricity, Light, Sound
-
-            CRITICAL: Use the SPECIFIC chapter name mentioned in the question (e.g., if question says "Pythagoras theorem", use "Pythagoras Theorem" as chapter, NOT "Geometry")`
+            CRITICAL RULE FOR CHAPTER NAMES:
+            - Extract the specific mathematical/scientific concept from the question
+            - DO NOT use broad categories like "Algebra", "Geometry", "Biology"
+            - DO use specific topics like "Multiply Two Binomials", "Pythagoras Theorem", "Photosynthesis"
+            - The chapter name should match what a teacher would write in a teaching method form`
         }
     ];
 
