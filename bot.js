@@ -549,7 +549,13 @@ app.post('/api/teaching-method', async (req, res) => {
         tips
     } = req.body;
 
-    const key = `${subject.toLowerCase()}-${classLevel}-${chapter.toLowerCase().replace(/\s+/g, '-')}`;
+    // Normalize subject name (same as findTeachingMethod)
+    let normalizedSubject = subject.toLowerCase();
+    if (normalizedSubject === 'mathematics' || normalizedSubject === 'maths') {
+        normalizedSubject = 'math';
+    }
+
+    const key = `${normalizedSubject}-${classLevel}-${chapter.toLowerCase().replace(/\s+/g, '-')}`;
 
     const teachingMethodData = {
         teacher,
