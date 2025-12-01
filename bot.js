@@ -126,7 +126,7 @@ const schools = {
 // =====================================================
 
 // Detect topic from question using GPT
-async function detectTopic(question, imageUrl = null) {
+async function detectTopic(question, imageUrl = null, studentClass = null) {
     const messages = [
         {
             role: "system",
@@ -157,19 +157,19 @@ If INVALID, return:
 
 If VALID, identify:
 1. Subject - Use "Mathematics" for math, "Science" for science questions
-2. Class level (1-12)
-3. Chapter name - Be specific (e.g., "Linear Equations", "Quadratic Equations", "Photosynthesis")
+2. Class level (1-12)${studentClass ? ` - Student is in class ${studentClass}, use this unless question clearly indicates different class` : ''}
+3. Chapter name - Be SPECIFIC, use the exact topic name from the question (e.g., "Pythagoras Theorem", not just "Geometry")
 4. Specific topic
 
             IMPORTANT: Always respond with valid JSON only, no extra text.
             Format for VALID: {"valid": true, "subject": "Mathematics", "class": 8, "chapter": "Linear Equations", "topic": "Solving linear equations"}
             Format for INVALID: {"valid": false, "subject": "N/A", "class": 0, "chapter": "N/A", "topic": "N/A"}
 
-            Common chapters (use exact names):
-            - Math: Linear Equations, Quadratic Equations, Square Roots, Polynomials, Trigonometry, Algebra
-            - Science: Photosynthesis, Chemical Reactions, Force and Motion, Electricity
+            Common chapters (use exact names, be specific):
+            - Math: Linear Equations, Quadratic Equations, Square Roots, Pythagoras Theorem, Polynomials, Trigonometry, Algebra, Geometry
+            - Science: Photosynthesis, Chemical Reactions, Force and Motion, Electricity, Light, Sound
 
-            Note: Use singular form (e.g., "Square Roots" not "Squares and Square Roots")`
+            CRITICAL: Use the SPECIFIC chapter name mentioned in the question (e.g., if question says "Pythagoras theorem", use "Pythagoras Theorem" as chapter, NOT "Geometry")`
         }
     ];
 
@@ -466,8 +466,8 @@ Send me any homework question or photo, and I'll help you! 📸`;
             }
             // Process homework question
             else {
-                // Detect topic
-                const topicInfo = await detectTopic(body, mediaUrl);
+                // Detect topic (pass student's class if available)
+                const topicInfo = await detectTopic(body, mediaUrl, userInfo?.class);
                 console.log('Detected topic:', topicInfo);
 
                 // Check if question is valid homework query
@@ -778,10 +778,11 @@ Return as JSON with keys: method, example, commonMistakes, tips`
 
 app.get('/api/debug-topic', async (req, res) => {
     const question = req.query.q || "How do I find square roots?";
+    const studentClass = req.query.class ? parseInt(req.query.class) : null;
 
     try {
         // Detect topic
-        const topicInfo = await detectTopic(question, null);
+        const topicInfo = await detectTopic(question, null, studentClass);
 
         // Find teaching method
         const teachingMethod = await findTeachingMethod(
