@@ -5,8 +5,8 @@
 module.exports = {
     // School Branding
     school: {
-        name: 'Springfield Public School',
-        shortName: 'Springfield',
+        name: 'Springfields Public School',
+        shortName: 'Springfields',
         code: 'SPS',
         logo: 'https://springfield.edu/logo.png', // Replace with actual logo URL
         website: 'https://springfield.edu',
@@ -16,16 +16,16 @@ module.exports = {
 
     // Bot Settings
     bot: {
-        name: 'Springfield Study Buddy',
+        name: 'Springfields Study Buddy',
         whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886', // Twilio sandbox number
 
-        welcomeMessage: `Welcome to Springfield Study Buddy! 🎓
+        welcomeMessage: `Welcome to Springfields Study Buddy! 🎓
 
-I help Springfield students with homework using YOUR teacher's exact methods.
+I help Springfields students with homework using YOUR teacher's exact methods.
 
 To get started, I need to verify your number is registered with our school.`,
 
-        notAuthorizedMessage: `Sorry, this number is not registered with Springfield Public School.
+        notAuthorizedMessage: `Sorry, this number is not registered with Springfields Public School.
 
 Please contact the school office at support@springfield.edu or +91-9876543210 to register.`,
 

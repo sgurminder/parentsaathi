@@ -1665,6 +1665,24 @@ app.get('/teacher-form', (req, res) => {
 });
 
 // =====================================================
+// PRESENTATIONS
+// =====================================================
+
+app.get('/presentation/springfields', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const presentationPath = path.join(__dirname, 'presentation.html');
+
+    fs.readFile(presentationPath, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(500).send('Presentation not found');
+        }
+        res.setHeader('Content-Type', 'text/html');
+        res.send(data);
+    });
+});
+
+// =====================================================
 // HEALTH CHECK
 // =====================================================
 

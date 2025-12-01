@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidyaMitra - AI Personalised Tutor | Eulean AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            padding: 60px 80px;
+            position: relative;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo-strip {
+            position: absolute;
+            top: 30px;
+            left: 80px;
+            right: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px;
+            color: #64b5f6;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            right: 80px;
+            font-size: 16px;
+            color: #666;
+        }
+
+        h1 {
+            font-size: 64px;
+            margin-bottom: 30px;
+            background: linear-gradient(90deg, #64b5f6, #42a5f5, #1e88e5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        h2 {
+            font-size: 48px;
+            margin-bottom: 40px;
+            color: #64b5f6;
+        }
+
+        h3 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #90caf9;
+        }
+
+        p, li {
+            font-size: 28px;
+            line-height: 1.8;
+            color: #e0e0e0;
+        }
+
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        li {
+            margin-bottom: 20px;
+            padding-left: 40px;
+            position: relative;
+        }
+
+        li::before {
+            content: ">";
+            position: absolute;
+            left: 0;
+            color: #42a5f5;
+            font-weight: bold;
+        }
+
+        .highlight {
+            color: #42a5f5;
+            font-weight: bold;
+        }
+
+        .emoji {
+            font-size: 32px;
+            margin-right: 10px;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            margin-top: 40px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(100, 181, 246, 0.2);
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, rgba(66, 165, 245, 0.2), rgba(30, 136, 229, 0.1));
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            border: 1px solid rgba(100, 181, 246, 0.3);
+        }
+
+        .stat-number {
+            font-size: 52px;
+            font-weight: bold;
+            color: #42a5f5;
+        }
+
+        .stat-label {
+            font-size: 20px;
+            color: #90caf9;
+            margin-top: 10px;
+        }
+
+        .title-slide h1 {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .title-slide .subtitle {
+            font-size: 36px;
+            color: #90caf9;
+            margin-bottom: 60px;
+        }
+
+        .title-slide .tagline {
+            font-size: 28px;
+            color: #64b5f6;
+            font-style: italic;
+        }
+
+        .local-pride {
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 87, 34, 0.1));
+            border: 2px solid rgba(255, 152, 0, 0.4);
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        .local-pride h3 {
+            color: #ffb74d;
+        }
+
+        .local-pride p {
+            color: #ffe0b2;
+        }
+
+        .demo-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px solid rgba(76, 175, 80, 0.4);
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 30px;
+        }
+
+        .demo-box h3 {
+            color: #81c784;
+        }
+
+        .timeline {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 50px;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 10%;
+            right: 10%;
+            height: 4px;
+            background: linear-gradient(90deg, #42a5f5, #66bb6a);
+            border-radius: 2px;
+        }
+
+        .timeline-item {
+            text-align: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .timeline-dot {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #42a5f5, #1e88e5);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .pilot-highlight {
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.2), rgba(103, 58, 183, 0.1));
+            border: 2px solid rgba(156, 39, 176, 0.4);
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 30px;
+        }
+
+        .navigation {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .nav-btn {
+            background: rgba(66, 165, 245, 0.2);
+            border: 1px solid rgba(66, 165, 245, 0.4);
+            color: #64b5f6;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: rgba(66, 165, 245, 0.4);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .feature-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            border: 1px solid rgba(100, 181, 246, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .feature-item h4 {
+            color: #64b5f6;
+            font-size: 22px;
+            margin-bottom: 10px;
+        }
+
+        .feature-item p {
+            font-size: 18px;
+            color: #b0bec5;
+        }
+
+        .whatsapp-demo {
+            background: rgba(37, 211, 102, 0.1);
+            border: 2px solid rgba(37, 211, 102, 0.3);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            margin: 30px auto;
+        }
+
+        .whatsapp-header {
+            background: #075e54;
+            padding: 15px;
+            border-radius: 10px 10px 0 0;
+            margin: -30px -30px 20px -30px;
+        }
+
+        .chat-bubble {
+            background: #dcf8c6;
+            color: #000;
+            padding: 15px 20px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            max-width: 80%;
+        }
+
+        .chat-bubble.incoming {
+            background: #fff;
+            margin-left: auto;
+        }
+
+        .small-text {
+            font-size: 20px;
+        }
+
+        .cta-box {
+            background: linear-gradient(135deg, rgba(66, 165, 245, 0.3), rgba(30, 136, 229, 0.2));
+            border: 2px solid rgba(66, 165, 245, 0.5);
+            border-radius: 25px;
+            padding: 50px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin-top: 40px;
+        }
+
+        .contact-item {
+            text-align: center;
+        }
+
+        .contact-item .icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="slide active title-slide" id="slide1">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>Springfields Public School</span>
+        </div>
+        <div class="center">
+            <h1>VidyaMitra</h1>
+            <p class="subtitle">AI-Powered Personalised Home Tutor</p>
+            <p class="tagline">"Your Teacher's Method, Available 24/7"</p>
+            <div class="local-pride" style="max-width: 600px; margin: 60px auto 0;">
+                <h3>Proudly Built in Yamuna Nagar</h3>
+                <p>A homegrown startup bringing world-class AI education to our city</p>
+            </div>
+        </div>
+        <div class="slide-number">1 / 13</div>
+    </div>
+
+    <!-- Slide 2: The Problem -->
+    <div class="slide" id="slide2">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>The Challenge We Face</h2>
+        <div class="two-columns">
+            <div class="card">
+                <h3>For Students</h3>
+                <ul>
+                    <li>Stuck on homework at 9 PM - no one to help</li>
+                    <li>YouTube teaches differently than class teacher</li>
+                    <li>One-size-fits-all tutoring doesn't work</li>
+                    <li>Fear of asking "silly" questions</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>For Teachers</h3>
+                <ul>
+                    <li>Can't be available 24/7 for every student</li>
+                    <li>Different tutors confuse students</li>
+                    <li>No visibility into homework struggles</li>
+                    <li>Hard to give personalised attention to 40+ students</li>
+                </ul>
+            </div>
+        </div>
+        <div class="slide-number">2 / 13</div>
+    </div>
+
+    <!-- Slide 3: The Solution -->
+    <div class="slide" id="slide3">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>Introducing VidyaMitra</h2>
+        <p style="font-size: 32px; text-align: center; margin-bottom: 40px;">
+            An AI tutor that teaches <span class="highlight">exactly the way YOUR teachers teach</span>
+        </p>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <div class="feature-icon">24/7</div>
+                <h4>Always Available</h4>
+                <p>Help at midnight before exams</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">WhatsApp</div>
+                <h4>On WhatsApp</h4>
+                <p>No app download needed</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Camera</div>
+                <h4>Photo Support</h4>
+                <p>Click & send homework problems</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Method</div>
+                <h4>Teacher's Method</h4>
+                <p>Same explanation as classroom</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Safe</div>
+                <h4>Safe & Focused</h4>
+                <p>Only homework, no distractions</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Hindi/En</div>
+                <h4>Bilingual</h4>
+                <p>Hindi + English support</p>
+            </div>
+        </div>
+        <div class="slide-number">3 / 13</div>
+    </div>
+
+    <!-- Slide 4: How It Works -->
+    <div class="slide" id="slide4">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>How VidyaMitra Works</h2>
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-dot">1</div>
+                <h3>Teacher Enters Method</h3>
+                <p class="small-text">Teacher shares their unique way of explaining a concept</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot">2</div>
+                <h3>Student Asks Question</h3>
+                <p class="small-text">Student sends homework question on WhatsApp</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot">3</div>
+                <h3>AI Finds Method</h3>
+                <p class="small-text">VidyaMitra identifies topic and finds teacher's method</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot">4</div>
+                <h3>Personalised Help</h3>
+                <p class="small-text">Explains using teacher's exact approach + examples</p>
+            </div>
+        </div>
+        <div class="demo-box" style="margin-top: 60px;">
+            <h3>Key Insight</h3>
+            <p>The AI doesn't replace teachers - it <span class="highlight">amplifies their teaching</span> by making their methods available 24/7</p>
+        </div>
+        <div class="slide-number">4 / 13</div>
+    </div>
+
+    <!-- Slide 5: Live Demo -->
+    <div class="slide" id="slide5">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2 style="text-align: center;">Live Demo Time!</h2>
+        <div class="two-columns" style="margin-top: 30px;">
+            <div class="demo-box">
+                <h3>Demo 1: Teacher Portal</h3>
+                <ul>
+                    <li>Open teacher form</li>
+                    <li>Enter a Math concept (Linear Equations)</li>
+                    <li>Add your teaching method</li>
+                    <li>Include example & common mistakes</li>
+                </ul>
+            </div>
+            <div class="demo-box">
+                <h3>Demo 2: Student Experience</h3>
+                <ul>
+                    <li>Open WhatsApp</li>
+                    <li>Ask: "How to solve 2x + 5 = 15?"</li>
+                    <li>See AI use teacher's method</li>
+                    <li>Try with a photo of homework</li>
+                </ul>
+            </div>
+        </div>
+        <div class="whatsapp-demo" style="margin-top: 40px;">
+            <div class="whatsapp-header">
+                <strong style="color: #fff;">VidyaMitra - Springfield</strong>
+            </div>
+            <div class="chat-bubble incoming">How do I solve 2x + 5 = 15?</div>
+            <div class="chat-bubble">Great question! Let me explain using Mrs. Sharma's method...</div>
+        </div>
+        <div class="slide-number">5 / 13</div>
+    </div>
+
+    <!-- Slide 6: Vision - The Future -->
+    <div class="slide" id="slide6">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>The Vision: Complete Learning Ecosystem</h2>
+        <div class="feature-grid">
+            <div class="feature-item" style="border-color: rgba(76, 175, 80, 0.4);">
+                <div class="feature-icon" style="color: #81c784;">Phase 1</div>
+                <h4>Homework Help</h4>
+                <p>24/7 doubt solving using teacher's methods</p>
+                <p style="color: #81c784; margin-top: 10px;">READY NOW</p>
+            </div>
+            <div class="feature-item" style="border-color: rgba(255, 193, 7, 0.4);">
+                <div class="feature-icon" style="color: #ffd54f;">Phase 2</div>
+                <h4>Smart Homework</h4>
+                <p>AI creates assignments, tracks completion, gives feedback</p>
+                <p style="color: #ffd54f; margin-top: 10px;">COMING SOON</p>
+            </div>
+            <div class="feature-item" style="border-color: rgba(156, 39, 176, 0.4);">
+                <div class="feature-icon" style="color: #ba68c8;">Phase 3</div>
+                <h4>Student Profiles</h4>
+                <p>Year-on-year learning journey, strengths & weak areas</p>
+                <p style="color: #ba68c8; margin-top: 10px;">ROADMAP</p>
+            </div>
+        </div>
+        <div class="slide-number">6 / 13</div>
+    </div>
+
+    <!-- Slide 7: Adaptive Learning -->
+    <div class="slide" id="slide7">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>Adaptive Learning Intelligence</h2>
+        <p style="font-size: 28px; margin-bottom: 40px;">VidyaMitra doesn't just answer - it <span class="highlight">ensures understanding</span></p>
+        <div class="two-columns">
+            <div class="card">
+                <h3>Follow-up Questions</h3>
+                <ul>
+                    <li>AI asks questions to verify understanding</li>
+                    <li>"Can you solve this similar problem?"</li>
+                    <li>If wrong, tries a different explanation</li>
+                    <li>Builds confidence through practice</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>Smart Adaptation</h3>
+                <ul>
+                    <li>Detects if student is confused</li>
+                    <li>Switches to simpler examples</li>
+                    <li>Uses real-life analogies</li>
+                    <li>Never makes student feel stupid</li>
+                </ul>
+            </div>
+        </div>
+        <div class="demo-box" style="margin-top: 40px; text-align: center;">
+            <p style="font-size: 24px;"><em>"A patient tutor that never gets tired, never judges, and always has a new way to explain"</em></p>
+        </div>
+        <div class="slide-number">7 / 13</div>
+    </div>
+
+    <!-- Slide 8: For Teachers -->
+    <div class="slide" id="slide8">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>Empowering Teachers</h2>
+        <div class="two-columns">
+            <div class="card">
+                <h3>Teacher Dashboard (Coming)</h3>
+                <ul>
+                    <li>See which topics students struggle with</li>
+                    <li>Track homework completion</li>
+                    <li>Identify students needing extra help</li>
+                    <li>Analytics on class performance</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>Smart Homework (Coming)</h3>
+                <ul>
+                    <li>Create assignments with one click</li>
+                    <li>AI sends questions to students</li>
+                    <li>Auto-grades and provides feedback</li>
+                    <li>Detailed reports for teachers</li>
+                </ul>
+            </div>
+        </div>
+        <p style="text-align: center; margin-top: 50px; font-size: 28px;">
+            Teachers spend less time on repetitive tasks,<br>
+            more time on <span class="highlight">meaningful student interaction</span>
+        </p>
+        <div class="slide-number">8 / 13</div>
+    </div>
+
+    <!-- Slide 9: Student Profile Vision -->
+    <div class="slide" id="slide9">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>Building Learning Profiles</h2>
+        <p style="font-size: 28px; margin-bottom: 30px;">A <span class="highlight">complete academic companion</span> that grows with every student</p>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <div class="feature-icon">Profile</div>
+                <h4>Learning History</h4>
+                <p>Every question, every struggle, every victory - recorded</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Strength</div>
+                <h4>Strength Mapping</h4>
+                <p>Know what each student excels at</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Focus</div>
+                <h4>Weak Area Detection</h4>
+                <p>Identify concepts needing revision</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Year</div>
+                <h4>Year-on-Year Growth</h4>
+                <p>Track progress from Class 4 to 12</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Parent</div>
+                <h4>Parent Reports</h4>
+                <p>Keep parents informed</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">Career</div>
+                <h4>Career Insights</h4>
+                <p>AI-powered career guidance based on strengths</p>
+            </div>
+        </div>
+        <div class="slide-number">9 / 13</div>
+    </div>
+
+    <!-- Slide 10: Pilot Program -->
+    <div class="slide" id="slide10">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>Pilot Program Proposal</h2>
+        <div class="pilot-highlight">
+            <h3 style="color: #ce93d8; font-size: 32px;">FREE 2-Month Pilot for Class 9 & 10</h3>
+            <p style="font-size: 24px; margin-top: 20px;">Let's prove the value together - zero risk for the school</p>
+        </div>
+        <div class="two-columns" style="margin-top: 40px;">
+            <div class="card">
+                <h3>What We'll Do</h3>
+                <ul class="small-text">
+                    <li>Setup VidyaMitra for Maths & Science</li>
+                    <li>Train 2-3 teachers on the platform</li>
+                    <li>Onboard Class 9 & 10 students</li>
+                    <li>Provide 24/7 homework support</li>
+                    <li>Weekly progress reports</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>Success Metrics</h3>
+                <ul class="small-text">
+                    <li>Student engagement rate</li>
+                    <li>Homework completion improvement</li>
+                    <li>Teacher & student feedback</li>
+                    <li>Reduction in repetitive doubts</li>
+                    <li>Test score comparison</li>
+                </ul>
+            </div>
+        </div>
+        <div class="slide-number">10 / 13</div>
+    </div>
+
+    <!-- Slide 11: Why Us -->
+    <div class="slide" id="slide11">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>VidyaMitra</span>
+        </div>
+        <h2>Why Eulean AI?</h2>
+        <div class="two-columns">
+            <div>
+                <div class="local-pride" style="margin-top: 0;">
+                    <h3>Yamuna Nagar's Own</h3>
+                    <p>Not a faceless corporation from Bangalore or USA. We're your neighbors, invested in our community's education.</p>
+                </div>
+                <div class="card" style="margin-top: 30px;">
+                    <h3>Our Commitment</h3>
+                    <ul>
+                        <li>Local support - always available for you</li>
+                        <li>Customised for Indian curriculum (CBSE/ICSE)</li>
+                        <li>Affordable pricing for all families</li>
+                        <li>Data privacy - your data stays in India</li>
+                    </ul>
+                </div>
+            </div>
+            <div>
+                <div class="stat-box" style="margin-bottom: 30px;">
+                    <div class="stat-number">2025</div>
+                    <div class="stat-label">The Year AI Transforms Education</div>
+                </div>
+                <div class="card">
+                    <h3>Be an Early Adopter</h3>
+                    <p style="font-size: 22px;">
+                        Springfields Public School can be among the first schools in Haryana to offer AI-powered personalised tutoring.
+                    </p>
+                    <p style="font-size: 22px; margin-top: 20px; color: #64b5f6;">
+                        <strong>Your students deserve the best.</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">11 / 13</div>
+    </div>
+
+    <!-- Slide 12: Questions -->
+    <div class="slide" id="slide12">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>Springfields Public School</span>
+        </div>
+        <div class="center">
+            <h1 style="font-size: 72px;">Questions?</h1>
+            <p style="font-size: 32px; margin: 50px 0;">
+                We'd love to hear your thoughts and answer any questions
+            </p>
+            <div class="cta-box" style="max-width: 600px; margin: 0 auto;">
+                <h3 style="color: #64b5f6; font-size: 28px; margin-bottom: 30px;">Get in Touch</h3>
+                <div class="contact-info" style="flex-direction: column; gap: 25px; margin-top: 0;">
+                    <div class="contact-item">
+                        <p style="font-size: 28px;">contact@euleanai.com</p>
+                    </div>
+                    <div class="contact-item">
+                        <p style="font-size: 28px;">+91 95901 05978</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">12 / 13</div>
+    </div>
+
+    <!-- Slide 13: Thank You & CTA -->
+    <div class="slide" id="slide13">
+        <div class="logo-strip">
+            <span>Eulean AI</span>
+            <span>Springfields Public School</span>
+        </div>
+        <div class="center">
+            <h1>Let's Transform Education Together</h1>
+            <p style="font-size: 32px; margin-bottom: 50px;">
+                <span class="highlight">VidyaMitra</span> - Where Every Student Gets a Personal Tutor
+            </p>
+            <div class="cta-box" style="max-width: 800px; margin: 0 auto;">
+                <h3 style="color: #64b5f6; font-size: 32px;">Next Steps</h3>
+                <p style="font-size: 24px; margin-top: 20px;">
+                    1. Sign MoU for 2-month FREE pilot<br>
+                    2. We setup within 15 days<br>
+                    3. Begin with Class 9 & 10 Maths/Science<br>
+                    4. Review results together
+                </p>
+            </div>
+            <div class="contact-info" style="margin-top: 50px;">
+                <div class="contact-item">
+                    <p style="font-size: 24px;"><strong>Eulean AI</strong> | Yamuna Nagar, Haryana</p>
+                    <p style="font-size: 22px; margin-top: 15px;">contact@euleanai.com | +91 95901 05978</p>
+                </div>
+            </div>
+            <p style="margin-top: 40px; font-size: 24px; color: #90caf9;">
+                <em>"The best time to start was yesterday. The next best time is now."</em>
+            </p>
+        </div>
+        <div class="slide-number">13 / 13</div>
+    </div>
+
+    <div class="navigation">
+        <button class="nav-btn" onclick="prevSlide()">Previous</button>
+        <button class="nav-btn" onclick="nextSlide()">Next</button>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 13;
+
+        function showSlide(n) {
+            // Hide all slides
+            document.querySelectorAll('.slide').forEach(slide => {
+                slide.classList.remove('active');
+            });
+
+            // Show current slide
+            document.getElementById('slide' + n).classList.add('active');
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                currentSlide++;
+                showSlide(currentSlide);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                currentSlide--;
+                showSlide(currentSlide);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Touch/swipe support for mobile
+        let touchStartX = 0;
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+        document.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const diff = touchStartX - touchEndX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) nextSlide();
+                else prevSlide();
+            }
+        });
+    </script>
+</body>
+</html>
