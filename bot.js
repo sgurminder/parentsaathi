@@ -1,7 +1,7 @@
 // =====================================================
-// PARENTSAATHI SCHOOLS - MVP DEMO BOT
+// VIDYAMITRA - AI PERSONALIZED TUTOR
 // =====================================================
-// This is a minimal working bot for demo purposes
+// School-specific WhatsApp homework helper
 // Uses: Twilio WhatsApp Sandbox + OpenAI GPT-4 Vision
 // =====================================================
 
@@ -1035,7 +1035,7 @@ app.get('/admin', (req, res) => {
 <body>
     <div class="container">
         <h1>🎓 Admin Panel</h1>
-        <p class="subtitle">Manage authorized users for ParentSaathi</p>
+        <p class="subtitle">Manage authorized users for VidyaMitra</p>
 
         <div class="stats" id="stats">
             <div class="stat-card">
@@ -1406,7 +1406,7 @@ app.get('/teacher-form', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Form - Add Teaching Method</title>
+    <title>VidyaMitra - ${config.school.name} | Teacher Form</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1513,8 +1513,8 @@ app.get('/teacher-form', (req, res) => {
 </head>
 <body>
     <div class="container">
-        <h1>🎓 Teacher Form</h1>
-        <p class="subtitle">Add or edit your teaching method. Start with a topic and let AI help!</p>
+        <h1>🎓 VidyaMitra - ${config.school.shortName}</h1>
+        <p class="subtitle">Add your teaching method for ${config.school.name}. Let AI help!</p>
 
         <form id="teacherForm">
             <div class="form-group">
@@ -1702,7 +1702,7 @@ app.get('/presentation/vidyamitra', (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        status: 'ParentSaathi Schools Bot is running!',
+        status: 'VidyaMitra Bot is running!',
         version: '1.0.0-demo',
         endpoints: {
             webhook: 'POST /webhook',
@@ -1720,7 +1720,7 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`ParentSaathi Schools Bot running on port ${PORT}`);
+    console.log(`VidyaMitra Bot running on port ${PORT}`);
     console.log(`Webhook URL: http://localhost:${PORT}/webhook`);
 });
 

@@ -1,5 +1,5 @@
 {
-  "name": "parentsaathi-schools",
+  "name": "vidyamitra",
   "version": "1.0.0",
   "description": "School-specific WhatsApp homework helper that uses teacher's teaching methods",
   "main": "bot.js",
@@ -14,9 +14,10 @@
     "homework",
     "school",
     "ai",
-    "chatbot"
+    "chatbot",
+    "vidyamitra"
   ],
-  "author": "ParentSaathi",
+  "author": "Eulean AI",
   "license": "MIT",
   "dependencies": {
     "@vercel/kv": "^1.0.1",
