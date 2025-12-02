@@ -146,6 +146,7 @@ ACCEPT ONLY:
 - Textbook chapter questions
 - Concept explanations from CBSE curriculum
 - Problem-solving for specific topics
+- Questions with language preferences like "explain in Hindi", "answer in Hindi and English" - these are VALID, just extract the academic topic
 
 If INVALID, return:
 {
