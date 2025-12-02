@@ -412,10 +412,10 @@ app.post('/webhook', async (req, res) => {
                 if (isFirstTime) {
                     welcomeMsg = `🎉 Welcome to ${config.school.name}, ${userInfo.name}! 👩‍🏫
 
-You've been added as a teacher to our homework helper bot!${teachingList}
+You're now connected to VidyaMitra - your AI Teaching Assistant!${teachingList}
 
 As a teacher, you can:
-📚 Test the bot with any question
+📚 Ask any question to see how students learn
 ✏️ Add/edit teaching methods via the form
 🎯 See how students will receive your explanations
 
@@ -424,7 +424,7 @@ Send any question to test how students will experience your teaching methods!`;
                     welcomeMsg = `Welcome back, ${userInfo.name}! 👩‍🏫${teachingList}
 
 As a ${config.school.shortName} teacher, you can:
-📚 Test the bot with any question
+📚 Ask any question to preview student experience
 ✏️ Add/edit teaching methods via the form
 🎯 See how students will receive your explanations
 
@@ -434,7 +434,7 @@ Send any question to test!`;
                 if (isFirstTime) {
                     welcomeMsg = `🎉 Welcome to ${config.school.name}, ${userInfo.name}! 🎓
 
-You've been enrolled in our 24/7 homework helper bot!
+You're now connected to VidyaMitra - your personal AI Study Companion!
 
 📚 Class ${userInfo.class}
 🏫 ${config.school.shortName}
@@ -476,7 +476,7 @@ Send me any homework question or photo, and I'll help you! 📸`;
 
                 // Check if question is valid homework query
                 if (topicInfo.valid === false) {
-                    const rejectionMsg = `I'm ${config.school.name}'s homework helper bot. 📚
+                    const rejectionMsg = `I'm VidyaMitra - ${config.school.name}'s AI Study Companion. 📚
 
 I can only help with:
 ✅ Homework questions
@@ -1702,7 +1702,7 @@ app.get('/presentation/vidyamitra', (req, res) => {
 
 app.get('/', (req, res) => {
     res.json({
-        status: 'VidyaMitra Bot is running!',
+        status: 'VidyaMitra AI is running',
         version: '1.0.0-demo',
         endpoints: {
             webhook: 'POST /webhook',
@@ -1720,7 +1720,7 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`VidyaMitra Bot running on port ${PORT}`);
+    console.log(`🎓 VidyaMitra AI running on port ${PORT}`);
     console.log(`Webhook URL: http://localhost:${PORT}/webhook`);
 });
 

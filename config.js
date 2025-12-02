@@ -29,11 +29,11 @@ module.exports = {
 
         welcomeMessage: `Welcome to VidyaMitra! 🎓
 
-I'm your AI study buddy for ${schoolName}.
+Your personal AI Study Companion for ${schoolName}.
 
-I help students with homework using YOUR teacher's exact methods.
+I explain concepts exactly the way your teachers do - their methods, their examples.
 
-Send me any homework question to get started!`,
+Send any homework question to get started!`,
 
         notAuthorizedMessage: `Sorry, this number is not registered with ${schoolName}.
 
