@@ -157,7 +157,7 @@ If INVALID, return:
 
 If VALID, identify:
 1. Subject - Use "Mathematics" for math, "Science" for science questions
-2. Class level (1-12)${studentClass ? ` - Student is in class ${studentClass}, use this unless question clearly indicates different class` : ''}
+2. Class level (1-12)${studentClass ? ` - IMPORTANT: Student is in CLASS ${studentClass}. ALWAYS use class ${studentClass} unless the question explicitly mentions a different class level.` : ''}
 3. Chapter name - Extract the EXACT specific topic/concept from the question
    - If question mentions "Pythagoras theorem" → chapter: "Pythagoras Theorem" (NOT "Geometry")
    - If question mentions "multiply binomials" → chapter: "Multiply Two Binomials" (NOT "Algebra")
@@ -166,7 +166,7 @@ If VALID, identify:
 4. Specific topic
 
             IMPORTANT: Always respond with valid JSON only, no extra text.
-            Format for VALID: {"valid": true, "subject": "Mathematics", "class": 8, "chapter": "Linear Equations", "topic": "Solving linear equations"}
+            Format for VALID: {"valid": true, "subject": "Mathematics", "class": <USE_STUDENT_CLASS>, "chapter": "Linear Equations", "topic": "Solving linear equations"}
             Format for INVALID: {"valid": false, "subject": "N/A", "class": 0, "chapter": "N/A", "topic": "N/A"}
 
             CRITICAL RULE FOR CHAPTER NAMES:
