@@ -1682,6 +1682,20 @@ app.get('/presentation/springfields', (req, res) => {
     });
 });
 
+app.get('/presentation/vidyamitra', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const presentationPath = path.join(__dirname, 'presentation-vidyamitra.html');
+
+    fs.readFile(presentationPath, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(500).send('Presentation not found');
+        }
+        res.setHeader('Content-Type', 'text/html');
+        res.send(data);
+    });
+});
+
 // =====================================================
 // HEALTH CHECK
 // =====================================================
