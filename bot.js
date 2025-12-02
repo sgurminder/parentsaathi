@@ -1401,6 +1401,11 @@ app.get('/admin', (req, res) => {
 // TEACHER FORM
 // =====================================================
 
+// Clean URL redirect
+app.get('/teacher', (req, res) => {
+    res.redirect('/teacher-form');
+});
+
 app.get('/teacher-form', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -1716,13 +1721,33 @@ app.get('/presentation/vidyamitra', (req, res) => {
 });
 
 // =====================================================
-// HEALTH CHECK
+// HOMEPAGE - VidyaMitra.ai Website
 // =====================================================
 
 app.get('/', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const websitePath = path.join(__dirname, 'website.html');
+
+    fs.readFile(websitePath, 'utf8', (err, data) => {
+        if (err) {
+            // Fallback to JSON status if website not found
+            return res.json({
+                status: 'VidyaMitra AI is running',
+                version: '1.0.0',
+                website: 'https://vidyamitra.ai'
+            });
+        }
+        res.setHeader('Content-Type', 'text/html');
+        res.send(data);
+    });
+});
+
+// Health check / API status
+app.get('/api/status', (req, res) => {
     res.json({
         status: 'VidyaMitra AI is running',
-        version: '1.0.0-demo',
+        version: '1.0.0',
         endpoints: {
             webhook: 'POST /webhook',
             addMethod: 'POST /api/teaching-method',
