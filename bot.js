@@ -1666,6 +1666,24 @@ app.get('/teacher-form', (req, res) => {
 });
 
 // =====================================================
+// WEBSITE - Landing Page for VidyaMitra.ai
+// =====================================================
+
+app.get('/website', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const websitePath = path.join(__dirname, 'website.html');
+
+    fs.readFile(websitePath, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(500).send('Website not found');
+        }
+        res.setHeader('Content-Type', 'text/html');
+        res.send(data);
+    });
+});
+
+// =====================================================
 // PRESENTATIONS
 // =====================================================
 

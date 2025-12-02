@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidyaMitra - AI Personalised Tutor for Schools</title>
+    <meta name="description" content="VidyaMitra brings your teacher's methods home. AI-powered personalised tutoring that explains concepts exactly the way your teachers do.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a56db;
+            --primary-dark: #1e40af;
+            --secondary: #f59e0b;
+            --text: #1f2937;
+            --text-light: #6b7280;
+            --bg: #ffffff;
+            --bg-alt: #f9fafb;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            line-height: 1.6;
+            background: var(--bg);
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(26, 86, 219, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 140px 24px 80px;
+            background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
+            text-align: center;
+        }
+
+        .hero-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(26, 86, 219, 0.1);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            color: var(--text);
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            max-width: 600px;
+            margin: 0 auto 32px;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .hero-image {
+            margin-top: 60px;
+            position: relative;
+        }
+
+        .hero-image img {
+            max-width: 100%;
+            border-radius: 16px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.1);
+        }
+
+        .phone-mockup {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 40px;
+            padding: 12px;
+            max-width: 320px;
+            margin: 0 auto;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.2);
+        }
+
+        .phone-screen {
+            background: #075e54;
+            border-radius: 32px;
+            overflow: hidden;
+        }
+
+        .phone-header {
+            background: #128c7e;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .phone-avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+        }
+
+        .phone-name {
+            color: white;
+            font-weight: 600;
+        }
+
+        .phone-status {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.75rem;
+        }
+
+        .chat-messages {
+            background: #ece5dd;
+            padding: 16px;
+            min-height: 400px;
+        }
+
+        .chat-bubble {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .chat-bubble.sent {
+            background: #dcf8c6;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+        }
+
+        .chat-bubble.received {
+            background: white;
+            border-bottom-left-radius: 2px;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 100px 24px;
+            background: var(--bg);
+        }
+
+        .section-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            color: var(--text-light);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+        }
+
+        .feature-card {
+            background: var(--bg-alt);
+            padding: 32px;
+            border-radius: 16px;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+            box-shadow: 0 20px 40px rgba(26, 86, 219, 0.1);
+        }
+
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            color: var(--text-light);
+        }
+
+        /* How It Works */
+        .how-it-works {
+            padding: 100px 24px;
+            background: linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            margin-top: 60px;
+        }
+
+        .step {
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 64px;
+            height: 64px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0 auto 20px;
+        }
+
+        .step h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .step p {
+            color: var(--text-light);
+        }
+
+        /* For Schools */
+        .for-schools {
+            padding: 100px 24px;
+            background: var(--bg);
+        }
+
+        .schools-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .schools-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .schools-text h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 24px;
+        }
+
+        .schools-text p {
+            color: var(--text-light);
+            font-size: 1.1rem;
+            margin-bottom: 24px;
+        }
+
+        .benefit-list {
+            list-style: none;
+            margin-bottom: 32px;
+        }
+
+        .benefit-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .benefit-list li::before {
+            content: "✓";
+            color: var(--success);
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .schools-visual {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 24px;
+            padding: 40px;
+            color: white;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 24px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+        }
+
+        .stat-item .number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .stat-item .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        /* Security */
+        .security {
+            padding: 80px 24px;
+            background: var(--bg-alt);
+        }
+
+        .security-content {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .security-badges {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+
+        .security-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .security-badge-icon {
+            width: 64px;
+            height: 64px;
+            background: white;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .security-badge span {
+            font-weight: 600;
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        /* CTA Section */
+        .cta {
+            padding: 100px 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .cta h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .cta p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 32px;
+        }
+
+        .cta .btn-primary {
+            background: white;
+            color: var(--primary);
+        }
+
+        .cta .btn-primary:hover {
+            background: #f0f0f0;
+        }
+
+        /* Footer */
+        footer {
+            padding: 60px 24px 30px;
+            background: #111827;
+            color: white;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .footer-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .footer-brand .logo {
+            color: white;
+            margin-bottom: 16px;
+        }
+
+        .footer-brand .logo-icon {
+            background: white;
+            color: var(--primary);
+        }
+
+        .footer-brand p {
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+
+        .footer-tagline {
+            color: #9ca3af;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+
+        .footer-col h4 {
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .footer-col ul {
+            list-style: none;
+        }
+
+        .footer-col li {
+            margin-bottom: 10px;
+        }
+
+        .footer-col a {
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .footer-col a:hover {
+            color: white;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #374151;
+            padding-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .footer-bottom p {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .footer-social {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer-social a {
+            color: #9ca3af;
+            font-size: 1.25rem;
+            transition: color 0.2s;
+        }
+
+        .footer-social a:hover {
+            color: white;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .section-header h2 {
+                font-size: 1.75rem;
+            }
+
+            .footer-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Coming Soon Badge */
+        .coming-soon {
+            display: inline-block;
+            background: var(--secondary);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <div class="logo-icon">VM</div>
+                VidyaMitra
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#schools">For Schools</a>
+                <a href="#contact" class="btn btn-primary">Get Started</a>
+            </div>
+            <button class="mobile-menu-btn">☰</button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-badge">
+                <span>🎓</span> Empowering Education with AI
+            </div>
+            <h1>Your Teacher's Methods,<br><span>Available 24/7</span></h1>
+            <p>VidyaMitra is an AI-powered study companion that explains concepts exactly the way your teachers do. Personalised learning for every student.</p>
+            <div class="hero-cta">
+                <a href="#contact" class="btn btn-primary">Request a Demo</a>
+                <a href="#how-it-works" class="btn btn-secondary">See How It Works</a>
+            </div>
+
+            <div class="hero-image">
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="phone-header">
+                            <div class="phone-avatar">VM</div>
+                            <div>
+                                <div class="phone-name">VidyaMitra</div>
+                                <div class="phone-status">Online</div>
+                            </div>
+                        </div>
+                        <div class="chat-messages">
+                            <div class="chat-bubble sent">How do I solve linear equations?</div>
+                            <div class="chat-bubble received">
+                                Great question! Here's how your teacher Mrs. Sharma explains it:<br><br>
+                                1. Move all variables to the left side<br>
+                                2. Move all numbers to the right<br>
+                                3. Divide both sides by the coefficient<br><br>
+                                <strong>Example:</strong> 2x + 5 = 11<br>
+                                2x = 11 - 5 = 6<br>
+                                x = 6 ÷ 2 = 3 ✓
+                            </div>
+                            <div class="chat-bubble sent">Thanks! Can I practice?</div>
+                            <div class="chat-bubble received">
+                                Of course! Try this:<br>
+                                Solve: 3x - 7 = 14<br><br>
+                                Send your answer when ready!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>Why Students Love VidyaMitra</h2>
+                <p>Personalised learning that adapts to your child's needs and follows their teacher's methods</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">👩‍🏫</div>
+                    <h3>Teacher's Own Methods</h3>
+                    <p>Every explanation uses your teacher's exact teaching style, examples, and approaches. No more confusion between home and school learning.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>WhatsApp Integration</h3>
+                    <p>No new apps to download. Students simply message on WhatsApp - the app they already use every day.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📸</div>
+                    <h3>Photo Support</h3>
+                    <p>Snap a photo of any homework problem. VidyaMitra understands images and provides step-by-step solutions.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌙</div>
+                    <h3>Available 24/7</h3>
+                    <p>Homework help at 10 PM? Exam revision at 6 AM? VidyaMitra is always ready to help.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🇮🇳</div>
+                    <h3>Hindi & English</h3>
+                    <p>Get explanations in Hindi, English, or both - whatever helps your child understand better.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>NEP 2020 Aligned</h3>
+                    <p>Content designed for CBSE, ICSE, and state board curricula. Aligned with National Education Policy 2020.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>How VidyaMitra Works</h2>
+                <p>Getting started is simple. Here's the journey from confusion to clarity.</p>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>School Partners with Us</h3>
+                    <p>Teachers add their teaching methods for each chapter. Takes just 5 minutes per topic.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Students Get Access</h3>
+                    <p>Parents receive a WhatsApp number. Just save it and start asking questions.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Ask Any Question</h3>
+                    <p>Type a question or send a photo. VidyaMitra responds with teacher-approved explanations.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Learn & Practice</h3>
+                    <p>Understand concepts deeply and practice with generated questions to build confidence.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- For Schools -->
+    <section class="for-schools" id="schools">
+        <div class="section-container">
+            <div class="schools-content">
+                <div class="schools-text">
+                    <h2>Partner With VidyaMitra</h2>
+                    <p>Join the growing network of forward-thinking schools that are transforming homework help with AI.</p>
+                    <ul class="benefit-list">
+                        <li>Reduce repetitive parent calls and messages</li>
+                        <li>Extend your teaching beyond classroom hours</li>
+                        <li>Provide consistent learning experience at home</li>
+                        <li>Stand out as an innovative, tech-forward school</li>
+                        <li>Comprehensive teacher training included</li>
+                        <li>White-label solution with your school branding</li>
+                    </ul>
+                    <a href="#contact" class="btn btn-primary">Schedule a Demo</a>
+                </div>
+                <div class="schools-visual">
+                    <div class="stat-grid">
+                        <div class="stat-item">
+                            <div class="number">24/7</div>
+                            <div class="label">Availability</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">90%</div>
+                            <div class="label">Cost Savings vs Tutors</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">100%</div>
+                            <div class="label">Teacher-Aligned</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">∞</div>
+                            <div class="label">Questions Answered</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security Section -->
+    <section class="security">
+        <div class="security-content">
+            <h2>Your Child's Data is Safe</h2>
+            <p style="color: var(--text-light); margin-top: 16px;">We take data privacy seriously. VidyaMitra is built with industry-leading security standards.</p>
+            <div class="security-badges">
+                <div class="security-badge">
+                    <div class="security-badge-icon">🔒</div>
+                    <span>AES-256 Encryption</span>
+                </div>
+                <div class="security-badge">
+                    <div class="security-badge-icon">🇮🇳</div>
+                    <span>India Data Residency</span>
+                </div>
+                <div class="security-badge">
+                    <div class="security-badge-icon">🛡️</div>
+                    <span>GDPR Compliant</span>
+                </div>
+                <div class="security-badge">
+                    <div class="security-badge-icon">📋</div>
+                    <span>IT Act Compliant</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta" id="contact">
+        <h2>Ready to Transform Learning?</h2>
+        <p>Join schools across India that are bringing AI-powered personalised tutoring to their students.</p>
+        <a href="mailto:contact@euleanai.com" class="btn btn-primary">Contact Us Today</a>
+        <p style="margin-top: 24px; font-size: 0.9rem; opacity: 0.8;">
+            Email: contact@euleanai.com | Phone: +91 95901 05978
+        </p>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="/" class="logo">
+                        <div class="logo-icon">VM</div>
+                        VidyaMitra
+                    </a>
+                    <p class="footer-tagline">Empowering Education with AI</p>
+                    <p style="margin-top: 16px;">AI-powered personalised tutoring that brings your teacher's methods home.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#schools">For Schools</a></li>
+                        <li><a href="#">Pricing</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Company</h4>
+                    <ul>
+                        <li><a href="#">About Eulean AI</a></li>
+                        <li><a href="#">Careers</a></li>
+                        <li><a href="#">Blog</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Coming Soon</h4>
+                    <ul>
+                        <li><a href="#">iOS App <span class="coming-soon">SOON</span></a></li>
+                        <li><a href="#">Android App <span class="coming-soon">SOON</span></a></li>
+                        <li><a href="#">Teacher Portal <span class="coming-soon">SOON</span></a></li>
+                        <li><a href="#">Parent Dashboard <span class="coming-soon">SOON</span></a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2025 Eulean AI · Yamuna Nagar, Haryana, India</p>
+                <div class="footer-social">
+                    <a href="#">LinkedIn</a>
+                    <a href="#">Twitter</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
