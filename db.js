@@ -235,6 +235,155 @@ class Database {
         return null;
     }
 
+    // ==================== SCHOOL-SCOPED DATA (Multi-School Demo) ====================
+
+    // Get key with school prefix for data isolation
+    _schoolKey(schoolId, type, id) {
+        return `${schoolId}:${type}:${id}`;
+    }
+
+    // Tests (school-scoped)
+    async saveTest(schoolId, testId, testData) {
+        const key = this._schoolKey(schoolId, 'test', testId);
+
+        if (this.type === 'vercel-kv') {
+            await this.kv.set(key, testData);
+            // Also add to school's test list
+            await this.kv.sadd(`${schoolId}:tests`, testId);
+        } else {
+            if (!this.cache.tests) this.cache.tests = {};
+            this.cache.tests[key] = testData;
+        }
+    }
+
+    async getTest(schoolId, testId) {
+        const key = this._schoolKey(schoolId, 'test', testId);
+
+        if (this.type === 'vercel-kv') {
+            return await this.kv.get(key);
+        }
+        return this.cache.tests?.[key] || null;
+    }
+
+    async getTestByFullId(testId) {
+        // testId format: schoolId_timestamp
+        const parts = testId.split('_');
+        if (parts.length < 2) return null;
+        const schoolId = parts[0];
+        return await this.getTest(schoolId, testId);
+    }
+
+    async getAllTests(schoolId) {
+        if (this.type === 'vercel-kv') {
+            const testIds = await this.kv.smembers(`${schoolId}:tests`) || [];
+            const tests = [];
+            for (const testId of testIds) {
+                const test = await this.getTest(schoolId, testId);
+                if (test) tests.push({ id: testId, ...test });
+            }
+            return tests;
+        }
+        // In-memory
+        const tests = [];
+        const prefix = `${schoolId}:test:`;
+        for (const [key, test] of Object.entries(this.cache.tests || {})) {
+            if (key.startsWith(prefix)) {
+                const testId = key.replace(prefix, '');
+                tests.push({ id: testId, ...test });
+            }
+        }
+        return tests;
+    }
+
+    // Test Attempts (school-scoped)
+    async saveTestAttempt(schoolId, testId, attemptId, attemptData) {
+        const key = this._schoolKey(schoolId, 'attempt', attemptId);
+
+        if (this.type === 'vercel-kv') {
+            await this.kv.set(key, attemptData);
+            // Add to test's attempts list
+            await this.kv.sadd(`${schoolId}:test:${testId}:attempts`, attemptId);
+        } else {
+            if (!this.cache.attempts) this.cache.attempts = {};
+            this.cache.attempts[key] = attemptData;
+        }
+    }
+
+    async getTestAttempt(schoolId, attemptId) {
+        const key = this._schoolKey(schoolId, 'attempt', attemptId);
+
+        if (this.type === 'vercel-kv') {
+            return await this.kv.get(key);
+        }
+        return this.cache.attempts?.[key] || null;
+    }
+
+    async getTestAttempts(schoolId, testId) {
+        if (this.type === 'vercel-kv') {
+            const attemptIds = await this.kv.smembers(`${schoolId}:test:${testId}:attempts`) || [];
+            const attempts = [];
+            for (const attemptId of attemptIds) {
+                const attempt = await this.getTestAttempt(schoolId, attemptId);
+                if (attempt) attempts.push({ id: attemptId, ...attempt });
+            }
+            return attempts;
+        }
+        // In-memory
+        const attempts = [];
+        const prefix = `${schoolId}:attempt:`;
+        for (const [key, attempt] of Object.entries(this.cache.attempts || {})) {
+            if (key.startsWith(prefix) && attempt.testId === testId) {
+                const attemptId = key.replace(prefix, '');
+                attempts.push({ id: attemptId, ...attempt });
+            }
+        }
+        return attempts;
+    }
+
+    // School-scoped teaching methods
+    async getSchoolTeachingMethod(schoolId, key) {
+        const fullKey = this._schoolKey(schoolId, 'method', key);
+
+        if (this.type === 'vercel-kv') {
+            return await this.kv.get(fullKey);
+        }
+        return this.cache.teachingMethods?.[fullKey] || null;
+    }
+
+    async saveSchoolTeachingMethod(schoolId, key, method) {
+        const fullKey = this._schoolKey(schoolId, 'method', key);
+
+        if (this.type === 'vercel-kv') {
+            await this.kv.set(fullKey, method);
+            await this.kv.sadd(`${schoolId}:methods`, key);
+        } else {
+            if (!this.cache.teachingMethods) this.cache.teachingMethods = {};
+            this.cache.teachingMethods[fullKey] = method;
+        }
+    }
+
+    async getAllSchoolTeachingMethods(schoolId) {
+        if (this.type === 'vercel-kv') {
+            const keys = await this.kv.smembers(`${schoolId}:methods`) || [];
+            const methods = {};
+            for (const key of keys) {
+                const method = await this.getSchoolTeachingMethod(schoolId, key);
+                if (method) methods[key] = method;
+            }
+            return methods;
+        }
+        // In-memory
+        const methods = {};
+        const prefix = `${schoolId}:method:`;
+        for (const [key, method] of Object.entries(this.cache.teachingMethods || {})) {
+            if (key.startsWith(prefix)) {
+                const methodKey = key.replace(prefix, '');
+                methods[methodKey] = method;
+            }
+        }
+        return methods;
+    }
+
     // ==================== ANALYTICS ====================
 
     async incrementQueryCount(phoneNumber) {

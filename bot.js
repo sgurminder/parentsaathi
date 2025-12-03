@@ -10,8 +10,72 @@ require('dotenv').config();
 const express = require('express');
 const { MessagingResponse } = require('twilio').twiml;
 const OpenAI = require('openai');
+const multer = require('multer');
+const { memoryStorage } = require('multer');
 const db = require('./db');
 const config = require('./config');
+
+// =====================================================
+// MULTI-SCHOOL DEMO CONFIGURATION
+// =====================================================
+const demoSchools = {
+    'springfields': {
+        id: 'springfields',
+        name: 'Springfields Academy',
+        shortName: 'Springfields',
+        logo: '🏫',
+        primaryColor: '#667eea',
+        gradientFrom: '#667eea',
+        gradientTo: '#764ba2'
+    },
+    'dps': {
+        id: 'dps',
+        name: 'Delhi Public School',
+        shortName: 'DPS',
+        logo: '📚',
+        primaryColor: '#1a56db',
+        gradientFrom: '#1a56db',
+        gradientTo: '#1e40af'
+    },
+    'greenvalley': {
+        id: 'greenvalley',
+        name: 'Green Valley International',
+        shortName: 'GVI',
+        logo: '🌿',
+        primaryColor: '#059669',
+        gradientFrom: '#059669',
+        gradientTo: '#047857'
+    },
+    'demo': {
+        id: 'demo',
+        name: 'Demo School',
+        shortName: 'Demo',
+        logo: '🎓',
+        primaryColor: '#10b981',
+        gradientFrom: '#10b981',
+        gradientTo: '#059669'
+    }
+};
+
+// Helper to get school config from query param
+function getSchoolConfig(req) {
+    const schoolId = req.query.school || 'demo';
+    return demoSchools[schoolId] || demoSchools['demo'];
+}
+
+// Configure multer for memory storage (works on serverless)
+const upload = multer({
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only JPEG, PNG, GIF, WebP, and PDF are allowed.'));
+        }
+    }
+});
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -24,6 +88,67 @@ app.use(express.json());
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY // Set in environment
 });
+
+// =====================================================
+// FREE EDUCATIONAL DIAGRAM LIBRARY (Verified Working URLs)
+// =====================================================
+const diagramLibrary = {
+    // Science - Biology (all verified working)
+    'photosynthesis': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Photosynthesis_en.svg/500px-Photosynthesis_en.svg.png',
+    'cell structure': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Animal_cell_structure_en.svg/400px-Animal_cell_structure_en.svg.png',
+    'plant cell': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Animal_cell_structure_en.svg/400px-Animal_cell_structure_en.svg.png',
+    'animal cell': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Animal_cell_structure_en.svg/400px-Animal_cell_structure_en.svg.png',
+    'cell': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Animal_cell_structure_en.svg/400px-Animal_cell_structure_en.svg.png',
+    'human heart': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Diagram_of_the_human_heart_%28cropped%29.svg/400px-Diagram_of_the_human_heart_%28cropped%29.svg.png',
+    'heart': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Diagram_of_the_human_heart_%28cropped%29.svg/400px-Diagram_of_the_human_heart_%28cropped%29.svg.png',
+    'digestive system': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Digestive_system_diagram_en.svg/300px-Digestive_system_diagram_en.svg.png',
+    'digestion': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Digestive_system_diagram_en.svg/300px-Digestive_system_diagram_en.svg.png',
+    'water cycle': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Water_cycle.png/500px-Water_cycle.png',
+    'human eye': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Schematic_diagram_of_the_human_eye_en.svg/400px-Schematic_diagram_of_the_human_eye_en.svg.png',
+    'eye': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Schematic_diagram_of_the_human_eye_en.svg/400px-Schematic_diagram_of_the_human_eye_en.svg.png',
+
+    // Science - Physics
+    'electric circuit': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Simple_circuit_diagram.svg/300px-Simple_circuit_diagram.svg.png',
+    'circuit': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Simple_circuit_diagram.svg/300px-Simple_circuit_diagram.svg.png',
+
+    // Math - Geometry
+    'pythagoras': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Pythagorean.svg/400px-Pythagorean.svg.png',
+    'pythagorean': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Pythagorean.svg/400px-Pythagorean.svg.png',
+
+    // Geography
+    'solar system': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Planets2013.svg/400px-Planets2013.svg.png',
+    'planets': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Planets2013.svg/400px-Planets2013.svg.png'
+};
+
+// Find relevant diagram for a topic
+function findDiagram(question, chapter) {
+    const searchText = `${question} ${chapter || ''}`.toLowerCase();
+
+    for (const [topic, url] of Object.entries(diagramLibrary)) {
+        if (searchText.includes(topic) || topic.split(' ').every(word => searchText.includes(word))) {
+            return url;
+        }
+    }
+    return null;
+}
+
+// Generate math graph using QuickChart.io (FREE)
+function generateMathGraph(equation, type = 'line') {
+    // QuickChart.io generates charts via URL - completely free
+    const config = {
+        type: type,
+        data: {
+            labels: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
+            datasets: [{
+                label: equation,
+                data: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5].map(x => eval(equation.replace(/x/g, `(${x})`))),
+                borderColor: 'rgb(75, 192, 192)',
+                fill: false
+            }]
+        }
+    };
+    return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(config))}`;
+}
 
 // In-memory storage for demo (use database in production)
 const teachingMethods = {
@@ -194,7 +319,7 @@ If VALID, identify:
     }
 
     const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",  // Using mini for topic detection (cost savings)
         messages: messages,
         max_tokens: 100,
         response_format: { type: "json_object" }
@@ -268,8 +393,14 @@ Instructions:
 3. Be warm and encouraging
 4. Include the common mistakes warning
 5. End with an encouraging tip
-6. Keep response concise (under 300 words)
-7. NEVER mention ChatGPT, OpenAI, or being an AI language model`;
+6. Keep response concise (under 350 words)
+7. NEVER mention ChatGPT, OpenAI, or being an AI language model
+
+ENRICHMENT (when helpful):
+- For visual concepts, describe a simple diagram: "📊 Imagine a diagram showing..."
+- For topics with good educational videos, add: "🎬 Watch: Search 'topic name NCERT' on YouTube"
+- Use emojis sparingly to make key points stand out
+- For math, show step-by-step working with proper formatting`;
 
     const messages = [{ role: "system", content: systemPrompt }];
 
@@ -316,10 +447,16 @@ Instructions:
 1. Use simple, clear language
 2. Give step-by-step explanation (max 3-4 steps)
 3. Include ONE brief real-life example
-4. Keep response VERY SHORT - under 600 characters total
-5. Be concise and to the point
+4. Keep response concise (under 250 words)
+5. Be helpful and encouraging
 6. End with: "Note: I'll notify your teacher to add their method!"
-7. NEVER mention ChatGPT, OpenAI, or being an AI language model`;
+7. NEVER mention ChatGPT, OpenAI, or being an AI language model
+
+ENRICHMENT (when helpful):
+- For visual concepts, describe a simple diagram: "📊 Imagine..."
+- For topics with good educational videos, add: "🎬 Watch: Search '[topic] Class ${classLevel} NCERT' on YouTube"
+- Use emojis sparingly to highlight key points
+- For math, show step-by-step working`;
 
     const messages = [{ role: "system", content: systemPrompt }];
 
@@ -341,7 +478,7 @@ Instructions:
     const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: messages,
-        max_tokens: 200
+        max_tokens: 350
     });
 
     return response.choices[0].message.content;
@@ -520,10 +657,20 @@ Example: "How do I solve quadratic equations?" or "Explain photosynthesis"`;
                 // Track query for analytics
                 await db.incrementQueryCount(from);
 
+                // Find relevant diagram for the topic
+                const diagramUrl = findDiagram(body, topicInfo.chapter);
+
                 console.log('Sending response to WhatsApp...');
                 console.log('Response length:', response.length, 'characters');
                 console.log('Response preview:', response.substring(0, 100) + '...');
-                twiml.message(response);
+                console.log('Diagram found:', diagramUrl ? 'Yes' : 'No');
+
+                // Send message with optional diagram
+                const message = twiml.message(response);
+                if (diagramUrl) {
+                    message.media(diagramUrl);
+                    console.log('Adding diagram:', diagramUrl);
+                }
             }
         }
     } catch (error) {
@@ -742,7 +889,7 @@ app.post('/api/prefill-teaching-method', async (req, res) => {
 
     try {
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4o-mini',  // Using mini for prefill (cost savings)
             messages: [{
                 role: 'system',
                 content: `You are a helpful assistant that generates teaching method templates for teachers.
@@ -780,6 +927,85 @@ Return as JSON with keys: method, example, commonMistakes, tips`
     } catch (error) {
         console.error('AI prefill error:', error);
         res.status(500).json({ error: 'Failed to generate teaching method', details: error.message });
+    }
+});
+
+// =====================================================
+// FILE UPLOAD FOR TEACHER FORM - AI PROCESSING
+// =====================================================
+
+app.post('/api/process-file', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    try {
+        const file = req.file;
+        let imageContent;
+
+        // Convert file to base64 for GPT-4 Vision
+        if (file.mimetype.startsWith('image/')) {
+            const base64 = file.buffer.toString('base64');
+            imageContent = {
+                type: 'image_url',
+                image_url: {
+                    url: `data:${file.mimetype};base64,${base64}`,
+                    detail: 'high'
+                }
+            };
+        } else if (file.mimetype === 'application/pdf') {
+            // For PDF, we'll extract what we can or inform user to use image
+            return res.status(400).json({
+                error: 'PDF support coming soon. Please upload an image (screenshot/photo) of the page instead.'
+            });
+        }
+
+        console.log('Processing uploaded file:', file.originalname, file.mimetype);
+
+        // Use GPT-4o-mini Vision to extract teaching content (cost savings)
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',  // Using mini for vision tasks too
+            messages: [{
+                role: 'system',
+                content: `You are a teaching content extractor. Analyze educational material images (lesson plans, textbook pages, worksheets, notes) and extract structured teaching information.
+
+Extract the following if present:
+1. Subject (Mathematics, Science, English, Social Studies)
+2. Class/Grade level (1-12)
+3. Chapter/Topic name
+4. Teaching method or explanation approach
+5. Real-life examples used
+6. Common mistakes students make
+7. Tips for parents/practice suggestions
+
+Be thorough but concise. If information is not clearly present, leave that field empty.
+Return as JSON with keys: subject, classLevel, chapter, method, example, commonMistakes, tips`
+            }, {
+                role: 'user',
+                content: [
+                    { type: 'text', text: 'Extract teaching content from this educational material:' },
+                    imageContent
+                ]
+            }],
+            response_format: { type: 'json_object' },
+            max_tokens: 1500
+        });
+
+        const result = JSON.parse(completion.choices[0].message.content);
+        console.log('Extracted content:', result);
+
+        res.json({
+            success: true,
+            filename: file.originalname,
+            extracted: result
+        });
+
+    } catch (error) {
+        console.error('File processing error:', error);
+        res.status(500).json({
+            error: 'Failed to process file',
+            details: error.message
+        });
     }
 });
 
@@ -1515,12 +1741,80 @@ app.get('/teacher-form', (req, res) => {
             margin-top: 20px;
             display: none;
         }
+        .upload-section {
+            background: #f8f9ff;
+            border: 2px dashed #667eea;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-section:hover, .upload-section.dragover {
+            background: #eef1ff;
+            border-color: #5568d3;
+        }
+        .upload-section.processing {
+            background: #fff8e1;
+            border-color: #ffa726;
+        }
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .upload-text {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .upload-hint {
+            color: #999;
+            font-size: 14px;
+        }
+        .file-preview {
+            display: none;
+            margin-top: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .file-preview.show {
+            display: block;
+        }
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #999;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .divider span {
+            padding: 0 15px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎓 VidyaMitra - ${config.school.shortName}</h1>
         <p class="subtitle">Add your teaching method for ${config.school.name}. Let AI help!</p>
+
+        <!-- File Upload Section -->
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">Upload Lesson Plan or Textbook Page</div>
+            <div class="upload-hint">Drop image here or click to browse (PNG, JPG, GIF)</div>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            <div class="file-preview" id="filePreview"></div>
+        </div>
+
+        <div class="divider"><span>OR fill manually</span></div>
 
         <form id="teacherForm">
             <div class="form-group">
@@ -1587,6 +1881,93 @@ app.get('/teacher-form', (req, res) => {
         const form = document.getElementById('teacherForm');
         const success = document.getElementById('success');
         const error = document.getElementById('error');
+
+        // File Upload Handling
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const filePreview = document.getElementById('filePreview');
+
+        uploadSection.addEventListener('click', () => fileInput.click());
+
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFileUpload(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFileUpload(file);
+        });
+
+        async function handleFileUpload(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please upload an image file (PNG, JPG, GIF)');
+                return;
+            }
+
+            uploadSection.classList.add('processing');
+            uploadSection.querySelector('.upload-text').textContent = '🔄 Processing with AI...';
+            uploadSection.querySelector('.upload-hint').textContent = 'Extracting teaching content from image';
+            filePreview.textContent = 'File: ' + file.name;
+            filePreview.classList.add('show');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/process-file', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.extracted) {
+                    const ext = data.extracted;
+
+                    // Populate form fields
+                    if (ext.subject) {
+                        const subjectSelect = document.getElementById('subject');
+                        for (let option of subjectSelect.options) {
+                            if (option.value.toLowerCase().includes(ext.subject.toLowerCase()) ||
+                                ext.subject.toLowerCase().includes(option.value.toLowerCase())) {
+                                subjectSelect.value = option.value;
+                                break;
+                            }
+                        }
+                    }
+                    if (ext.classLevel) document.getElementById('class').value = ext.classLevel;
+                    if (ext.chapter) document.getElementById('chapter').value = ext.chapter;
+                    if (ext.method) document.getElementById('explanation').value = ext.method;
+                    if (ext.example) document.getElementById('example').value = ext.example;
+                    if (ext.commonMistakes) document.getElementById('mistakes').value = ext.commonMistakes;
+                    if (ext.tips) document.getElementById('tips').value = ext.tips;
+
+                    alert('✅ Content extracted! Please review and edit as needed.');
+                    uploadSection.querySelector('.upload-text').textContent = '✅ Content Extracted';
+                    uploadSection.querySelector('.upload-hint').textContent = 'Upload another file to replace';
+                } else {
+                    throw new Error(data.error || 'Failed to extract content');
+                }
+            } catch (err) {
+                alert('❌ Error: ' + err.message);
+                uploadSection.querySelector('.upload-text').textContent = 'Upload Lesson Plan or Textbook Page';
+                uploadSection.querySelector('.upload-hint').textContent = 'Drop image here or click to browse (PNG, JPG, GIF)';
+            } finally {
+                uploadSection.classList.remove('processing');
+            }
+        }
 
         prefillBtn.addEventListener('click', async () => {
             const topic = document.getElementById('chapter').value;
@@ -1714,6 +2095,1237 @@ app.get('/presentation/vidyamitra', (req, res) => {
     fs.readFile(presentationPath, 'utf8', (err, data) => {
         if (err) {
             return res.status(500).send('Presentation not found');
+        }
+        res.setHeader('Content-Type', 'text/html');
+        res.send(data);
+    });
+});
+
+// =====================================================
+// ASSESSMENT SYSTEM - Question Generation & Tests
+// =====================================================
+
+// Get available demo schools
+app.get('/api/schools', (req, res) => {
+    res.json(Object.values(demoSchools));
+});
+
+// Question Generation API
+app.post('/api/generate-questions', async (req, res) => {
+    const { subject, classLevel, chapter, count = 10, difficulty = 'medium' } = req.body;
+
+    if (!subject || !classLevel || !chapter) {
+        return res.status(400).json({ error: 'subject, classLevel, and chapter are required' });
+    }
+
+    try {
+        const prompt = `Generate ${count} multiple choice questions for:
+Subject: ${subject}
+Class: ${classLevel}
+Chapter: ${chapter}
+Difficulty: ${difficulty}
+
+Requirements:
+- NCERT/CBSE aligned for Indian students
+- Clear, unambiguous questions
+- 4 options each, only 1 correct answer
+- Include brief explanation for the correct answer
+- Vary difficulty within the set (${difficulty} average)
+- Questions should test understanding, not just memorization
+
+Return as JSON array with this exact structure:
+{
+  "questions": [
+    {
+      "question": "The question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": 0,
+      "explanation": "Brief explanation why this is correct"
+    }
+  ]
+}`;
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: 'You are an expert Indian school teacher who creates excellent MCQ questions. Always respond with valid JSON only.' },
+                { role: 'user', content: prompt }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.7,
+            max_tokens: 3000
+        });
+
+        const result = JSON.parse(completion.choices[0].message.content);
+
+        res.json({
+            success: true,
+            subject,
+            classLevel,
+            chapter,
+            difficulty,
+            ...result
+        });
+    } catch (error) {
+        console.error('Question generation error:', error);
+        res.status(500).json({ error: 'Failed to generate questions', details: error.message });
+    }
+});
+
+// Save a test
+app.post('/api/tests', async (req, res) => {
+    const { school, title, subject, classLevel, chapter, questions, teacherName } = req.body;
+
+    if (!school || !title || !questions || questions.length === 0) {
+        return res.status(400).json({ error: 'school, title, and questions are required' });
+    }
+
+    const schoolConfig = demoSchools[school] || demoSchools['demo'];
+    const testId = `${schoolConfig.id}_${Date.now()}`;
+
+    const testData = {
+        title,
+        subject,
+        classLevel,
+        chapter,
+        questions,
+        teacherName: teacherName || 'Teacher',
+        school: schoolConfig.id,
+        schoolName: schoolConfig.name,
+        createdAt: new Date().toISOString(),
+        status: 'active'
+    };
+
+    await db.saveTest(schoolConfig.id, testId, testData);
+
+    res.json({
+        success: true,
+        testId,
+        testUrl: `/test/${testId}`,
+        shareUrl: `${req.protocol}://${req.get('host')}/test/${testId}`
+    });
+});
+
+// Get all tests for a school
+app.get('/api/tests', async (req, res) => {
+    const school = req.query.school || 'demo';
+    const tests = await db.getAllTests(school);
+    res.json({ tests });
+});
+
+// Get a specific test
+app.get('/api/tests/:testId', async (req, res) => {
+    const { testId } = req.params;
+    const test = await db.getTestByFullId(testId);
+
+    if (!test) {
+        return res.status(404).json({ error: 'Test not found' });
+    }
+
+    res.json(test);
+});
+
+// Submit test attempt
+app.post('/api/tests/:testId/submit', async (req, res) => {
+    const { testId } = req.params;
+    const { studentName, studentPhone, answers } = req.body;
+
+    const test = await db.getTestByFullId(testId);
+    if (!test) {
+        return res.status(404).json({ error: 'Test not found' });
+    }
+
+    // Calculate score
+    let correct = 0;
+    const results = test.questions.map((q, i) => {
+        const isCorrect = answers[i] === q.correct;
+        if (isCorrect) correct++;
+        return {
+            question: q.question,
+            selected: answers[i],
+            correct: q.correct,
+            isCorrect,
+            explanation: q.explanation
+        };
+    });
+
+    const score = Math.round((correct / test.questions.length) * 100);
+    const attemptId = `${testId}_${Date.now()}`;
+
+    const attemptData = {
+        testId,
+        studentName: studentName || 'Student',
+        studentPhone: studentPhone || '',
+        answers,
+        results,
+        score,
+        correct,
+        total: test.questions.length,
+        submittedAt: new Date().toISOString()
+    };
+
+    const schoolId = testId.split('_')[0];
+    await db.saveTestAttempt(schoolId, testId, attemptId, attemptData);
+
+    res.json({
+        success: true,
+        attemptId,
+        score,
+        correct,
+        total: test.questions.length,
+        results
+    });
+});
+
+// Get test results/attempts
+app.get('/api/tests/:testId/results', async (req, res) => {
+    const { testId } = req.params;
+    const schoolId = testId.split('_')[0];
+
+    const test = await db.getTestByFullId(testId);
+    if (!test) {
+        return res.status(404).json({ error: 'Test not found' });
+    }
+
+    const attempts = await db.getTestAttempts(schoolId, testId);
+
+    // Calculate analytics
+    const scores = attempts.map(a => a.score);
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+
+    // Question-wise analysis
+    const questionStats = test.questions.map((q, i) => {
+        const correctCount = attempts.filter(a => a.answers[i] === q.correct).length;
+        return {
+            question: q.question,
+            correctCount,
+            totalAttempts: attempts.length,
+            successRate: attempts.length > 0 ? Math.round((correctCount / attempts.length) * 100) : 0
+        };
+    });
+
+    res.json({
+        test,
+        attempts: attempts.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)),
+        analytics: {
+            totalAttempts: attempts.length,
+            avgScore,
+            highestScore: Math.max(...scores, 0),
+            lowestScore: scores.length > 0 ? Math.min(...scores) : 0,
+            questionStats
+        }
+    });
+});
+
+// Assessment Creation Page
+app.get('/assessment', (req, res) => {
+    const school = getSchoolConfig(req);
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Assessment - ${school.name}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f5f7fa; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, ${school.gradientFrom} 0%, ${school.gradientTo} 100%); color: white; padding: 20px 24px; }
+        .header h1 { font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        .header .school-name { font-size: 0.9rem; opacity: 0.9; margin-top: 4px; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+        .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h2 { font-size: 1.1rem; color: #374151; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: ${school.primaryColor}; box-shadow: 0 0 0 3px ${school.primaryColor}20; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: ${school.primaryColor}; color: white; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #f3f4f6; color: #374151; }
+        .btn-secondary:hover { background: #e5e7eb; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; padding: 6px 12px; font-size: 0.8rem; }
+        .questions-list { margin-top: 16px; }
+        .question-item { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+        .question-item.selected { border-color: ${school.primaryColor}; background: ${school.primaryColor}08; }
+        .question-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+        .question-checkbox { width: 20px; height: 20px; accent-color: ${school.primaryColor}; cursor: pointer; flex-shrink: 0; margin-top: 2px; }
+        .question-text { flex: 1; font-weight: 500; color: #1f2937; }
+        .question-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .options-list { margin-left: 32px; }
+        .option { padding: 6px 0; color: #4b5563; font-size: 0.9rem; }
+        .option.correct { color: #059669; font-weight: 500; }
+        .option.correct::before { content: '✓ '; }
+        .loading { text-align: center; padding: 40px; color: #6b7280; }
+        .loading-spinner { width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top-color: ${school.primaryColor}; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty-state { text-align: center; padding: 40px; color: #6b7280; }
+        .stats-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .stat { background: #f3f4f6; padding: 12px 16px; border-radius: 8px; }
+        .stat-value { font-size: 1.25rem; font-weight: 700; color: ${school.primaryColor}; }
+        .stat-label { font-size: 0.75rem; color: #6b7280; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 16px; max-width: 500px; width: 100%; padding: 24px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 1.25rem; color: #1f2937; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280; }
+        .success-message { background: #d1fae5; border: 1px solid #10b981; color: #065f46; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+        .share-link { background: #f3f4f6; padding: 12px; border-radius: 8px; word-break: break-all; font-family: monospace; font-size: 0.85rem; }
+        .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+        .select-all-wrapper { display: flex; align-items: center; gap: 8px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${school.logo} Create Assessment</h1>
+        <div class="school-name">${school.name}</div>
+    </div>
+
+    <div class="container">
+        <!-- Step 1: Test Details -->
+        <div class="card" id="step1">
+            <h2>📝 Step 1: Test Details</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Test Title *</label>
+                    <input type="text" id="testTitle" placeholder="e.g., Weekly Math Test">
+                </div>
+                <div class="form-group">
+                    <label>Teacher Name</label>
+                    <input type="text" id="teacherName" placeholder="e.g., Mrs. Sharma">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Subject *</label>
+                    <select id="subject">
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Science">Science</option>
+                        <option value="Physics">Physics</option>
+                        <option value="Chemistry">Chemistry</option>
+                        <option value="Biology">Biology</option>
+                        <option value="English">English</option>
+                        <option value="Hindi">Hindi</option>
+                        <option value="Social Studies">Social Studies</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Class *</label>
+                    <select id="classLevel">
+                        ${[1,2,3,4,5,6,7,8,9,10,11,12].map(c => '<option value="'+c+'">Class '+c+'</option>').join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Difficulty</label>
+                    <select id="difficulty">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Chapter/Topic *</label>
+                <input type="text" id="chapter" placeholder="e.g., Linear Equations, Photosynthesis">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Number of Questions</label>
+                    <input type="number" id="questionCount" value="10" min="5" max="30">
+                </div>
+            </div>
+            <button class="btn btn-primary" id="generateBtn" onclick="generateQuestions()">
+                ✨ Generate Questions with AI
+            </button>
+        </div>
+
+        <!-- Step 2: Review Questions -->
+        <div class="card hidden" id="step2">
+            <h2>📋 Step 2: Review & Select Questions</h2>
+            <div class="stats-row">
+                <div class="stat">
+                    <div class="stat-value" id="selectedCount">0</div>
+                    <div class="stat-label">Selected</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-label">Total</div>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <div class="select-all-wrapper">
+                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                    <label for="selectAll">Select All</label>
+                </div>
+                <button class="btn btn-secondary" onclick="generateMore()">🔄 Generate More</button>
+                <button class="btn btn-secondary" onclick="openAddModal()">➕ Add Custom</button>
+            </div>
+
+            <div id="questionsLoading" class="loading hidden">
+                <div class="loading-spinner"></div>
+                <p>Generating questions with AI...</p>
+            </div>
+
+            <div id="questionsList" class="questions-list"></div>
+
+            <div style="margin-top: 20px; display: flex; gap: 12px;">
+                <button class="btn btn-primary" id="createTestBtn" onclick="createTest()" disabled>
+                    📤 Create Test
+                </button>
+                <button class="btn btn-secondary" onclick="goBack()">← Back</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Success -->
+        <div class="card hidden" id="step3">
+            <h2>🎉 Test Created Successfully!</h2>
+            <div class="success-message">
+                Your test has been created and is ready to share with students.
+            </div>
+            <div class="form-group">
+                <label>Share this link with students:</label>
+                <div class="share-link" id="shareLink"></div>
+            </div>
+            <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="copyLink()">📋 Copy Link</button>
+                <button class="btn btn-success" onclick="shareWhatsApp()">📱 Share on WhatsApp</button>
+                <a id="viewResultsLink" href="#" class="btn btn-secondary">📊 View Results</a>
+                <button class="btn btn-secondary" onclick="createAnother()">➕ Create Another</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Custom Question Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>➕ Add Custom Question</h3>
+                <button class="modal-close" onclick="closeAddModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Question *</label>
+                <textarea id="customQuestion" rows="3" placeholder="Enter your question"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Option A *</label>
+                <input type="text" id="optionA" placeholder="First option">
+            </div>
+            <div class="form-group">
+                <label>Option B *</label>
+                <input type="text" id="optionB" placeholder="Second option">
+            </div>
+            <div class="form-group">
+                <label>Option C *</label>
+                <input type="text" id="optionC" placeholder="Third option">
+            </div>
+            <div class="form-group">
+                <label>Option D *</label>
+                <input type="text" id="optionD" placeholder="Fourth option">
+            </div>
+            <div class="form-group">
+                <label>Correct Answer *</label>
+                <select id="correctAnswer">
+                    <option value="0">Option A</option>
+                    <option value="1">Option B</option>
+                    <option value="2">Option C</option>
+                    <option value="3">Option D</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Explanation (optional)</label>
+                <textarea id="customExplanation" rows="2" placeholder="Why is this the correct answer?"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="addCustomQuestion()">Add Question</button>
+        </div>
+    </div>
+
+    <!-- Edit Question Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Edit Question</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Question *</label>
+                <textarea id="editQuestion" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Option A *</label>
+                <input type="text" id="editOptionA">
+            </div>
+            <div class="form-group">
+                <label>Option B *</label>
+                <input type="text" id="editOptionB">
+            </div>
+            <div class="form-group">
+                <label>Option C *</label>
+                <input type="text" id="editOptionC">
+            </div>
+            <div class="form-group">
+                <label>Option D *</label>
+                <input type="text" id="editOptionD">
+            </div>
+            <div class="form-group">
+                <label>Correct Answer *</label>
+                <select id="editCorrectAnswer">
+                    <option value="0">Option A</option>
+                    <option value="1">Option B</option>
+                    <option value="2">Option C</option>
+                    <option value="3">Option D</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Explanation</label>
+                <textarea id="editExplanation" rows="2"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveEditedQuestion()">Save Changes</button>
+        </div>
+    </div>
+
+    <script>
+        const schoolId = '${school.id}';
+        let allQuestions = [];
+        let selectedQuestions = new Set();
+        let editingIndex = -1;
+        let createdTestId = '';
+
+        async function generateQuestions() {
+            const subject = document.getElementById('subject').value;
+            const classLevel = document.getElementById('classLevel').value;
+            const chapter = document.getElementById('chapter').value;
+            const count = parseInt(document.getElementById('questionCount').value);
+            const difficulty = document.getElementById('difficulty').value;
+
+            if (!chapter.trim()) {
+                alert('Please enter a chapter/topic');
+                return;
+            }
+
+            document.getElementById('step1').classList.add('hidden');
+            document.getElementById('step2').classList.remove('hidden');
+            document.getElementById('questionsLoading').classList.remove('hidden');
+            document.getElementById('questionsList').innerHTML = '';
+
+            try {
+                const response = await fetch('/api/generate-questions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, classLevel, chapter, count, difficulty })
+                });
+
+                const data = await response.json();
+
+                if (data.questions) {
+                    allQuestions = data.questions.map((q, i) => ({ ...q, id: 'q_' + Date.now() + '_' + i }));
+                    allQuestions.forEach(q => selectedQuestions.add(q.id));
+                    renderQuestions();
+                } else {
+                    throw new Error('No questions generated');
+                }
+            } catch (error) {
+                alert('Failed to generate questions: ' + error.message);
+                goBack();
+            } finally {
+                document.getElementById('questionsLoading').classList.add('hidden');
+            }
+        }
+
+        async function generateMore() {
+            const subject = document.getElementById('subject').value;
+            const classLevel = document.getElementById('classLevel').value;
+            const chapter = document.getElementById('chapter').value;
+            const difficulty = document.getElementById('difficulty').value;
+
+            document.getElementById('questionsLoading').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/generate-questions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, classLevel, chapter, count: 5, difficulty })
+                });
+
+                const data = await response.json();
+
+                if (data.questions) {
+                    const newQuestions = data.questions.map((q, i) => ({
+                        ...q,
+                        id: 'q_' + Date.now() + '_' + i
+                    }));
+                    allQuestions = [...allQuestions, ...newQuestions];
+                    newQuestions.forEach(q => selectedQuestions.add(q.id));
+                    renderQuestions();
+                }
+            } catch (error) {
+                alert('Failed to generate more questions: ' + error.message);
+            } finally {
+                document.getElementById('questionsLoading').classList.add('hidden');
+            }
+        }
+
+        function renderQuestions() {
+            const container = document.getElementById('questionsList');
+
+            if (allQuestions.length === 0) {
+                container.innerHTML = '<div class="empty-state">No questions yet. Generate some!</div>';
+                return;
+            }
+
+            container.innerHTML = allQuestions.map((q, i) => {
+                const isSelected = selectedQuestions.has(q.id);
+                return \`
+                    <div class="question-item \${isSelected ? 'selected' : ''}" data-id="\${q.id}">
+                        <div class="question-header">
+                            <input type="checkbox" class="question-checkbox"
+                                   \${isSelected ? 'checked' : ''}
+                                   onchange="toggleQuestion('\${q.id}')">
+                            <div class="question-text">\${i + 1}. \${q.question}</div>
+                            <div class="question-actions">
+                                <button class="btn btn-secondary" onclick="editQuestion(\${i})" style="padding: 6px 12px; font-size: 0.8rem;">✏️</button>
+                                <button class="btn btn-danger" onclick="deleteQuestion(\${i})">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="options-list">
+                            \${q.options.map((opt, oi) => \`
+                                <div class="option \${oi === q.correct ? 'correct' : ''}">\${String.fromCharCode(65 + oi)}. \${opt}</div>
+                            \`).join('')}
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+
+            updateStats();
+        }
+
+        function toggleQuestion(id) {
+            if (selectedQuestions.has(id)) {
+                selectedQuestions.delete(id);
+            } else {
+                selectedQuestions.add(id);
+            }
+            renderQuestions();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll').checked;
+            if (selectAll) {
+                allQuestions.forEach(q => selectedQuestions.add(q.id));
+            } else {
+                selectedQuestions.clear();
+            }
+            renderQuestions();
+        }
+
+        function updateStats() {
+            document.getElementById('selectedCount').textContent = selectedQuestions.size;
+            document.getElementById('totalCount').textContent = allQuestions.length;
+            document.getElementById('createTestBtn').disabled = selectedQuestions.size === 0;
+            document.getElementById('selectAll').checked = selectedQuestions.size === allQuestions.length && allQuestions.length > 0;
+        }
+
+        function editQuestion(index) {
+            editingIndex = index;
+            const q = allQuestions[index];
+            document.getElementById('editQuestion').value = q.question;
+            document.getElementById('editOptionA').value = q.options[0];
+            document.getElementById('editOptionB').value = q.options[1];
+            document.getElementById('editOptionC').value = q.options[2];
+            document.getElementById('editOptionD').value = q.options[3];
+            document.getElementById('editCorrectAnswer').value = q.correct;
+            document.getElementById('editExplanation').value = q.explanation || '';
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+            editingIndex = -1;
+        }
+
+        function saveEditedQuestion() {
+            if (editingIndex < 0) return;
+
+            allQuestions[editingIndex] = {
+                ...allQuestions[editingIndex],
+                question: document.getElementById('editQuestion').value,
+                options: [
+                    document.getElementById('editOptionA').value,
+                    document.getElementById('editOptionB').value,
+                    document.getElementById('editOptionC').value,
+                    document.getElementById('editOptionD').value
+                ],
+                correct: parseInt(document.getElementById('editCorrectAnswer').value),
+                explanation: document.getElementById('editExplanation').value
+            };
+
+            closeEditModal();
+            renderQuestions();
+        }
+
+        function deleteQuestion(index) {
+            if (!confirm('Delete this question?')) return;
+            const id = allQuestions[index].id;
+            selectedQuestions.delete(id);
+            allQuestions.splice(index, 1);
+            renderQuestions();
+        }
+
+        function openAddModal() {
+            document.getElementById('customQuestion').value = '';
+            document.getElementById('optionA').value = '';
+            document.getElementById('optionB').value = '';
+            document.getElementById('optionC').value = '';
+            document.getElementById('optionD').value = '';
+            document.getElementById('correctAnswer').value = '0';
+            document.getElementById('customExplanation').value = '';
+            document.getElementById('addModal').classList.add('active');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('active');
+        }
+
+        function addCustomQuestion() {
+            const question = document.getElementById('customQuestion').value.trim();
+            const options = [
+                document.getElementById('optionA').value.trim(),
+                document.getElementById('optionB').value.trim(),
+                document.getElementById('optionC').value.trim(),
+                document.getElementById('optionD').value.trim()
+            ];
+
+            if (!question || options.some(o => !o)) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const newQuestion = {
+                id: 'q_custom_' + Date.now(),
+                question,
+                options,
+                correct: parseInt(document.getElementById('correctAnswer').value),
+                explanation: document.getElementById('customExplanation').value.trim()
+            };
+
+            allQuestions.push(newQuestion);
+            selectedQuestions.add(newQuestion.id);
+            closeAddModal();
+            renderQuestions();
+        }
+
+        function goBack() {
+            document.getElementById('step2').classList.add('hidden');
+            document.getElementById('step1').classList.remove('hidden');
+        }
+
+        async function createTest() {
+            const title = document.getElementById('testTitle').value.trim();
+            if (!title) {
+                alert('Please enter a test title');
+                return;
+            }
+
+            const selectedQs = allQuestions.filter(q => selectedQuestions.has(q.id))
+                .map(({ id, ...rest }) => rest); // Remove internal IDs
+
+            if (selectedQs.length === 0) {
+                alert('Please select at least one question');
+                return;
+            }
+
+            document.getElementById('createTestBtn').disabled = true;
+            document.getElementById('createTestBtn').textContent = 'Creating...';
+
+            try {
+                const response = await fetch('/api/tests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        school: schoolId,
+                        title,
+                        subject: document.getElementById('subject').value,
+                        classLevel: document.getElementById('classLevel').value,
+                        chapter: document.getElementById('chapter').value,
+                        questions: selectedQs,
+                        teacherName: document.getElementById('teacherName').value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    createdTestId = data.testId;
+                    document.getElementById('shareLink').textContent = data.shareUrl;
+                    document.getElementById('viewResultsLink').href = '/results/' + data.testId + '?school=' + schoolId;
+                    document.getElementById('step2').classList.add('hidden');
+                    document.getElementById('step3').classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Failed to create test');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                document.getElementById('createTestBtn').disabled = false;
+                document.getElementById('createTestBtn').textContent = '📤 Create Test';
+            }
+        }
+
+        function copyLink() {
+            const link = document.getElementById('shareLink').textContent;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('Link copied to clipboard!');
+            });
+        }
+
+        function shareWhatsApp() {
+            const link = document.getElementById('shareLink').textContent;
+            const title = document.getElementById('testTitle').value;
+            const teacher = document.getElementById('teacherName').value || 'Your Teacher';
+            const text = '📝 *' + title + '*\\n\\nHi! ' + teacher + ' has created a test for you.\\n\\n✅ Take the test here:\\n' + link;
+            window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+        }
+
+        function createAnother() {
+            allQuestions = [];
+            selectedQuestions.clear();
+            document.getElementById('testTitle').value = '';
+            document.getElementById('chapter').value = '';
+            document.getElementById('step3').classList.add('hidden');
+            document.getElementById('step1').classList.remove('hidden');
+        }
+
+        // Close modals on backdrop click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>`);
+});
+
+// Student Test Taking Page
+app.get('/test/:testId', async (req, res) => {
+    const { testId } = req.params;
+    const test = await db.getTestByFullId(testId);
+
+    if (!test) {
+        return res.status(404).send('Test not found');
+    }
+
+    const school = demoSchools[test.school] || demoSchools['demo'];
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${test.title} - ${school.name}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f5f7fa; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, ${school.gradientFrom} 0%, ${school.gradientTo} 100%); color: white; padding: 20px 24px; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 1.25rem; margin-bottom: 4px; }
+        .header .meta { font-size: 0.85rem; opacity: 0.9; }
+        .container { max-width: 700px; margin: 0 auto; padding: 24px; }
+        .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .student-info { margin-bottom: 24px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
+        .form-group input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
+        .form-group input:focus { outline: none; border-color: ${school.primaryColor}; }
+        .question-card { border-left: 4px solid ${school.primaryColor}; }
+        .question-number { font-size: 0.8rem; color: ${school.primaryColor}; font-weight: 600; margin-bottom: 8px; }
+        .question-text { font-size: 1.1rem; font-weight: 500; color: #1f2937; margin-bottom: 16px; line-height: 1.5; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .option:hover { border-color: ${school.primaryColor}40; background: ${school.primaryColor}05; }
+        .option.selected { border-color: ${school.primaryColor}; background: ${school.primaryColor}10; }
+        .option-radio { width: 20px; height: 20px; border: 2px solid #d1d5db; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .option.selected .option-radio { border-color: ${school.primaryColor}; }
+        .option.selected .option-radio::after { content: ''; width: 10px; height: 10px; background: ${school.primaryColor}; border-radius: 50%; }
+        .option-text { flex: 1; color: #374151; }
+        .btn { display: block; width: 100%; padding: 14px 24px; border-radius: 10px; font-weight: 600; font-size: 1rem; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: ${school.primaryColor}; color: white; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+        .progress-bar { height: 4px; background: #e5e7eb; border-radius: 2px; margin-bottom: 20px; overflow: hidden; }
+        .progress-fill { height: 100%; background: ${school.primaryColor}; transition: width 0.3s; }
+        .result-card { text-align: center; padding: 40px 24px; }
+        .score-circle { width: 120px; height: 120px; border-radius: 50%; background: ${school.primaryColor}; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto 24px; }
+        .score-value { font-size: 2.5rem; font-weight: 700; }
+        .score-label { font-size: 0.85rem; opacity: 0.9; }
+        .result-message { font-size: 1.25rem; font-weight: 600; color: #1f2937; margin-bottom: 8px; }
+        .result-detail { color: #6b7280; margin-bottom: 24px; }
+        .review-section { text-align: left; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 24px; }
+        .review-item { padding: 16px; background: #f9fafb; border-radius: 8px; margin-bottom: 12px; }
+        .review-item.correct { border-left: 4px solid #10b981; }
+        .review-item.wrong { border-left: 4px solid #ef4444; }
+        .review-question { font-weight: 500; margin-bottom: 8px; }
+        .review-answer { font-size: 0.9rem; color: #6b7280; }
+        .review-answer span { font-weight: 500; }
+        .review-explanation { font-size: 0.85rem; color: #059669; margin-top: 8px; font-style: italic; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${school.logo} ${test.title}</h1>
+        <div class="meta">${test.subject} | Class ${test.classLevel} | ${test.questions.length} Questions</div>
+    </div>
+
+    <div class="container">
+        <!-- Student Info -->
+        <div class="card student-info" id="studentInfo">
+            <h2 style="font-size: 1.1rem; margin-bottom: 16px;">Enter Your Details</h2>
+            <div class="form-group">
+                <label>Your Name *</label>
+                <input type="text" id="studentName" placeholder="Enter your name">
+            </div>
+            <div class="form-group">
+                <label>Phone Number (optional)</label>
+                <input type="tel" id="studentPhone" placeholder="Your WhatsApp number">
+            </div>
+            <button class="btn btn-primary" onclick="startTest()">Start Test</button>
+        </div>
+
+        <!-- Test Questions -->
+        <div id="testSection" class="hidden">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+            </div>
+
+            <div id="questionsContainer"></div>
+
+            <button class="btn btn-primary" id="submitBtn" onclick="submitTest()">Submit Test</button>
+        </div>
+
+        <!-- Results -->
+        <div class="card result-card hidden" id="resultSection">
+            <div class="score-circle">
+                <div class="score-value" id="scoreValue">0%</div>
+                <div class="score-label">Score</div>
+            </div>
+            <div class="result-message" id="resultMessage">Well done!</div>
+            <div class="result-detail" id="resultDetail">You got 0 out of 0 correct</div>
+
+            <div class="review-section">
+                <h3 style="font-size: 1rem; margin-bottom: 16px;">📝 Review Your Answers</h3>
+                <div id="reviewContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const testId = '${testId}';
+        const questions = ${JSON.stringify(test.questions.map(q => ({
+            question: q.question,
+            options: q.options
+        })))};
+        const answers = new Array(questions.length).fill(-1);
+
+        function startTest() {
+            const name = document.getElementById('studentName').value.trim();
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+            document.getElementById('studentInfo').classList.add('hidden');
+            document.getElementById('testSection').classList.remove('hidden');
+            renderQuestions();
+        }
+
+        function renderQuestions() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = questions.map((q, qi) => \`
+                <div class="card question-card">
+                    <div class="question-number">Question \${qi + 1} of \${questions.length}</div>
+                    <div class="question-text">\${q.question}</div>
+                    <div class="options">
+                        \${q.options.map((opt, oi) => \`
+                            <div class="option \${answers[qi] === oi ? 'selected' : ''}"
+                                 onclick="selectOption(\${qi}, \${oi})">
+                                <div class="option-radio"></div>
+                                <div class="option-text">\${opt}</div>
+                            </div>
+                        \`).join('')}
+                    </div>
+                </div>
+            \`).join('');
+            updateProgress();
+        }
+
+        function selectOption(questionIndex, optionIndex) {
+            answers[questionIndex] = optionIndex;
+            renderQuestions();
+        }
+
+        function updateProgress() {
+            const answered = answers.filter(a => a >= 0).length;
+            const percent = (answered / questions.length) * 100;
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('submitBtn').disabled = answered < questions.length;
+            document.getElementById('submitBtn').textContent = answered < questions.length
+                ? \`Submit Test (\${answered}/\${questions.length} answered)\`
+                : 'Submit Test';
+        }
+
+        async function submitTest() {
+            const unanswered = answers.filter(a => a < 0).length;
+            if (unanswered > 0) {
+                if (!confirm(\`You have \${unanswered} unanswered question(s). Submit anyway?\`)) {
+                    return;
+                }
+            }
+
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = 'Submitting...';
+
+            try {
+                const response = await fetch('/api/tests/' + testId + '/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        studentName: document.getElementById('studentName').value,
+                        studentPhone: document.getElementById('studentPhone').value,
+                        answers
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showResults(data);
+                } else {
+                    throw new Error(data.error || 'Submission failed');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = 'Submit Test';
+            }
+        }
+
+        function showResults(data) {
+            document.getElementById('testSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+
+            document.getElementById('scoreValue').textContent = data.score + '%';
+            document.getElementById('resultDetail').textContent = \`You got \${data.correct} out of \${data.total} correct\`;
+
+            let message = '';
+            if (data.score >= 90) message = '🌟 Excellent work!';
+            else if (data.score >= 70) message = '👏 Good job!';
+            else if (data.score >= 50) message = '📚 Keep practicing!';
+            else message = '💪 Don\\'t give up!';
+            document.getElementById('resultMessage').textContent = message;
+
+            const reviewContainer = document.getElementById('reviewContainer');
+            reviewContainer.innerHTML = data.results.map((r, i) => \`
+                <div class="review-item \${r.isCorrect ? 'correct' : 'wrong'}">
+                    <div class="review-question">\${i + 1}. \${r.question}</div>
+                    <div class="review-answer">
+                        Your answer: <span style="color: \${r.isCorrect ? '#10b981' : '#ef4444'}">\${r.selected >= 0 ? questions[i].options[r.selected] : 'Not answered'}</span>
+                        \${!r.isCorrect ? '<br>Correct answer: <span style="color: #10b981">' + questions[i].options[r.correct] + '</span>' : ''}
+                    </div>
+                    \${r.explanation ? '<div class="review-explanation">💡 ' + r.explanation + '</div>' : ''}
+                </div>
+            \`).join('');
+        }
+    </script>
+</body>
+</html>`);
+});
+
+// Results Dashboard Page
+app.get('/results/:testId', async (req, res) => {
+    const { testId } = req.params;
+    const schoolId = testId.split('_')[0];
+    const school = demoSchools[schoolId] || demoSchools['demo'];
+
+    const test = await db.getTestByFullId(testId);
+    if (!test) {
+        return res.status(404).send('Test not found');
+    }
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results - ${test.title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f5f7fa; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, ${school.gradientFrom} 0%, ${school.gradientTo} 100%); color: white; padding: 20px 24px; }
+        .header h1 { font-size: 1.25rem; margin-bottom: 4px; }
+        .header .meta { font-size: 0.85rem; opacity: 0.9; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 2rem; font-weight: 700; color: ${school.primaryColor}; }
+        .stat-label { font-size: 0.8rem; color: #6b7280; margin-top: 4px; }
+        .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h2 { font-size: 1.1rem; color: #374151; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background: #f9fafb; font-weight: 600; font-size: 0.85rem; color: #6b7280; }
+        .score-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
+        .score-high { background: #d1fae5; color: #065f46; }
+        .score-mid { background: #fef3c7; color: #92400e; }
+        .score-low { background: #fee2e2; color: #991b1b; }
+        .question-stat { padding: 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px; }
+        .question-stat-header { display: flex; justify-content: space-between; align-items: center; }
+        .success-rate { font-weight: 600; }
+        .success-rate.high { color: #059669; }
+        .success-rate.mid { color: #d97706; }
+        .success-rate.low { color: #dc2626; }
+        .progress-bar { height: 6px; background: #e5e7eb; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .progress-fill { height: 100%; background: ${school.primaryColor}; }
+        .empty-state { text-align: center; padding: 40px; color: #6b7280; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; text-decoration: none; }
+        .btn-primary { background: ${school.primaryColor}; color: white; }
+        .loading { text-align: center; padding: 40px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${school.logo} ${test.title} - Results</h1>
+        <div class="meta">${test.subject} | Class ${test.classLevel} | ${test.chapter}</div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalAttempts">-</div>
+                <div class="stat-label">Total Attempts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgScore">-</div>
+                <div class="stat-label">Avg Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="highScore">-</div>
+                <div class="stat-label">Highest</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="lowScore">-</div>
+                <div class="stat-label">Lowest</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>👥 Student Submissions</h2>
+            <div id="attemptsTable">
+                <div class="loading">Loading results...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Question Analysis</h2>
+            <div id="questionStats">
+                <div class="loading">Loading analysis...</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <a href="/assessment?school=${school.id}" class="btn btn-primary">← Back to Assessment</a>
+        </div>
+    </div>
+
+    <script>
+        const testId = '${testId}';
+
+        async function loadResults() {
+            try {
+                const response = await fetch('/api/tests/' + testId + '/results');
+                const data = await response.json();
+
+                // Update stats
+                document.getElementById('totalAttempts').textContent = data.analytics.totalAttempts;
+                document.getElementById('avgScore').textContent = data.analytics.avgScore + '%';
+                document.getElementById('highScore').textContent = data.analytics.highestScore + '%';
+                document.getElementById('lowScore').textContent = data.analytics.totalAttempts > 0 ? data.analytics.lowestScore + '%' : '-';
+
+                // Render attempts table
+                if (data.attempts.length === 0) {
+                    document.getElementById('attemptsTable').innerHTML = '<div class="empty-state">No submissions yet. Share the test link with students!</div>';
+                } else {
+                    document.getElementById('attemptsTable').innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Score</th>
+                                    <th>Correct</th>
+                                    <th>Submitted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${data.attempts.map(a => \`
+                                    <tr>
+                                        <td>\${a.studentName}</td>
+                                        <td><span class="score-badge \${a.score >= 70 ? 'score-high' : a.score >= 50 ? 'score-mid' : 'score-low'}">\${a.score}%</span></td>
+                                        <td>\${a.correct}/\${a.total}</td>
+                                        <td>\${new Date(a.submittedAt).toLocaleString('en-IN')}</td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+
+                // Render question stats
+                document.getElementById('questionStats').innerHTML = data.analytics.questionStats.map((q, i) => \`
+                    <div class="question-stat">
+                        <div class="question-stat-header">
+                            <span>Q\${i + 1}: \${q.question.substring(0, 60)}...</span>
+                            <span class="success-rate \${q.successRate >= 70 ? 'high' : q.successRate >= 50 ? 'mid' : 'low'}">\${q.successRate}% correct</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: \${q.successRate}%"></div>
+                        </div>
+                    </div>
+                \`).join('');
+
+            } catch (error) {
+                console.error('Error loading results:', error);
+            }
+        }
+
+        loadResults();
+        // Auto-refresh every 30 seconds
+        setInterval(loadResults, 30000);
+    </script>
+</body>
+</html>`);
+});
+
+// =====================================================
+// DASHBOARD - View All Teaching Methods
+// =====================================================
+
+app.get('/dashboard', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const dashboardPath = path.join(__dirname, 'dashboard.html');
+
+    fs.readFile(dashboardPath, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(500).send('Dashboard not found');
         }
         res.setHeader('Content-Type', 'text/html');
         res.send(data);
