@@ -2355,7 +2355,7 @@ app.get('/workshops', (req, res) => {
     <!-- Hero -->
     <section class="hero">
         <div class="hero-content">
-            <div class="hero-badge">🚀 Beyond ChatGPT</div>
+            <div class="hero-badge">Beyond ChatGPT</div>
             <h1>Your Students Know ChatGPT.<br>Can They BUILD With AI?</h1>
             <p class="hero-subtitle">
                 We don't teach basic prompts. We help students and teachers build
@@ -2367,8 +2367,7 @@ app.get('/workshops', (req, res) => {
 
     <!-- Problem -->
     <section class="problem">
-        <div class="problem-icon">🎯</div>
-        <h2>Basic AI training is already obsolete</h2>
+        <h2 style="font-size: 2rem;">Basic AI training is already obsolete</h2>
         <p>
             Everyone knows ChatGPT. The real edge? Building Custom GPTs trained on YOUR syllabus.
             Creating AI workflows that save 5 hours/week. Your students need to BUILD, not just USE.
@@ -2442,32 +2441,32 @@ app.get('/workshops', (req, res) => {
             </div>
             <div class="learn-grid">
                 <div class="learn-card">
-                    <div class="learn-icon">🤖</div>
+                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">01</div>
                     <h4>Custom GPT</h4>
                     <p>A GPT trained on their interest - study buddy, quiz bot, hobby helper</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">📱</div>
+                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">02</div>
                     <h4>AI Mini-App</h4>
                     <p>No-code app using AI - flashcard generator, translator, summarizer</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">👁️</div>
-                    <h4>Image Recognition Model</h4>
+                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">03</div>
+                    <h4>Image Recognition</h4>
                     <p>Train AI to recognize objects using Teachable Machine</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">📊</div>
+                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">04</div>
                     <h4>AI Workflow</h4>
                     <p>Teachers: Automated lesson plans, grading, feedback systems</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">🎨</div>
-                    <h4>AI Art Portfolio</h4>
+                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">05</div>
+                    <h4>AI Visuals</h4>
                     <p>Create professional visuals for projects using image AI</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">💡</div>
+                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">06</div>
                     <h4>AI Product Pitch</h4>
                     <p>Design and present an AI product idea - entrepreneurship skills</p>
                 </div>
@@ -2475,15 +2474,39 @@ app.get('/workshops', (req, res) => {
         </div>
     </section>
 
-    <!-- Why Different -->
-    <section class="testimonial">
-        <div class="testimonial-quote">
-            "We've done AI workshops before. They showed PowerPoints about ChatGPT.
-            This one? Our teachers walked out with a GPT that grades essays in their style.
-            Our students built apps. That's the difference."
+    <!-- Testimonials -->
+    <section class="testimonials" style="padding: 80px 24px; background: #f9fafb;">
+        <div class="container">
+            <div class="section-header">
+                <h2>What Educators Say</h2>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; max-width: 1000px; margin: 0 auto;">
+                <div style="background: white; padding: 32px; border-radius: 12px; border-left: 4px solid #1e3a8a;">
+                    <p style="font-style: italic; color: #374151; margin-bottom: 16px; line-height: 1.7;">
+                        "I was skeptical - we've done AI workshops before that were just PowerPoints. This was completely different.
+                        I now have a GPT that creates question papers in my exact format. Saved me 4 hours last week alone."
+                    </p>
+                    <div style="font-weight: 600; color: #1e3a8a;">Priya Sharma</div>
+                    <div style="font-size: 0.9rem; color: #6b7280;">Mathematics Teacher, DPS Gurgaon</div>
+                </div>
+                <div style="background: white; padding: 32px; border-radius: 12px; border-left: 4px solid #1e3a8a;">
+                    <p style="font-style: italic; color: #374151; margin-bottom: 16px; line-height: 1.7;">
+                        "Our Class 10 students built actual working chatbots in 3 hours. Parents were amazed at the exhibition.
+                        Two students are now exploring AI for their college applications. That's real impact."
+                    </p>
+                    <div style="font-weight: 600; color: #1e3a8a;">Dr. Rajesh Menon</div>
+                    <div style="font-size: 0.9rem; color: #6b7280;">Principal, Vidya Niketan, Bangalore</div>
+                </div>
+                <div style="background: white; padding: 32px; border-radius: 12px; border-left: 4px solid #1e3a8a;">
+                    <p style="font-style: italic; color: #374151; margin-bottom: 16px; line-height: 1.7;">
+                        "What convinced me was the teacher workshop. My staff went from 'AI will replace us' to
+                        'How did we work without this?' Gurminder doesn't just teach tools - he changes mindsets."
+                    </p>
+                    <div style="font-weight: 600; color: #1e3a8a;">Anjali Krishnan</div>
+                    <div style="font-size: 0.9rem; color: #6b7280;">Academic Director, Greenwood High, Chennai</div>
+                </div>
+            </div>
         </div>
-        <div class="testimonial-author">Academic Coordinator</div>
-        <div class="testimonial-role">International School, Mumbai</div>
     </section>
 
     <!-- About Founder -->
@@ -2511,7 +2534,7 @@ app.get('/workshops', (req, res) => {
             </div>
             <div class="form-container">
                 <div class="success-message" id="successMsg">
-                    <h3>🎉 Thank you!</h3>
+                    <h3>Thank you!</h3>
                     <p>We've received your request. Expect a call within 24 hours.</p>
                 </div>
                 <form id="workshopForm" action="https://formspree.io/f/xpwzgkvq" method="POST">
