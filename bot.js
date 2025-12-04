@@ -2609,9 +2609,9 @@ app.get('/workshops', (req, res) => {
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-brand">Eulean AI</div>
-        <div class="footer-tagline">Transforming Education with AI</div>
+        <div class="footer-tagline">Connecting Every Learner to Knowledge</div>
         <div class="footer-links">
-            <a href="/">Home</a>
+            <a href="/eulean">Home</a>
             <a href="/workshops">Workshops</a>
             <a href="https://vidyamitra.ai">VidyaMitra</a>
             <a href="https://linkedin.com/in/sgurminder">LinkedIn</a>
@@ -2795,8 +2795,9 @@ app.get('/eulean', (req, res) => {
     </nav>
 
     <section class="hero">
-        <h1>We Help Teachers<br>10x Their Productivity</h1>
-        <p>AI workshops that save teachers hours every week. Plus an AI tutor that gives students 24/7 homework help - the way YOUR teacher teaches.</p>
+        <p style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; margin-bottom: 16px;">Inspired by Leonhard Euler</p>
+        <h1>Connecting Every Learner<br>to Knowledge</h1>
+        <p>We help schools use AI the right way. Hands-on workshops for teachers. Personalized AI tutoring for students. No hype—just tools that work.</p>
         <div class="hero-buttons">
             <a href="/workshops" class="btn btn-primary">Explore Workshops →</a>
             <a href="https://vidyamitra.ai" class="btn btn-secondary">Try VidyaMitra</a>
@@ -2908,13 +2909,14 @@ app.get('/eulean', (req, res) => {
 
     <footer class="footer">
         <div class="footer-brand">Eulean AI</div>
+        <div style="color: rgba(255,255,255,0.6); margin-bottom: 16px; font-style: italic;">Connecting Every Learner to Knowledge</div>
         <div class="footer-links">
             <a href="/workshops">Workshops</a>
             <a href="https://vidyamitra.ai">VidyaMitra</a>
             <a href="https://www.linkedin.com/in/sgurminder/" target="_blank">LinkedIn</a>
             <a href="mailto:gurminder@euleanai.com">Contact</a>
         </div>
-        <div class="footer-copy">© 2025 Eulean AI. All rights reserved.</div>
+        <div class="footer-copy">Inspired by Leonhard Euler, inventor of graph theory. © 2025 Eulean AI.</div>
     </footer>
 </body>
 </html>`);
