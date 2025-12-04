@@ -2111,8 +2111,8 @@ app.get('/workshops', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Literacy Workshops for Schools | Eulean AI</title>
-    <meta name="description" content="Prepare your students for an AI-driven future. Hands-on AI workshops for schools by Eulean AI.">
+    <title>AI Builder Workshops for Schools | Eulean AI</title>
+    <meta name="description" content="Beyond ChatGPT basics. Build Custom GPTs, AI workflows, and real products. Advanced AI workshops for students and teachers.">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2355,11 +2355,11 @@ app.get('/workshops', (req, res) => {
     <!-- Hero -->
     <section class="hero">
         <div class="hero-content">
-            <div class="hero-badge">🎓 Eulean AI</div>
-            <h1>AI Literacy Workshops for Schools</h1>
+            <div class="hero-badge">🚀 Beyond ChatGPT</div>
+            <h1>Your Students Know ChatGPT.<br>Can They BUILD With AI?</h1>
             <p class="hero-subtitle">
-                Your students are already using ChatGPT.
-                We help them use it right - ethically, effectively, and safely.
+                We don't teach basic prompts. We help students and teachers build
+                Custom GPTs, AI workflows, and real products - skills that matter.
             </p>
             <a href="#book" class="hero-cta">Book a Workshop →</a>
         </div>
@@ -2367,11 +2367,11 @@ app.get('/workshops', (req, res) => {
 
     <!-- Problem -->
     <section class="problem">
-        <div class="problem-icon">⚠️</div>
-        <h2>85% of students use AI tools without guidance</h2>
+        <div class="problem-icon">🎯</div>
+        <h2>Basic AI training is already obsolete</h2>
         <p>
-            They're copying homework, bypassing learning, and missing the chance to develop
-            critical AI skills they'll need for the future. It's time to teach them the right way.
+            Everyone knows ChatGPT. The real edge? Building Custom GPTs trained on YOUR syllabus.
+            Creating AI workflows that save 5 hours/week. Your students need to BUILD, not just USE.
         </p>
     </section>
 
@@ -2385,104 +2385,105 @@ app.get('/workshops', (req, res) => {
             <div class="workshops-grid">
                 <!-- Tier 1 -->
                 <div class="workshop-card">
-                    <div class="workshop-badge">STARTER</div>
-                    <h3>AI Awareness Session</h3>
-                    <div class="duration">45-60 minutes</div>
-                    <div class="price">₹5,000 <span>/ session</span></div>
+                    <div class="workshop-badge">FOR STUDENTS</div>
+                    <h3>AI Builder Workshop</h3>
+                    <div class="duration">Half day (3-4 hours)</div>
+                    <div class="price">₹15,000 <span>/ batch of 30</span></div>
                     <ul>
-                        <li>What is AI? Live demos</li>
-                        <li>AI careers of the future</li>
-                        <li>Safe AI usage basics</li>
-                        <li>Interactive Q&A</li>
-                        <li>Up to 200 students</li>
+                        <li>Build a Custom GPT from scratch</li>
+                        <li>Create an AI-powered mini-app</li>
+                        <li>Train an image recognition model</li>
+                        <li>AI product pitch competition</li>
+                        <li>Portfolio project they keep</li>
                     </ul>
                 </div>
 
                 <!-- Tier 2 -->
                 <div class="workshop-card featured">
-                    <div class="workshop-badge">MOST POPULAR</div>
-                    <h3>AI Literacy Workshop</h3>
-                    <div class="duration">2-3 hours</div>
-                    <div class="price">₹25,000 <span>/ workshop</span></div>
+                    <div class="workshop-badge">FOR TEACHERS</div>
+                    <h3>AI Productivity Masterclass</h3>
+                    <div class="duration">Full day (6 hours)</div>
+                    <div class="price">₹35,000 <span>/ batch of 20</span></div>
                     <ul>
-                        <li>Everything in Awareness +</li>
-                        <li>Hands-on AI tools practice</li>
-                        <li>AI ethics & safety deep-dive</li>
-                        <li>Using AI for learning (not cheating)</li>
-                        <li>Certificate for all participants</li>
-                        <li>Teacher resource kit included</li>
+                        <li>Build a GPT trained on YOUR syllabus</li>
+                        <li>Create 1 month lesson plans in 1 hour</li>
+                        <li>Automate grading with AI workflows</li>
+                        <li>Design AI-native assignments</li>
+                        <li>Claude, Gemini, Perplexity - when to use what</li>
+                        <li>Take home: 20+ ready-to-use prompts</li>
                     </ul>
                 </div>
 
                 <!-- Tier 3 -->
                 <div class="workshop-card">
-                    <div class="workshop-badge">COMPREHENSIVE</div>
-                    <h3>AI Integration Program</h3>
-                    <div class="duration">Full day (6-8 hours)</div>
-                    <div class="price">₹75,000 <span>/ program</span></div>
+                    <div class="workshop-badge">FOR LEADERSHIP</div>
+                    <h3>AI-First School Program</h3>
+                    <div class="duration">2 days + 30-day support</div>
+                    <div class="price">₹1,50,000 <span>/ school</span></div>
                     <ul>
-                        <li>Everything in Literacy +</li>
-                        <li>Teacher training session</li>
-                        <li>Curriculum integration planning</li>
-                        <li>Admin strategy workshop</li>
-                        <li>VidyaMitra pilot included</li>
-                        <li>30-day follow-up support</li>
+                        <li>Full student + teacher workshops</li>
+                        <li>Leadership strategy session</li>
+                        <li>AI policy framework (ready to use)</li>
+                        <li>EdTech vendor evaluation guide</li>
+                        <li>VidyaMitra pilot (100 students)</li>
+                        <li>"AI-Ready School" certification</li>
                     </ul>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- What Students Learn -->
+    <!-- What They Build -->
     <section class="section" style="background: #f9fafb;">
         <div class="container">
             <div class="section-header">
-                <h2>What Students Learn</h2>
-                <p>Practical skills for an AI-driven future</p>
+                <h2>What They Actually Build</h2>
+                <p>Not theory. Real projects they take home.</p>
             </div>
             <div class="learn-grid">
                 <div class="learn-card">
                     <div class="learn-icon">🤖</div>
-                    <h4>AI Fundamentals</h4>
-                    <p>How AI works, what it can and cannot do</p>
+                    <h4>Custom GPT</h4>
+                    <p>A GPT trained on their interest - study buddy, quiz bot, hobby helper</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">🛡️</div>
-                    <h4>AI Safety & Ethics</h4>
-                    <p>Privacy, bias, misinformation, responsible use</p>
+                    <div class="learn-icon">📱</div>
+                    <h4>AI Mini-App</h4>
+                    <p>No-code app using AI - flashcard generator, translator, summarizer</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">📚</div>
-                    <h4>AI for Learning</h4>
-                    <p>Using AI to enhance (not replace) learning</p>
+                    <div class="learn-icon">👁️</div>
+                    <h4>Image Recognition Model</h4>
+                    <p>Train AI to recognize objects using Teachable Machine</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">💼</div>
-                    <h4>Future Careers</h4>
-                    <p>Jobs that will exist, skills that will matter</p>
+                    <div class="learn-icon">📊</div>
+                    <h4>AI Workflow</h4>
+                    <p>Teachers: Automated lesson plans, grading, feedback systems</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">🔧</div>
-                    <h4>Hands-on Tools</h4>
-                    <p>ChatGPT, image AI, coding assistants</p>
+                    <div class="learn-icon">🎨</div>
+                    <h4>AI Art Portfolio</h4>
+                    <p>Create professional visuals for projects using image AI</p>
                 </div>
                 <div class="learn-card">
-                    <div class="learn-icon">🎯</div>
-                    <h4>Critical Thinking</h4>
-                    <p>Evaluating AI outputs, fact-checking</p>
+                    <div class="learn-icon">💡</div>
+                    <h4>AI Product Pitch</h4>
+                    <p>Design and present an AI product idea - entrepreneurship skills</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Testimonial -->
+    <!-- Why Different -->
     <section class="testimonial">
         <div class="testimonial-quote">
-            "The workshop was eye-opening for both students and teachers.
-            Finally, a practical approach to AI in education instead of just banning it."
+            "We've done AI workshops before. They showed PowerPoints about ChatGPT.
+            This one? Our teachers walked out with a GPT that grades essays in their style.
+            Our students built apps. That's the difference."
         </div>
-        <div class="testimonial-author">School Principal</div>
-        <div class="testimonial-role">Premium International School, Bangalore</div>
+        <div class="testimonial-author">Academic Coordinator</div>
+        <div class="testimonial-role">International School, Mumbai</div>
     </section>
 
     <!-- About Founder -->
@@ -2491,11 +2492,11 @@ app.get('/workshops', (req, res) => {
             <div class="founder-photo">GS</div>
             <div class="founder-text">
                 <h3>Gurminder Singh</h3>
-                <div class="title">Founder, Eulean AI</div>
+                <div class="title">Founder, Eulean AI | Builder of VidyaMitra</div>
                 <p>
-                    With 15+ years in technology, I've seen AI transform industries.
-                    Now I'm on a mission to help Indian schools prepare the next generation
-                    for an AI-driven world - not by fearing it, but by mastering it.
+                    I don't just talk about AI in education - I build it. VidyaMitra, my AI tutor
+                    product, is used by schools across India. I bring implementation experience,
+                    not theory. Every workshop includes tools I've built and use daily.
                 </p>
             </div>
         </div>
@@ -2559,10 +2560,10 @@ app.get('/workshops', (req, res) => {
                         <div class="form-group">
                             <label>Interested In</label>
                             <select name="workshop_type">
-                                <option value="Awareness Session">Awareness Session (₹5K)</option>
-                                <option value="AI Literacy Workshop" selected>AI Literacy Workshop (₹25K)</option>
-                                <option value="Full Program">Full Program (₹75K)</option>
-                                <option value="Not Sure">Not sure yet</option>
+                                <option value="Student Workshop">Student Workshop (₹15K)</option>
+                                <option value="Teacher Masterclass" selected>Teacher Masterclass (₹35K)</option>
+                                <option value="AI-First School Program">Full School Program (₹1.5L)</option>
+                                <option value="Custom">Custom / Not sure yet</option>
                             </select>
                         </div>
                     </div>
