@@ -4064,6 +4064,12 @@ app.get('/dashboard', (req, res) => {
 // =====================================================
 
 app.get('/', (req, res) => {
+    // Domain-based routing
+    const host = req.get('host') || '';
+    if (host.includes('euleanai.com')) {
+        return res.redirect('/eulean');
+    }
+
     const fs = require('fs');
     const path = require('path');
     const websitePath = path.join(__dirname, 'website.html');

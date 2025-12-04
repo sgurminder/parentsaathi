@@ -12,18 +12,6 @@
       "dest": "bot.js"
     }
   ],
-  "rewrites": [
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "euleanai.com" }],
-      "destination": "/eulean"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "www.euleanai.com" }],
-      "destination": "/eulean"
-    }
-  ],
   "env": {
     "NODE_ENV": "production"
   }
