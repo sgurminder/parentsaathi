@@ -2515,12 +2515,17 @@ app.get('/workshops', (req, res) => {
             <div class="founder-photo">GS</div>
             <div class="founder-text">
                 <h3>Gurminder Singh</h3>
-                <div class="title">Founder, Eulean AI | Builder of VidyaMitra</div>
-                <p>
-                    I don't just talk about AI in education - I build it. VidyaMitra, my AI tutor
-                    product, is used by schools across India. I bring implementation experience,
-                    not theory. Every workshop includes tools I've built and use daily.
+                <div class="title">Founder, Eulean AI | Ex-Samsung Research | Gen AI Patent Holder</div>
+                <p style="margin-bottom: 12px;">
+                    19 years in tech. Ex-Samsung Research, Ex-LSI Systems, Ex-IISc Research Assistant.
+                    Inventor on a Generative AI patent (Immersive Display Systems).
+                    I've built AI systems at scale - now I'm bringing that expertise to education.
                 </p>
+                <p style="margin-bottom: 16px;">
+                    VidyaMitra, my AI tutor, is used by schools across India.
+                    Every workshop includes tools I've built and use daily. Not theory - real implementation.
+                </p>
+                <a href="https://www.linkedin.com/in/sgurminder/" target="_blank" style="color: #3b82f6; font-weight: 600; text-decoration: none;">View LinkedIn Profile →</a>
             </div>
         </div>
     </section>
@@ -2609,7 +2614,7 @@ app.get('/workshops', (req, res) => {
             <a href="/">Home</a>
             <a href="/workshops">Workshops</a>
             <a href="https://vidyamitra.ai">VidyaMitra</a>
-            <a href="https://linkedin.com/in/gurminder">LinkedIn</a>
+            <a href="https://linkedin.com/in/sgurminder">LinkedIn</a>
         </div>
         <div class="footer-contact">
             gurminder@euleanai.com | +91-9590105978<br>
@@ -2784,7 +2789,7 @@ app.get('/eulean', (req, res) => {
         <div class="nav-links">
             <a href="/workshops">Workshops</a>
             <a href="https://vidyamitra.ai">VidyaMitra</a>
-            <a href="https://linkedin.com/in/gurminder">About</a>
+            <a href="https://linkedin.com/in/sgurminder">About</a>
             <a href="/workshops#book" class="nav-cta">Book Workshop</a>
         </div>
     </nav>
@@ -2879,6 +2884,22 @@ app.get('/eulean', (req, res) => {
         </div>
     </section>
 
+    <!-- Founder -->
+    <section style="padding: 60px 24px; background: white;">
+        <div style="max-width: 700px; margin: 0 auto; display: flex; gap: 32px; align-items: center; flex-wrap: wrap;">
+            <div style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #1e3a8a, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: white; font-weight: 700; flex-shrink: 0;">GS</div>
+            <div style="flex: 1; min-width: 280px;">
+                <h3 style="font-size: 1.5rem; margin-bottom: 4px; color: #1e3a8a;">Gurminder Singh</h3>
+                <div style="color: #6b7280; margin-bottom: 12px; font-size: 0.95rem;">Founder | Ex-Samsung Research | Gen AI Patent Holder</div>
+                <p style="color: #374151; line-height: 1.7; margin-bottom: 12px;">
+                    19 years building AI systems at Samsung Research, LSI Systems, and IISc.
+                    Now bringing enterprise-grade AI expertise to transform how schools teach and students learn.
+                </p>
+                <a href="https://www.linkedin.com/in/sgurminder/" target="_blank" style="color: #3b82f6; font-weight: 600; text-decoration: none;">LinkedIn →</a>
+            </div>
+        </div>
+    </section>
+
     <section class="cta-section">
         <h2>Ready to transform your school with AI?</h2>
         <p>Book a workshop and see the productivity gains firsthand.</p>
@@ -2890,6 +2911,7 @@ app.get('/eulean', (req, res) => {
         <div class="footer-links">
             <a href="/workshops">Workshops</a>
             <a href="https://vidyamitra.ai">VidyaMitra</a>
+            <a href="https://www.linkedin.com/in/sgurminder/" target="_blank">LinkedIn</a>
             <a href="mailto:gurminder@euleanai.com">Contact</a>
         </div>
         <div class="footer-copy">© 2025 Eulean AI. All rights reserved.</div>
