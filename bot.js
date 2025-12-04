@@ -2102,6 +2102,732 @@ app.get('/presentation/vidyamitra', (req, res) => {
 });
 
 // =====================================================
+// EULEAN AI - Workshop Landing Page
+// =====================================================
+
+app.get('/workshops', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Literacy Workshops for Schools | Eulean AI</title>
+    <meta name="description" content="Prepare your students for an AI-driven future. Hands-on AI workshops for schools by Eulean AI.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, sans-serif; color: #1f2937; line-height: 1.6; }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #0ea5e9 100%);
+            color: white;
+            padding: 80px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.5;
+        }
+        .hero-content { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; }
+        .hero-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+        }
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        .hero-subtitle {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 32px;
+        }
+        .hero-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            color: #1e3a8a;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+        }
+        .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+
+        /* Problem Section */
+        .problem {
+            padding: 80px 24px;
+            background: #fef3c7;
+            text-align: center;
+        }
+        .problem-icon { font-size: 3rem; margin-bottom: 16px; }
+        .problem h2 { font-size: 1.75rem; color: #92400e; margin-bottom: 16px; }
+        .problem p { font-size: 1.1rem; color: #78350f; max-width: 700px; margin: 0 auto; }
+
+        /* Container */
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+        /* Section */
+        .section { padding: 80px 24px; }
+        .section-header { text-align: center; margin-bottom: 48px; }
+        .section-header h2 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
+        .section-header p { color: #6b7280; font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+
+        /* Workshop Cards */
+        .workshops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        .workshop-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 32px;
+            transition: all 0.2s;
+        }
+        .workshop-card:hover { border-color: #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.15); }
+        .workshop-card.featured { border-color: #3b82f6; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); }
+        .workshop-badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 4px 12px;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        .workshop-card.featured .workshop-badge { background: #1e40af; color: white; }
+        .workshop-card h3 { font-size: 1.35rem; margin-bottom: 8px; }
+        .workshop-card .duration { color: #6b7280; font-size: 0.9rem; margin-bottom: 16px; }
+        .workshop-card .price { font-size: 1.5rem; font-weight: 700; color: #1e3a8a; margin-bottom: 16px; }
+        .workshop-card .price span { font-size: 0.9rem; font-weight: 400; color: #6b7280; }
+        .workshop-card ul { list-style: none; margin-bottom: 20px; }
+        .workshop-card li { padding: 8px 0; padding-left: 28px; position: relative; color: #374151; }
+        .workshop-card li::before { content: '✓'; position: absolute; left: 0; color: #10b981; font-weight: 700; }
+
+        /* What Students Learn */
+        .learn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; }
+        .learn-card {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+        .learn-icon { font-size: 2.5rem; margin-bottom: 12px; }
+        .learn-card h4 { font-size: 1.1rem; margin-bottom: 8px; }
+        .learn-card p { color: #6b7280; font-size: 0.9rem; }
+
+        /* Testimonial */
+        .testimonial {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 60px 24px;
+            text-align: center;
+        }
+        .testimonial-quote {
+            font-size: 1.5rem;
+            font-style: italic;
+            max-width: 700px;
+            margin: 0 auto 24px;
+            line-height: 1.6;
+        }
+        .testimonial-author { font-weight: 600; }
+        .testimonial-role { opacity: 0.8; font-size: 0.9rem; }
+
+        /* About Founder */
+        .founder {
+            background: #f9fafb;
+            padding: 60px 24px;
+        }
+        .founder-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            gap: 32px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .founder-photo {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #1e3a8a);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: white;
+            flex-shrink: 0;
+        }
+        .founder-text { flex: 1; min-width: 300px; }
+        .founder-text h3 { font-size: 1.5rem; margin-bottom: 4px; }
+        .founder-text .title { color: #6b7280; margin-bottom: 12px; }
+        .founder-text p { color: #374151; }
+
+        /* Form Section */
+        .form-section {
+            background: white;
+            padding: 80px 24px;
+        }
+        .form-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 40px;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #374151; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+        .form-submit {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .form-submit:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
+
+        /* Footer */
+        .footer {
+            background: #1f2937;
+            color: white;
+            padding: 40px 24px;
+            text-align: center;
+        }
+        .footer-brand { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+        .footer-tagline { opacity: 0.7; margin-bottom: 24px; }
+        .footer-links { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+        .footer-links a { color: white; text-decoration: none; opacity: 0.8; transition: opacity 0.2s; }
+        .footer-links a:hover { opacity: 1; }
+        .footer-contact { opacity: 0.6; font-size: 0.9rem; }
+
+        /* Success Message */
+        .success-message {
+            display: none;
+            background: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .success-message.show { display: block; }
+    </style>
+</head>
+<body>
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">🎓 Eulean AI</div>
+            <h1>AI Literacy Workshops for Schools</h1>
+            <p class="hero-subtitle">
+                Your students are already using ChatGPT.
+                We help them use it right - ethically, effectively, and safely.
+            </p>
+            <a href="#book" class="hero-cta">Book a Workshop →</a>
+        </div>
+    </section>
+
+    <!-- Problem -->
+    <section class="problem">
+        <div class="problem-icon">⚠️</div>
+        <h2>85% of students use AI tools without guidance</h2>
+        <p>
+            They're copying homework, bypassing learning, and missing the chance to develop
+            critical AI skills they'll need for the future. It's time to teach them the right way.
+        </p>
+    </section>
+
+    <!-- Workshop Options -->
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2>Workshop Options</h2>
+                <p>Choose the format that works best for your school</p>
+            </div>
+            <div class="workshops-grid">
+                <!-- Tier 1 -->
+                <div class="workshop-card">
+                    <div class="workshop-badge">STARTER</div>
+                    <h3>AI Awareness Session</h3>
+                    <div class="duration">45-60 minutes</div>
+                    <div class="price">₹5,000 <span>/ session</span></div>
+                    <ul>
+                        <li>What is AI? Live demos</li>
+                        <li>AI careers of the future</li>
+                        <li>Safe AI usage basics</li>
+                        <li>Interactive Q&A</li>
+                        <li>Up to 200 students</li>
+                    </ul>
+                </div>
+
+                <!-- Tier 2 -->
+                <div class="workshop-card featured">
+                    <div class="workshop-badge">MOST POPULAR</div>
+                    <h3>AI Literacy Workshop</h3>
+                    <div class="duration">2-3 hours</div>
+                    <div class="price">₹25,000 <span>/ workshop</span></div>
+                    <ul>
+                        <li>Everything in Awareness +</li>
+                        <li>Hands-on AI tools practice</li>
+                        <li>AI ethics & safety deep-dive</li>
+                        <li>Using AI for learning (not cheating)</li>
+                        <li>Certificate for all participants</li>
+                        <li>Teacher resource kit included</li>
+                    </ul>
+                </div>
+
+                <!-- Tier 3 -->
+                <div class="workshop-card">
+                    <div class="workshop-badge">COMPREHENSIVE</div>
+                    <h3>AI Integration Program</h3>
+                    <div class="duration">Full day (6-8 hours)</div>
+                    <div class="price">₹75,000 <span>/ program</span></div>
+                    <ul>
+                        <li>Everything in Literacy +</li>
+                        <li>Teacher training session</li>
+                        <li>Curriculum integration planning</li>
+                        <li>Admin strategy workshop</li>
+                        <li>VidyaMitra pilot included</li>
+                        <li>30-day follow-up support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- What Students Learn -->
+    <section class="section" style="background: #f9fafb;">
+        <div class="container">
+            <div class="section-header">
+                <h2>What Students Learn</h2>
+                <p>Practical skills for an AI-driven future</p>
+            </div>
+            <div class="learn-grid">
+                <div class="learn-card">
+                    <div class="learn-icon">🤖</div>
+                    <h4>AI Fundamentals</h4>
+                    <p>How AI works, what it can and cannot do</p>
+                </div>
+                <div class="learn-card">
+                    <div class="learn-icon">🛡️</div>
+                    <h4>AI Safety & Ethics</h4>
+                    <p>Privacy, bias, misinformation, responsible use</p>
+                </div>
+                <div class="learn-card">
+                    <div class="learn-icon">📚</div>
+                    <h4>AI for Learning</h4>
+                    <p>Using AI to enhance (not replace) learning</p>
+                </div>
+                <div class="learn-card">
+                    <div class="learn-icon">💼</div>
+                    <h4>Future Careers</h4>
+                    <p>Jobs that will exist, skills that will matter</p>
+                </div>
+                <div class="learn-card">
+                    <div class="learn-icon">🔧</div>
+                    <h4>Hands-on Tools</h4>
+                    <p>ChatGPT, image AI, coding assistants</p>
+                </div>
+                <div class="learn-card">
+                    <div class="learn-icon">🎯</div>
+                    <h4>Critical Thinking</h4>
+                    <p>Evaluating AI outputs, fact-checking</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonial -->
+    <section class="testimonial">
+        <div class="testimonial-quote">
+            "The workshop was eye-opening for both students and teachers.
+            Finally, a practical approach to AI in education instead of just banning it."
+        </div>
+        <div class="testimonial-author">School Principal</div>
+        <div class="testimonial-role">Premium International School, Bangalore</div>
+    </section>
+
+    <!-- About Founder -->
+    <section class="founder">
+        <div class="founder-content">
+            <div class="founder-photo">GS</div>
+            <div class="founder-text">
+                <h3>Gurminder Singh</h3>
+                <div class="title">Founder, Eulean AI</div>
+                <p>
+                    With 15+ years in technology, I've seen AI transform industries.
+                    Now I'm on a mission to help Indian schools prepare the next generation
+                    for an AI-driven world - not by fearing it, but by mastering it.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Booking Form -->
+    <section class="form-section" id="book">
+        <div class="container">
+            <div class="section-header">
+                <h2>Book a Workshop</h2>
+                <p>Fill in your details and we'll get back within 24 hours</p>
+            </div>
+            <div class="form-container">
+                <div class="success-message" id="successMsg">
+                    <h3>🎉 Thank you!</h3>
+                    <p>We've received your request. Expect a call within 24 hours.</p>
+                </div>
+                <form id="workshopForm" action="https://formspree.io/f/xpwzgkvq" method="POST">
+                    <div class="form-group">
+                        <label>School Name *</label>
+                        <input type="text" name="school" required placeholder="e.g., Delhi Public School">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Your Name *</label>
+                            <input type="text" name="name" required placeholder="Full name">
+                        </div>
+                        <div class="form-group">
+                            <label>Your Role *</label>
+                            <select name="role" required>
+                                <option value="">Select...</option>
+                                <option value="Principal">Principal</option>
+                                <option value="Vice Principal">Vice Principal</option>
+                                <option value="Coordinator">Academic Coordinator</option>
+                                <option value="Teacher">Teacher</option>
+                                <option value="Admin">Administrator</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email *</label>
+                            <input type="email" name="email" required placeholder="you@school.edu">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone *</label>
+                            <input type="tel" name="phone" required placeholder="+91 98xxx xxxxx">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Number of Students</label>
+                            <select name="students">
+                                <option value="< 100">Less than 100</option>
+                                <option value="100-200">100-200</option>
+                                <option value="200-500">200-500</option>
+                                <option value="500+">500+</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Interested In</label>
+                            <select name="workshop_type">
+                                <option value="Awareness Session">Awareness Session (₹5K)</option>
+                                <option value="AI Literacy Workshop" selected>AI Literacy Workshop (₹25K)</option>
+                                <option value="Full Program">Full Program (₹75K)</option>
+                                <option value="Not Sure">Not sure yet</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Message (optional)</label>
+                        <textarea name="message" rows="3" placeholder="Any specific requirements or questions?"></textarea>
+                    </div>
+                    <input type="hidden" name="_subject" value="New Workshop Inquiry from Website">
+                    <button type="submit" class="form-submit">Request Workshop Details →</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-brand">Eulean AI</div>
+        <div class="footer-tagline">Transforming Education with AI</div>
+        <div class="footer-links">
+            <a href="/">Home</a>
+            <a href="/workshops">Workshops</a>
+            <a href="https://vidyamitra.ai">VidyaMitra</a>
+            <a href="https://linkedin.com/in/gurminder">LinkedIn</a>
+        </div>
+        <div class="footer-contact">
+            gurminder@euleanai.com | +91-9590105978<br>
+            © 2025 Eulean AI. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        // Form submission
+        document.getElementById('workshopForm').addEventListener('submit', function(e) {
+            const form = this;
+            const submitBtn = form.querySelector('.form-submit');
+            submitBtn.textContent = 'Sending...';
+            submitBtn.disabled = true;
+
+            // Form will submit normally to Formspree
+            // Show success message after a delay (for UX)
+            setTimeout(() => {
+                document.getElementById('successMsg').classList.add('show');
+                form.style.display = 'none';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>`);
+});
+
+// Eulean AI Homepage
+app.get('/eulean', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eulean AI | Transforming Education with AI</title>
+    <meta name="description" content="Eulean AI helps schools prepare students for an AI-driven future through workshops and personalized learning tools.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, sans-serif; color: #1f2937; }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .nav-brand { font-size: 1.25rem; font-weight: 700; color: #1e3a8a; text-decoration: none; }
+        .nav-links { display: flex; gap: 32px; align-items: center; }
+        .nav-links a { color: #374151; text-decoration: none; font-weight: 500; transition: color 0.2s; }
+        .nav-links a:hover { color: #1e3a8a; }
+        .nav-cta {
+            background: #1e3a8a;
+            color: white !important;
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+        .nav-cta:hover { background: #1e40af; }
+
+        .hero {
+            padding: 140px 24px 80px;
+            text-align: center;
+            background: linear-gradient(180deg, #eff6ff 0%, white 100%);
+        }
+        .hero h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            color: #1e3a8a;
+            margin-bottom: 20px;
+            line-height: 1.1;
+        }
+        .hero p {
+            font-size: 1.25rem;
+            color: #4b5563;
+            max-width: 600px;
+            margin: 0 auto 32px;
+        }
+        .hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #1e3a8a; color: white; }
+        .btn-primary:hover { background: #1e40af; transform: translateY(-2px); }
+        .btn-secondary { background: white; color: #1e3a8a; border: 2px solid #1e3a8a; }
+        .btn-secondary:hover { background: #eff6ff; }
+
+        .services {
+            padding: 80px 24px;
+        }
+        .services-grid {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+        }
+        .service-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .service-card:hover { border-color: #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.1); }
+        .service-icon { font-size: 3rem; margin-bottom: 16px; }
+        .service-card h3 { font-size: 1.5rem; margin-bottom: 12px; color: #1e3a8a; }
+        .service-card p { color: #6b7280; margin-bottom: 20px; }
+        .service-card a { color: #3b82f6; font-weight: 600; text-decoration: none; }
+        .service-card a:hover { text-decoration: underline; }
+
+        .stats {
+            background: #1e3a8a;
+            color: white;
+            padding: 60px 24px;
+        }
+        .stats-grid {
+            max-width: 800px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+            text-align: center;
+        }
+        .stat-value { font-size: 3rem; font-weight: 800; }
+        .stat-label { opacity: 0.8; }
+
+        .cta-section {
+            padding: 80px 24px;
+            text-align: center;
+            background: #f9fafb;
+        }
+        .cta-section h2 { font-size: 2rem; margin-bottom: 16px; }
+        .cta-section p { color: #6b7280; margin-bottom: 32px; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+        .footer {
+            background: #1f2937;
+            color: white;
+            padding: 40px 24px;
+            text-align: center;
+        }
+        .footer-brand { font-size: 1.25rem; font-weight: 700; margin-bottom: 16px; }
+        .footer-links { display: flex; gap: 24px; justify-content: center; margin-bottom: 24px; }
+        .footer-links a { color: rgba(255,255,255,0.7); text-decoration: none; }
+        .footer-links a:hover { color: white; }
+        .footer-copy { color: rgba(255,255,255,0.5); font-size: 0.9rem; }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="/eulean" class="nav-brand">Eulean AI</a>
+        <div class="nav-links">
+            <a href="/workshops">Workshops</a>
+            <a href="https://vidyamitra.ai">VidyaMitra</a>
+            <a href="https://linkedin.com/in/gurminder">About</a>
+            <a href="/workshops#book" class="nav-cta">Book Workshop</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1>Transforming Education<br>with AI</h1>
+        <p>We help Indian schools prepare students for an AI-driven future through cutting-edge workshops and personalized learning tools.</p>
+        <div class="hero-buttons">
+            <a href="/workshops" class="btn btn-primary">Explore Workshops →</a>
+            <a href="https://vidyamitra.ai" class="btn btn-secondary">Try VidyaMitra</a>
+        </div>
+    </section>
+
+    <section class="services">
+        <div class="services-grid">
+            <div class="service-card">
+                <div class="service-icon">🎓</div>
+                <h3>AI Workshops</h3>
+                <p>Hands-on sessions that teach students and teachers how to use AI ethically and effectively.</p>
+                <a href="/workshops">Learn more →</a>
+            </div>
+            <div class="service-card">
+                <div class="service-icon">🤖</div>
+                <h3>VidyaMitra</h3>
+                <p>An AI tutor on WhatsApp that explains concepts the way your teachers do. Personalized learning at scale.</p>
+                <a href="https://vidyamitra.ai">Try it free →</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="stats-grid">
+            <div>
+                <div class="stat-value">10+</div>
+                <div class="stat-label">Schools</div>
+            </div>
+            <div>
+                <div class="stat-value">1000+</div>
+                <div class="stat-label">Students Reached</div>
+            </div>
+            <div>
+                <div class="stat-value">50+</div>
+                <div class="stat-label">Teachers Trained</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <h2>Ready to prepare your school for AI?</h2>
+        <p>Book a workshop today and give your students the skills they need for tomorrow.</p>
+        <a href="/workshops#book" class="btn btn-primary">Book a Workshop →</a>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-brand">Eulean AI</div>
+        <div class="footer-links">
+            <a href="/workshops">Workshops</a>
+            <a href="https://vidyamitra.ai">VidyaMitra</a>
+            <a href="mailto:gurminder@euleanai.com">Contact</a>
+        </div>
+        <div class="footer-copy">© 2025 Eulean AI. All rights reserved.</div>
+    </footer>
+</body>
+</html>`);
+});
+
+// =====================================================
 // ASSESSMENT SYSTEM - Question Generation & Tests
 // =====================================================
 
