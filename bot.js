@@ -2641,7 +2641,7 @@ app.get('/eulean', (req, res) => {
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             z-index: 1000;
         }
-        .nav-brand { font-size: 1.25rem; font-weight: 700; color: #1e3a8a; text-decoration: none; }
+        .nav-brand { font-size: 1.5rem; font-weight: 800; color: #1e3a8a; text-decoration: none; letter-spacing: -0.5px; }
         .nav-links { display: flex; gap: 32px; align-items: center; }
         .nav-links a { color: #374151; text-decoration: none; font-weight: 500; transition: color 0.2s; }
         .nav-links a:hover { color: #1e3a8a; }
@@ -2767,8 +2767,8 @@ app.get('/eulean', (req, res) => {
     </nav>
 
     <section class="hero">
-        <h1>Transforming Education<br>with AI</h1>
-        <p>We help Indian schools prepare students for an AI-driven future through cutting-edge workshops and personalized learning tools.</p>
+        <h1>We Help Teachers<br>10x Their Productivity</h1>
+        <p>AI workshops that save teachers hours every week. Plus an AI tutor that gives students 24/7 homework help - the way YOUR teacher teaches.</p>
         <div class="hero-buttons">
             <a href="/workshops" class="btn btn-primary">Explore Workshops →</a>
             <a href="https://vidyamitra.ai" class="btn btn-secondary">Try VidyaMitra</a>
@@ -2778,15 +2778,31 @@ app.get('/eulean', (req, res) => {
     <section class="services">
         <div class="services-grid">
             <div class="service-card">
-                <div class="service-icon">🎓</div>
-                <h3>AI Workshops</h3>
-                <p>Hands-on sessions that teach students and teachers how to use AI ethically and effectively.</p>
+                <div class="service-icon">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="24" cy="12" r="8" stroke="#1e3a8a" stroke-width="3" fill="none"/>
+                        <circle cx="10" cy="36" r="6" stroke="#1e3a8a" stroke-width="3" fill="none"/>
+                        <circle cx="38" cy="36" r="6" stroke="#1e3a8a" stroke-width="3" fill="none"/>
+                        <line x1="24" y1="20" x2="12" y2="30" stroke="#1e3a8a" stroke-width="2"/>
+                        <line x1="24" y1="20" x2="36" y2="30" stroke="#1e3a8a" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3>AI Workshops for Teachers</h3>
+                <p>Create a month's lesson plans in 1 hour. Automate grading. Design AI-native assignments. Real productivity gains.</p>
                 <a href="/workshops">Learn more →</a>
             </div>
             <div class="service-card">
-                <div class="service-icon">🤖</div>
+                <div class="service-icon">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="8" y="6" width="32" height="36" rx="4" stroke="#1e3a8a" stroke-width="3" fill="none"/>
+                        <circle cx="24" cy="38" r="2" fill="#1e3a8a"/>
+                        <line x1="14" y1="16" x2="34" y2="16" stroke="#1e3a8a" stroke-width="2"/>
+                        <line x1="14" y1="22" x2="30" y2="22" stroke="#1e3a8a" stroke-width="2"/>
+                        <line x1="14" y1="28" x2="26" y2="28" stroke="#1e3a8a" stroke-width="2"/>
+                    </svg>
+                </div>
                 <h3>VidyaMitra</h3>
-                <p>An AI tutor on WhatsApp that explains concepts the way your teachers do. Personalized learning at scale.</p>
+                <p>AI tutor on WhatsApp. Explains concepts the way YOUR teacher does. 24/7 homework help, personalized at scale.</p>
                 <a href="https://vidyamitra.ai">Try it free →</a>
             </div>
         </div>
@@ -2809,9 +2825,40 @@ app.get('/eulean', (req, res) => {
         </div>
     </section>
 
+    <section class="story" style="padding: 80px 24px; background: white;">
+        <div style="max-width: 700px; margin: 0 auto; text-align: center;">
+            <div style="margin-bottom: 24px;">
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="32" cy="12" r="8" stroke="#1e3a8a" stroke-width="2" fill="none"/>
+                    <circle cx="12" cy="52" r="8" stroke="#1e3a8a" stroke-width="2" fill="none"/>
+                    <circle cx="52" cy="52" r="8" stroke="#1e3a8a" stroke-width="2" fill="none"/>
+                    <circle cx="52" cy="24" r="6" stroke="#1e3a8a" stroke-width="2" fill="none"/>
+                    <circle cx="12" cy="24" r="6" stroke="#1e3a8a" stroke-width="2" fill="none"/>
+                    <line x1="32" y1="20" x2="32" y2="44" stroke="#1e3a8a" stroke-width="1.5"/>
+                    <line x1="18" y1="24" x2="46" y2="24" stroke="#1e3a8a" stroke-width="1.5"/>
+                    <line x1="17" y1="48" x2="27" y2="38" stroke="#1e3a8a" stroke-width="1.5"/>
+                    <line x1="47" y1="48" x2="37" y2="38" stroke="#1e3a8a" stroke-width="1.5"/>
+                </svg>
+            </div>
+            <h2 style="font-size: 1.75rem; color: #1e3a8a; margin-bottom: 16px;">Why "Eulean"?</h2>
+            <p style="color: #4b5563; line-height: 1.8; margin-bottom: 16px;">
+                We're named after <strong>Leonhard Euler</strong>, the 18th-century mathematician who invented graph theory.
+                Euler solved the famous "Seven Bridges of Königsberg" problem by finding a path that connects all points efficiently.
+            </p>
+            <p style="color: #4b5563; line-height: 1.8; margin-bottom: 16px;">
+                Just like Euler found elegant paths through complexity, we help schools navigate the AI revolution.
+                We connect teachers to productivity. We connect students to personalized learning.
+                We find the path that works for YOUR school.
+            </p>
+            <p style="color: #1e3a8a; font-weight: 600; font-style: italic;">
+                "Connecting every learner to knowledge."
+            </p>
+        </div>
+    </section>
+
     <section class="cta-section">
-        <h2>Ready to prepare your school for AI?</h2>
-        <p>Book a workshop today and give your students the skills they need for tomorrow.</p>
+        <h2>Ready to transform your school with AI?</h2>
+        <p>Book a workshop and see the productivity gains firsthand.</p>
         <a href="/workshops#book" class="btn btn-primary">Book a Workshop →</a>
     </section>
 
