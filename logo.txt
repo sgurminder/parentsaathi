@@ -1,0 +1,36 @@
+Here are DALL-E prompts to try (start with #1, iterate based on results):                                                        07:05 PM  claude-opus-4-5-20251101
+
+  ---
+  Prompt 1: Clean & Professional
+
+  Minimalist logo design for "VidyaMitra" - an AI education technology company. Features a stylized graduation cap merged with a
+  glowing lightbulb symbol. Color palette: deep blue (#1a56db) and warm orange (#f59e0b) on white background. Modern, clean vector
+   style, suitable for app icon and business cards. No text, icon only.
+
+  ---
+  Prompt 2: Book + AI Concept
+
+  Modern logo icon for education AI startup. Abstract open book with pages transforming into neural network nodes or digital
+  particles. Gradient from blue to purple. Minimalist flat design, Silicon Valley tech aesthetic. Clean white background, no text.
+
+  ---
+  Prompt 3: Indian Education Feel
+
+  Logo for Indian EdTech company VidyaMitra. Combines a traditional lamp of knowledge (diya) with modern AI circuit patterns. Deep
+   blue and saffron orange colors. Elegant, premium feel, minimal lines. Vector style, white background, no text.
+
+  ---
+  Prompt 4: Simple & Memorable
+
+  Simple geometric logo mark combining letters V and M into an abstract book or graduation cap shape. Blue (#1a56db) solid color.
+  Ultra minimal, works at small sizes like app icons. Clean vector, white background.
+
+  ---
+  Tips:
+
+  1. Generate 4 variations of each prompt
+  2. Ask DALL-E to "refine" your favorite with specific tweaks
+  3. Once you have a winner, say: "Make this more minimal" or "Make the lines thicker for small sizes"
+
+  After DALL-E: Take your favorite to Canva to add the "VidyaMitra" text in a clean font like Inter or Poppins.
+

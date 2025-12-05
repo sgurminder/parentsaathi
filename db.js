@@ -384,6 +384,41 @@ class Database {
         return methods;
     }
 
+    // ==================== FOLLOW-UP QUESTIONS ====================
+
+    async saveFollowUpState(phoneNumber, state) {
+        // state: { question, correctAnswer, topic, subject, attempts, originalQuestion }
+        const key = `followup:${phoneNumber}`;
+
+        if (this.type === 'vercel-kv') {
+            await this.kv.set(key, state, {
+                ex: 60 * 30 // 30 minutes expiry
+            });
+        } else {
+            if (!this.cache.followups) this.cache.followups = {};
+            this.cache.followups[key] = state;
+        }
+    }
+
+    async getFollowUpState(phoneNumber) {
+        const key = `followup:${phoneNumber}`;
+
+        if (this.type === 'vercel-kv') {
+            return await this.kv.get(key);
+        }
+        return this.cache.followups?.[key] || null;
+    }
+
+    async clearFollowUpState(phoneNumber) {
+        const key = `followup:${phoneNumber}`;
+
+        if (this.type === 'vercel-kv') {
+            await this.kv.del(key);
+        } else if (this.cache.followups) {
+            delete this.cache.followups[key];
+        }
+    }
+
     // ==================== ANALYTICS ====================
 
     async incrementQueryCount(phoneNumber) {

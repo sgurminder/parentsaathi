@@ -485,6 +485,134 @@ ENRICHMENT (when helpful):
 }
 
 // =====================================================
+// FOLLOW-UP QUESTION SYSTEM
+// =====================================================
+
+// Generate a follow-up practice question based on the topic just explained
+async function generateFollowUpQuestion(originalQuestion, topicInfo, teachingMethod = null) {
+    const subject = topicInfo?.subject || 'general';
+    const classLevel = topicInfo?.class || 8;
+    const chapter = topicInfo?.chapter || '';
+
+    const systemPrompt = `You are creating a simple practice question for a Class ${classLevel} student.
+
+The student just asked about: "${originalQuestion}"
+Subject: ${subject}
+Chapter: ${chapter}
+
+Generate ONE simple practice question to test their understanding. The question should:
+1. Be similar but slightly different from what they asked
+2. Be solvable in 1-2 steps
+3. Have a clear, short answer (number, word, or short phrase)
+
+RESPOND IN THIS EXACT JSON FORMAT:
+{
+    "question": "Your practice question here",
+    "correctAnswer": "The exact correct answer",
+    "hint": "A small hint if they get it wrong"
+}
+
+Keep the question simple and appropriate for Class ${classLevel}.`;
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Create a follow-up question for: ${originalQuestion}` }
+            ],
+            max_tokens: 200,
+            response_format: { type: "json_object" }
+        });
+
+        const result = JSON.parse(response.choices[0].message.content);
+        return result;
+    } catch (error) {
+        console.error('Error generating follow-up question:', error);
+        return null;
+    }
+}
+
+// Check if student's answer is correct
+async function checkStudentAnswer(studentAnswer, correctAnswer, question) {
+    const systemPrompt = `You are checking a student's answer.
+
+Question: ${question}
+Expected Answer: ${correctAnswer}
+Student's Answer: ${studentAnswer}
+
+Determine if the student's answer is correct. Be lenient with:
+- Minor spelling mistakes
+- Different but equivalent forms (e.g., "5" vs "five")
+- Extra spaces or formatting
+
+Respond with ONLY "correct" or "incorrect" (lowercase, one word).`;
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Is this answer correct? Student said: "${studentAnswer}"` }
+            ],
+            max_tokens: 10
+        });
+
+        const result = response.choices[0].message.content.toLowerCase().trim();
+        return result === 'correct';
+    } catch (error) {
+        console.error('Error checking answer:', error);
+        // Fall back to simple string comparison
+        return studentAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+    }
+}
+
+// Generate re-explanation with different approach
+async function generateReExplanation(originalQuestion, incorrectAnswer, correctAnswer, topicInfo, attempt = 1) {
+    const subject = topicInfo?.subject || 'general';
+    const classLevel = topicInfo?.class || 8;
+
+    const approaches = [
+        "Use a completely different analogy or real-life example",
+        "Break it down into smaller, simpler steps",
+        "Use a visual description or diagram explanation"
+    ];
+
+    const approach = approaches[Math.min(attempt - 1, approaches.length - 1)];
+
+    const systemPrompt = `You are helping a Class ${classLevel} student who got a ${subject} question wrong.
+
+Original Question: ${originalQuestion}
+Student's Wrong Answer: ${incorrectAnswer}
+Correct Answer: ${correctAnswer}
+
+The student didn't understand. ${approach}.
+
+Instructions:
+1. Don't criticize - be encouraging
+2. Explain WHY their answer was wrong (briefly)
+3. Re-explain the concept using ${approach.toLowerCase()}
+4. Keep it under 150 words
+5. End with the correct answer clearly stated`;
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Help me understand: ${originalQuestion}` }
+            ],
+            max_tokens: 250
+        });
+
+        return response.choices[0].message.content;
+    } catch (error) {
+        console.error('Error generating re-explanation:', error);
+        return `Let me explain differently:\n\nThe correct answer is: ${correctAnswer}\n\nWould you like me to explain step by step?`;
+    }
+}
+
+// =====================================================
 // WHATSAPP WEBHOOK (Twilio)
 // =====================================================
 
@@ -532,6 +660,80 @@ app.post('/webhook', async (req, res) => {
 
         // Check if first time contacting
         const isFirstTime = await db.markUserFirstContact(from);
+
+        // ============ CHECK FOR PENDING FOLLOW-UP QUESTION ============
+        const followUpState = await db.getFollowUpState(from);
+
+        if (followUpState && !body.toLowerCase().includes('skip') && !body.toLowerCase().includes('new question')) {
+            console.log(`📝 Checking follow-up answer from ${from}`);
+
+            // Check if student's answer is correct
+            const isCorrect = await checkStudentAnswer(body, followUpState.correctAnswer, followUpState.question);
+
+            if (isCorrect) {
+                // Correct answer!
+                await db.clearFollowUpState(from);
+                const successMsg = `✅ Correct! Great job! 🎉
+
+You've understood the concept well.
+
+Feel free to ask another question anytime!`;
+                twiml.message(successMsg);
+                res.type('text/xml');
+                res.send(twiml.toString());
+                return;
+            } else {
+                // Wrong answer - re-explain
+                const attempts = (followUpState.attempts || 0) + 1;
+
+                if (attempts >= 3) {
+                    // After 3 attempts, just give the answer and move on
+                    await db.clearFollowUpState(from);
+                    const finalMsg = `Let's look at this together:
+
+The correct answer is: ${followUpState.correctAnswer}
+
+${followUpState.hint || ''}
+
+Don't worry! Learning takes practice. Feel free to ask more questions! 📚`;
+                    twiml.message(finalMsg);
+                    res.type('text/xml');
+                    res.send(twiml.toString());
+                    return;
+                }
+
+                // Re-explain with different approach
+                const reExplanation = await generateReExplanation(
+                    followUpState.originalQuestion,
+                    body,
+                    followUpState.correctAnswer,
+                    followUpState.topicInfo,
+                    attempts
+                );
+
+                // Update attempts count
+                await db.saveFollowUpState(from, {
+                    ...followUpState,
+                    attempts: attempts
+                });
+
+                const retryMsg = `${reExplanation}
+
+🔄 Try again! What's your answer?
+
+(Type "skip" to move on)`;
+                twiml.message(retryMsg);
+                res.type('text/xml');
+                res.send(twiml.toString());
+                return;
+            }
+        }
+
+        // Clear any old follow-up state if user says "skip" or "new question"
+        if (body.toLowerCase().includes('skip') || body.toLowerCase().includes('new question')) {
+            await db.clearFollowUpState(from);
+        }
+        // ============ END FOLLOW-UP CHECK ============
 
         // Handle welcome/help message
         if (body.toLowerCase().includes('hi') || body.toLowerCase().includes('hello') || body.toLowerCase().includes('start')) {
@@ -645,7 +847,6 @@ Example: "How do I solve quadratic equations?" or "Explain photosynthesis"`;
                     console.log('Found teaching method, generating response...');
                     // Generate response using teacher's method
                     response = await generateResponse(body, teachingMethod, mediaUrl);
-                    response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
                     console.log('Response generated with teacher method');
                 } else {
                     console.log('No teaching method found, generating generic response...');
@@ -659,6 +860,44 @@ Example: "How do I solve quadratic equations?" or "Explain photosynthesis"`;
 
                 // Find relevant diagram for the topic
                 const diagramUrl = findDiagram(body, topicInfo.chapter);
+
+                // ============ GENERATE FOLLOW-UP QUESTION ============
+                // Only for students (not teachers) and only for valid homework questions
+                const isStudent = !userInfo || userInfo.role !== 'teacher';
+                let followUpQuestion = null;
+
+                if (isStudent) {
+                    try {
+                        console.log('Generating follow-up question...');
+                        followUpQuestion = await generateFollowUpQuestion(body, topicInfo, teachingMethod);
+
+                        if (followUpQuestion && followUpQuestion.question) {
+                            // Save follow-up state for this user
+                            await db.saveFollowUpState(from, {
+                                question: followUpQuestion.question,
+                                correctAnswer: followUpQuestion.correctAnswer,
+                                hint: followUpQuestion.hint || '',
+                                originalQuestion: body,
+                                topicInfo: topicInfo,
+                                attempts: 0
+                            });
+
+                            // Append follow-up question to response
+                            response += `\n\n---\n📝 *Practice Question:*\n${followUpQuestion.question}\n\n_Reply with your answer!_`;
+                            console.log('Follow-up question added:', followUpQuestion.question);
+                        } else {
+                            // Fallback to old feedback prompt
+                            response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
+                        }
+                    } catch (err) {
+                        console.error('Error generating follow-up:', err);
+                        response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
+                    }
+                } else {
+                    // For teachers, just show feedback prompt
+                    response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
+                }
+                // ============ END FOLLOW-UP QUESTION ============
 
                 console.log('Sending response to WhatsApp...');
                 console.log('Response length:', response.length, 'characters');

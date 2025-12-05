@@ -3,693 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParentSaathi Schools - Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title>Teaching Methods Dashboard - VidyaMitra</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Inter', -apple-system, sans-serif; 
-            background: #f8fafc; 
-            min-height: 100vh;
-        }
-        
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 250px;
-            background: #1e293b;
-            color: white;
-            padding: 24px;
-        }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 40px;
-        }
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-        .logo-text {
-            font-weight: 700;
-            font-size: 18px;
-        }
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            color: #94a3b8;
-            text-decoration: none;
-            transition: all 0.2s;
-        }
-        .nav-item:hover, .nav-item.active {
-            background: #334155;
-            color: white;
-        }
-        .nav-item.active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-        }
-        
-        /* Main Content */
-        .main {
-            margin-left: 250px;
-            padding: 24px;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-        }
-        .header h1 {
-            font-size: 28px;
-            color: #1e293b;
-        }
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        .school-badge {
-            background: white;
-            border: 1px solid #e2e8f0;
-            padding: 10px 20px;
-            border-radius: 50px;
-            font-size: 14px;
-            color: #64748b;
-        }
-        .school-badge strong {
-            color: #1e293b;
-        }
-        .live-badge {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #dcfce7;
-            color: #166534;
-            padding: 8px 16px;
-            border-radius: 50px;
-            font-size: 13px;
-            font-weight: 500;
-        }
-        .live-dot {
-            width: 8px;
-            height: 8px;
-            background: #22c55e;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.1); }
-        }
-        
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 32px;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            border: 1px solid #e2e8f0;
-        }
-        .stat-card.highlight {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-        }
-        .stat-icon {
-            width: 48px;
-            height: 48px;
-            background: #f1f5f9;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            margin-bottom: 16px;
-        }
-        .stat-card.highlight .stat-icon {
-            background: rgba(255,255,255,0.2);
-        }
-        .stat-label {
-            font-size: 14px;
-            color: #64748b;
-            margin-bottom: 8px;
-        }
-        .stat-card.highlight .stat-label {
-            color: rgba(255,255,255,0.8);
-        }
-        .stat-value {
-            font-size: 36px;
-            font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 8px;
-        }
-        .stat-card.highlight .stat-value {
-            color: white;
-        }
-        .stat-change {
-            font-size: 13px;
-            color: #22c55e;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .stat-change.down {
-            color: #ef4444;
-        }
-        .stat-card.highlight .stat-change {
-            color: rgba(255,255,255,0.9);
-        }
-        
-        /* Charts Section */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-bottom: 32px;
-        }
-        .chart-card {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            border: 1px solid #e2e8f0;
-        }
-        .chart-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-        .chart-header h3 {
-            font-size: 16px;
-            color: #1e293b;
-        }
-        .chart-filter {
-            background: #f1f5f9;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            color: #64748b;
-        }
-        
-        /* Bar Chart */
-        .bar-chart {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .bar-row {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        .bar-label {
-            width: 120px;
-            font-size: 14px;
-            color: #64748b;
-        }
-        .bar-track {
-            flex: 1;
-            height: 32px;
-            background: #f1f5f9;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .bar-fill {
-            height: 100%;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            padding-left: 12px;
-            font-size: 13px;
-            font-weight: 600;
-            color: white;
-        }
-        .bar-fill.math { background: linear-gradient(90deg, #667eea, #764ba2); }
-        .bar-fill.science { background: linear-gradient(90deg, #22c55e, #16a34a); }
-        .bar-fill.english { background: linear-gradient(90deg, #f59e0b, #d97706); }
-        .bar-fill.hindi { background: linear-gradient(90deg, #ef4444, #dc2626); }
-        .bar-fill.social { background: linear-gradient(90deg, #06b6d4, #0891b2); }
-        
-        /* List */
-        .topic-list {
-            display: flex;
-            flex-direction: column;
-        }
-        .topic-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 0;
-            border-bottom: 1px solid #f1f5f9;
-        }
-        .topic-item:last-child {
-            border: none;
-        }
-        .topic-rank {
-            width: 28px;
-            height: 28px;
-            background: #f1f5f9;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-            color: #64748b;
-            margin-right: 12px;
-        }
-        .topic-rank.top { background: #fef3c7; color: #b45309; }
-        .topic-name {
-            flex: 1;
-            font-size: 14px;
-            color: #1e293b;
-        }
-        .topic-count {
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        /* Time Chart */
-        .time-chart {
-            display: flex;
-            align-items: flex-end;
-            gap: 8px;
-            height: 180px;
-            padding-top: 20px;
-        }
-        .time-bar {
-            flex: 1;
-            background: #e2e8f0;
-            border-radius: 6px 6px 0 0;
-            position: relative;
-            transition: all 0.3s;
-        }
-        .time-bar.active {
-            background: linear-gradient(180deg, #667eea, #764ba2);
-        }
-        .time-bar:hover {
-            opacity: 0.8;
-        }
-        .time-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 12px;
-        }
-        .time-labels span {
-            font-size: 11px;
-            color: #94a3b8;
-        }
-        
-        /* Teachers Section */
-        .teachers-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-        }
-        .teacher-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid #e2e8f0;
-            text-align: center;
-        }
-        .teacher-avatar {
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            font-weight: 600;
-            margin: 0 auto 12px;
-        }
-        .teacher-name {
-            font-size: 15px;
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 4px;
-        }
-        .teacher-subject {
-            font-size: 13px;
-            color: #64748b;
-            margin-bottom: 12px;
-        }
-        .teacher-progress {
-            background: #f1f5f9;
-            border-radius: 50px;
-            height: 8px;
-            overflow: hidden;
-            margin-bottom: 8px;
-        }
-        .teacher-progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #22c55e, #16a34a);
-            border-radius: 50px;
-        }
-        .teacher-stats {
-            font-size: 12px;
-            color: #64748b;
-        }
-        .teacher-stats strong {
-            color: #22c55e;
-        }
-        
-        /* Recent Activity */
-        .activity-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .activity-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 16px;
-            background: #f8fafc;
-            border-radius: 12px;
-        }
-        .activity-icon {
-            width: 40px;
-            height: 40px;
-            background: white;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-        }
-        .activity-content {
-            flex: 1;
-        }
-        .activity-text {
-            font-size: 14px;
-            color: #1e293b;
-            margin-bottom: 4px;
-        }
-        .activity-text strong {
-            color: #667eea;
-        }
-        .activity-time {
-            font-size: 12px;
-            color: #94a3b8;
-        }
+        body { font-family: 'Inter', sans-serif; background: #f5f7fa; color: #1f2937; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%); color: white; padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .header h1 { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 12px; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; text-decoration: none; transition: all 0.2s; cursor: pointer; border: none; }
+        .btn-white { background: white; color: #1a56db; }
+        .btn-white:hover { background: #f0f0f0; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 32px; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .stat-card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .stat-card .number { font-size: 2rem; font-weight: 700; color: #1a56db; }
+        .stat-card .label { color: #6b7280; font-size: 0.9rem; margin-top: 4px; }
+        .filters { background: white; padding: 20px; border-radius: 12px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .filters select, .filters input { padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; min-width: 150px; }
+        .filters select:focus, .filters input:focus { outline: none; border-color: #1a56db; }
+        .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f9fafb; padding: 14px 16px; text-align: left; font-weight: 600; font-size: 0.85rem; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; }
+        td { padding: 16px; border-bottom: 1px solid #f3f4f6; font-size: 0.9rem; }
+        tr:hover { background: #f9fafb; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge-math { background: #dbeafe; color: #1e40af; }
+        .badge-science { background: #d1fae5; color: #065f46; }
+        .badge-english { background: #fef3c7; color: #92400e; }
+        .badge-social { background: #fce7f3; color: #9d174d; }
+        .method-preview { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6b7280; }
+        .class-badge { background: #f3f4f6; color: #374151; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; }
+        .view-btn { color: #1a56db; text-decoration: none; font-weight: 500; cursor: pointer; }
+        .view-btn:hover { text-decoration: underline; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #6b7280; }
+        .empty-state h3 { font-size: 1.25rem; margin-bottom: 8px; color: #374151; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 16px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 32px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .modal-header h2 { font-size: 1.5rem; color: #1f2937; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280; }
+        .modal-section { margin-bottom: 20px; }
+        .modal-section h4 { font-size: 0.85rem; text-transform: uppercase; color: #6b7280; margin-bottom: 8px; }
+        .modal-section p { color: #374151; line-height: 1.6; white-space: pre-wrap; }
+        .loading { text-align: center; padding: 40px; color: #6b7280; }
+        @media (max-width: 768px) { .container { padding: 16px; } .table-container { overflow-x: auto; } table { min-width: 800px; } }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="logo">
-            <div class="logo-icon">🎓</div>
-            <span class="logo-text">ParentSaathi</span>
-        </div>
-        <nav>
-            <a href="#" class="nav-item active">
-                <span>📊</span> Dashboard
-            </a>
-            <a href="#" class="nav-item">
-                <span>❓</span> Questions
-            </a>
-            <a href="#" class="nav-item">
-                <span>👩‍🏫</span> Teachers
-            </a>
-            <a href="#" class="nav-item">
-                <span>👨‍👩‍👧</span> Parents
-            </a>
-            <a href="#" class="nav-item">
-                <span>📚</span> Content
-            </a>
-            <a href="#" class="nav-item">
-                <span>⚙️</span> Settings
-            </a>
-        </nav>
+    <div class="header">
+        <h1><span>📚</span> Teaching Methods Dashboard</h1>
+        <div><a href="/teacher" class="btn btn-white">+ Add New Method</a></div>
     </div>
-
-    <!-- Main Content -->
-    <div class="main">
-        <div class="header">
-            <h1>📊 Dashboard</h1>
-            <div class="header-right">
-                <div class="school-badge">
-                    <strong>Demo Public School</strong> · Class 6-10
-                </div>
-                <div class="live-badge">
-                    <div class="live-dot"></div>
-                    Live
-                </div>
-            </div>
+    <div class="container">
+        <div class="stats-row">
+            <div class="stat-card"><div class="number" id="totalMethods">-</div><div class="label">Total Methods</div></div>
+            <div class="stat-card"><div class="number" id="totalTeachers">-</div><div class="label">Teachers</div></div>
+            <div class="stat-card"><div class="number" id="totalSubjects">-</div><div class="label">Subjects</div></div>
+            <div class="stat-card"><div class="number" id="totalClasses">-</div><div class="label">Classes Covered</div></div>
         </div>
-
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-card highlight">
-                <div class="stat-icon">❓</div>
-                <div class="stat-label">Questions Today</div>
-                <div class="stat-value">47</div>
-                <div class="stat-change">↑ 23% from yesterday</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">👨‍👩‍👧</div>
-                <div class="stat-label">Active Parents</div>
-                <div class="stat-value">156</div>
-                <div class="stat-change">↑ 12 new this week</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">📚</div>
-                <div class="stat-label">Topics Covered</div>
-                <div class="stat-value">78%</div>
-                <div class="stat-change">34 of 44 chapters</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">⭐</div>
-                <div class="stat-label">Satisfaction</div>
-                <div class="stat-value">4.8</div>
-                <div class="stat-change">Based on 203 ratings</div>
-            </div>
+        <div class="filters">
+            <select id="filterSubject"><option value="">All Subjects</option><option value="Mathematics">Mathematics</option><option value="Science">Science</option><option value="English">English</option><option value="Social Studies">Social Studies</option></select>
+            <select id="filterClass"><option value="">All Classes</option><option value="1">Class 1</option><option value="2">Class 2</option><option value="3">Class 3</option><option value="4">Class 4</option><option value="5">Class 5</option><option value="6">Class 6</option><option value="7">Class 7</option><option value="8">Class 8</option><option value="9">Class 9</option><option value="10">Class 10</option><option value="11">Class 11</option><option value="12">Class 12</option></select>
+            <input type="text" id="searchInput" placeholder="Search chapter or teacher...">
         </div>
-
-        <!-- Charts -->
-        <div class="charts-grid">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3>📈 Questions by Subject</h3>
-                    <select class="chart-filter">
-                        <option>This Week</option>
-                        <option>This Month</option>
-                        <option>All Time</option>
-                    </select>
-                </div>
-                <div class="bar-chart">
-                    <div class="bar-row">
-                        <span class="bar-label">Mathematics</span>
-                        <div class="bar-track">
-                            <div class="bar-fill math" style="width: 85%;">89</div>
-                        </div>
-                    </div>
-                    <div class="bar-row">
-                        <span class="bar-label">Science</span>
-                        <div class="bar-track">
-                            <div class="bar-fill science" style="width: 52%;">42</div>
-                        </div>
-                    </div>
-                    <div class="bar-row">
-                        <span class="bar-label">English</span>
-                        <div class="bar-track">
-                            <div class="bar-fill english" style="width: 24%;">16</div>
-                        </div>
-                    </div>
-                    <div class="bar-row">
-                        <span class="bar-label">Hindi</span>
-                        <div class="bar-track">
-                            <div class="bar-fill hindi" style="width: 15%;">8</div>
-                        </div>
-                    </div>
-                    <div class="bar-row">
-                        <span class="bar-label">Social Studies</span>
-                        <div class="bar-track">
-                            <div class="bar-fill social" style="width: 10%;">5</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3>🔥 Trending Topics</h3>
-                </div>
-                <div class="topic-list">
-                    <div class="topic-item">
-                        <span class="topic-rank top">1</span>
-                        <span class="topic-name">Linear Equations</span>
-                        <span class="topic-count">34</span>
-                    </div>
-                    <div class="topic-item">
-                        <span class="topic-rank top">2</span>
-                        <span class="topic-name">Quadratic Equations</span>
-                        <span class="topic-count">28</span>
-                    </div>
-                    <div class="topic-item">
-                        <span class="topic-rank top">3</span>
-                        <span class="topic-name">Photosynthesis</span>
-                        <span class="topic-count">19</span>
-                    </div>
-                    <div class="topic-item">
-                        <span class="topic-rank">4</span>
-                        <span class="topic-name">Trigonometry</span>
-                        <span class="topic-count">15</span>
-                    </div>
-                    <div class="topic-item">
-                        <span class="topic-rank">5</span>
-                        <span class="topic-name">Chemical Reactions</span>
-                        <span class="topic-count">12</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Time Chart & Teachers -->
-        <div class="charts-grid">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3>⏰ Peak Usage Hours</h3>
-                    <span style="font-size: 13px; color: #64748b;">When parents ask most questions</span>
-                </div>
-                <div class="time-chart">
-                    <div class="time-bar" style="height: 15%;"></div>
-                    <div class="time-bar" style="height: 20%;"></div>
-                    <div class="time-bar" style="height: 25%;"></div>
-                    <div class="time-bar" style="height: 35%;"></div>
-                    <div class="time-bar" style="height: 45%;"></div>
-                    <div class="time-bar active" style="height: 75%;"></div>
-                    <div class="time-bar active" style="height: 100%;"></div>
-                    <div class="time-bar active" style="height: 85%;"></div>
-                    <div class="time-bar" style="height: 55%;"></div>
-                    <div class="time-bar" style="height: 30%;"></div>
-                </div>
-                <div class="time-labels">
-                    <span>2PM</span>
-                    <span>3PM</span>
-                    <span>4PM</span>
-                    <span>5PM</span>
-                    <span>6PM</span>
-                    <span>7PM</span>
-                    <span>8PM</span>
-                    <span>9PM</span>
-                    <span>10PM</span>
-                    <span>11PM</span>
-                </div>
-            </div>
-
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3>🕐 Recent Activity</h3>
-                </div>
-                <div class="activity-list">
-                    <div class="activity-item">
-                        <div class="activity-icon">📸</div>
-                        <div class="activity-content">
-                            <div class="activity-text">Parent asked about <strong>Quadratic Equations</strong></div>
-                            <div class="activity-time">2 minutes ago</div>
-                        </div>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">✅</div>
-                        <div class="activity-content">
-                            <div class="activity-text"><strong>Mrs. Sharma</strong> added Trigonometry method</div>
-                            <div class="activity-time">15 minutes ago</div>
-                        </div>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">👍</div>
-                        <div class="activity-content">
-                            <div class="activity-text">Parent rated response <strong>helpful</strong></div>
-                            <div class="activity-time">23 minutes ago</div>
-                        </div>
-                    </div>
-                    <div class="activity-item">
-                        <div class="activity-icon">📸</div>
-                        <div class="activity-content">
-                            <div class="activity-text">Parent asked about <strong>Photosynthesis</strong></div>
-                            <div class="activity-time">31 minutes ago</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Teachers -->
-        <div class="chart-card">
-            <div class="chart-header">
-                <h3>👩‍🏫 Teacher Content Coverage</h3>
-                <a href="#" style="font-size: 14px; color: #667eea; text-decoration: none;">View All →</a>
-            </div>
-            <div class="teachers-grid">
-                <div class="teacher-card">
-                    <div class="teacher-avatar">S</div>
-                    <div class="teacher-name">Mrs. Sharma</div>
-                    <div class="teacher-subject">Mathematics</div>
-                    <div class="teacher-progress">
-                        <div class="teacher-progress-fill" style="width: 92%;"></div>
-                    </div>
-                    <div class="teacher-stats"><strong>12</strong> of 13 chapters</div>
-                </div>
-                <div class="teacher-card">
-                    <div class="teacher-avatar">V</div>
-                    <div class="teacher-name">Mr. Verma</div>
-                    <div class="teacher-subject">Science</div>
-                    <div class="teacher-progress">
-                        <div class="teacher-progress-fill" style="width: 73%;"></div>
-                    </div>
-                    <div class="teacher-stats"><strong>8</strong> of 11 chapters</div>
-                </div>
-                <div class="teacher-card">
-                    <div class="teacher-avatar">G</div>
-                    <div class="teacher-name">Ms. Gupta</div>
-                    <div class="teacher-subject">English</div>
-                    <div class="teacher-progress">
-                        <div class="teacher-progress-fill" style="width: 64%;"></div>
-                    </div>
-                    <div class="teacher-stats"><strong>7</strong> of 11 chapters</div>
-                </div>
-                <div class="teacher-card">
-                    <div class="teacher-avatar">S</div>
-                    <div class="teacher-name">Mr. Singh</div>
-                    <div class="teacher-subject">Social Studies</div>
-                    <div class="teacher-progress">
-                        <div class="teacher-progress-fill" style="width: 44%;"></div>
-                    </div>
-                    <div class="teacher-stats"><strong>4</strong> of 9 chapters</div>
-                </div>
-            </div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Chapter/Topic</th><th>Subject</th><th>Class</th><th>Teacher</th><th>Method Preview</th><th>Added On</th><th>Action</th></tr></thead>
+                <tbody id="methodsTable"><tr><td colspan="7" class="loading">Loading teaching methods...</td></tr></tbody>
+            </table>
         </div>
     </div>
+    <div class="modal" id="viewModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="modalTitle">Chapter Name</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+    <script>
+        let allMethods = [];
+        async function loadMethods() {
+            try {
+                const response = await fetch('/api/teaching-methods');
+                const data = await response.json();
+                allMethods = Object.entries(data).map(([key, method]) => ({ key, ...method }));
+                updateStats(); renderTable();
+            } catch (error) {
+                document.getElementById('methodsTable').innerHTML = '<tr><td colspan="7" class="empty-state"><h3>Error loading data</h3></td></tr>';
+            }
+        }
+        function updateStats() {
+            document.getElementById('totalMethods').textContent = allMethods.length;
+            document.getElementById('totalTeachers').textContent = new Set(allMethods.map(m => m.teacher)).size;
+            document.getElementById('totalSubjects').textContent = new Set(allMethods.map(m => m.subject)).size;
+            document.getElementById('totalClasses').textContent = new Set(allMethods.map(m => m.class || m.classLevel)).size;
+        }
+        function getSubjectBadgeClass(subject) {
+            if (!subject) return 'badge';
+            const s = subject.toLowerCase();
+            if (s.includes('math')) return 'badge badge-math';
+            if (s.includes('science')) return 'badge badge-science';
+            if (s.includes('english')) return 'badge badge-english';
+            if (s.includes('social')) return 'badge badge-social';
+            return 'badge';
+        }
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            return new Date(dateString).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        function renderTable() {
+            const subjectFilter = document.getElementById('filterSubject').value;
+            const classFilter = document.getElementById('filterClass').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = allMethods.filter(m => {
+                if (subjectFilter && m.subject !== subjectFilter) return false;
+                const methodClass = String(m.class || m.classLevel || '');
+                if (classFilter && methodClass !== classFilter) return false;
+                if (searchTerm && ![m.chapter, m.teacher, m.method].join(' ').toLowerCase().includes(searchTerm)) return false;
+                return true;
+            });
+            if (filtered.length === 0) {
+                document.getElementById('methodsTable').innerHTML = '<tr><td colspan="7" class="empty-state"><h3>No teaching methods found</h3></td></tr>';
+                return;
+            }
+            document.getElementById('methodsTable').innerHTML = filtered.map(m => 
+                '<tr><td><strong>' + (m.chapter || '-') + '</strong></td><td><span class="' + getSubjectBadgeClass(m.subject) + '">' + (m.subject || '-') + '</span></td><td><span class="class-badge">Class ' + (m.class || m.classLevel || '-') + '</span></td><td>' + (m.teacher || '-') + '</td><td class="method-preview">' + (m.method || '-') + '</td><td>' + formatDate(m.createdAt) + '</td><td><span class="view-btn" onclick="viewMethod(\'' + m.key + '\')">View</span></td></tr>'
+            ).join('');
+        }
+        function viewMethod(key) {
+            const m = allMethods.find(x => x.key === key);
+            if (!m) return;
+            document.getElementById('modalTitle').textContent = m.chapter || 'Teaching Method';
+            let html = '<div class="modal-section"><h4>Subject & Class</h4><p>' + (m.subject || '-') + ' | Class ' + (m.class || m.classLevel || '-') + '</p></div>';
+            html += '<div class="modal-section"><h4>Teacher</h4><p>' + (m.teacher || '-') + '</p></div>';
+            html += '<div class="modal-section"><h4>Teaching Method</h4><p>' + (m.method || '-') + '</p></div>';
+            if (m.example) html += '<div class="modal-section"><h4>Real-life Example</h4><p>' + m.example + '</p></div>';
+            if (m.commonMistakes || m.mistakes) html += '<div class="modal-section"><h4>Common Mistakes</h4><p>' + (m.commonMistakes || m.mistakes) + '</p></div>';
+            if (m.tips) html += '<div class="modal-section"><h4>Tips for Parents</h4><p>' + m.tips + '</p></div>';
+            document.getElementById('modalBody').innerHTML = html;
+            document.getElementById('viewModal').classList.add('active');
+        }
+        function closeModal() { document.getElementById('viewModal').classList.remove('active'); }
+        document.getElementById('filterSubject').addEventListener('change', renderTable);
+        document.getElementById('filterClass').addEventListener('change', renderTable);
+        document.getElementById('searchInput').addEventListener('input', renderTable);
+        document.getElementById('viewModal').addEventListener('click', (e) => { if (e.target.id === 'viewModal') closeModal(); });
+        loadMethods();
+    </script>
 </body>
 </html>
