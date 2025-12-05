@@ -1074,10 +1074,22 @@ app.post('/api/unauthorize', async (req, res) => {
     res.json({ success: true, phoneNumber });
 });
 
-// Get all authorized users
+// Get all authorized users with usage stats
 app.get('/api/authorized', async (req, res) => {
     const users = await db.getAllAuthorizedUsers();
-    res.json({ count: users.length, users });
+
+    // Add query counts for each user
+    const usersWithStats = await Promise.all(users.map(async (user) => {
+        const todayQueries = await db.getQueryCount(user.phoneNumber);
+        return {
+            ...user,
+            todayQueries,
+            lastActive: user.lastMessageAt || null,
+            firstContact: user.firstContactAt || null
+        };
+    }));
+
+    res.json({ count: usersWithStats.length, users: usersWithStats });
 });
 
 // Get specific user info
@@ -1571,7 +1583,8 @@ app.get('/admin', (req, res) => {
                             <th>Phone Number</th>
                             <th>Role</th>
                             <th>Class</th>
-                            <th>Subject</th>
+                            <th>Today's Queries</th>
+                            <th>Last Active</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -1777,23 +1790,42 @@ app.get('/admin', (req, res) => {
                 if (data.users && data.users.length > 0) {
                     data.users.forEach(user => {
                         // Build class/subject display
-                        let classDisplay, subjectDisplay;
+                        let classDisplay;
                         if (user.role === 'teacher' && user.teaches && user.teaches.length > 0) {
-                            const assignments = user.teaches.map(t => t.subject + ' (' + t.class + ')').join(', ');
                             classDisplay = user.teaches.map(t => t.class).join(', ');
-                            subjectDisplay = assignments;
                         } else {
                             classDisplay = user.class || 'N/A';
-                            subjectDisplay = user.subject || '-';
+                        }
+
+                        // Format last active date
+                        let lastActiveDisplay = 'Never';
+                        if (user.lastActive) {
+                            const date = new Date(user.lastActive);
+                            const now = new Date();
+                            const diffMs = now - date;
+                            const diffMins = Math.floor(diffMs / 60000);
+                            const diffHours = Math.floor(diffMs / 3600000);
+                            const diffDays = Math.floor(diffMs / 86400000);
+
+                            if (diffMins < 60) {
+                                lastActiveDisplay = diffMins + ' min ago';
+                            } else if (diffHours < 24) {
+                                lastActiveDisplay = diffHours + ' hr ago';
+                            } else if (diffDays < 7) {
+                                lastActiveDisplay = diffDays + ' days ago';
+                            } else {
+                                lastActiveDisplay = date.toLocaleDateString();
+                            }
                         }
 
                         const row = document.createElement('tr');
                         row.innerHTML = \`
                             <td>\${user.name || 'N/A'}</td>
-                            <td>\${user.phoneNumber}</td>
+                            <td>\${user.phoneNumber.replace('whatsapp:', '')}</td>
                             <td><span class="badge badge-\${user.role}">\${user.role || 'student'}</span></td>
                             <td>\${classDisplay}</td>
-                            <td>\${subjectDisplay}</td>
+                            <td><strong>\${user.todayQueries || 0}</strong></td>
+                            <td>\${lastActiveDisplay}</td>
                             <td>
                                 <button class="btn btn-danger" onclick="deleteUser('\${user.phoneNumber}')">🗑️ Delete</button>
                             </td>
@@ -1803,7 +1835,7 @@ app.get('/admin', (req, res) => {
 
                     tableContainer.style.display = 'block';
                 } else {
-                    usersTable.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: #999;">No users found. Add your first user!</td></tr>';
+                    usersTable.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #999;">No users found. Add your first user!</td></tr>';
                     tableContainer.style.display = 'block';
                 }
             } catch (err) {
