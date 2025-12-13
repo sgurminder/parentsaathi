@@ -615,51 +615,9 @@ app.post('/webhook', async (req, res) => {
         // Check if first time contacting
         const isFirstTime = await db.markUserFirstContact(from);
 
-        // ============ CHECK FOR PENDING FOLLOW-UP QUESTION ============
-        const followUpState = await db.getFollowUpState(from);
-
-        if (followUpState && !body.toLowerCase().includes('skip') && !body.toLowerCase().includes('new question')) {
-            console.log(`📝 Checking follow-up answer from ${from}`);
-
-            // Check if student's answer is correct
-            const isCorrect = await checkStudentAnswer(body, followUpState.correctAnswer, followUpState.question);
-
-            // Clear the follow-up state immediately (one attempt only)
-            await db.clearFollowUpState(from);
-
-            if (isCorrect) {
-                // Correct answer!
-                const successMsg = `✅ Correct! Well done! 🎉
-
-You've understood the concept. Keep practicing!
-
-Feel free to ask another question anytime.`;
-                twiml.message(successMsg);
-                res.type('text/xml');
-                res.send(twiml.toString());
-                return;
-            } else {
-                // Wrong answer - show correct answer and suggest teacher
-                const wrongMsg = `Not quite. The correct answer is:
-
-*${followUpState.correctAnswer}*
-
-${followUpState.hint ? `💡 ${followUpState.hint}` : ''}
-
-If this is still unclear, please ask your teacher to explain this topic in class.
-
-Feel free to ask me other questions! 📚`;
-                twiml.message(wrongMsg);
-                res.type('text/xml');
-                res.send(twiml.toString());
-                return;
-            }
-        }
-
-        // Clear any old follow-up state if user says "skip" or "new question"
-        if (body.toLowerCase().includes('skip') || body.toLowerCase().includes('new question')) {
-            await db.clearFollowUpState(from);
-        }
+        // ============ FOLLOW-UP QUESTIONS DISABLED ============
+        // Temporarily disabled - can be confusing for students who don't expect questions
+        // To re-enable: uncomment the follow-up check and generation code
         // ============ END FOLLOW-UP CHECK ============
 
         // Handle welcome/help message (only match standalone greetings, not words containing hi/hello)
@@ -792,41 +750,9 @@ Send me any homework question or photo, and I'll help you! 📸`;
                 const diagramUrl = findDiagram(body, topicInfo.chapter);
 
                 // ============ GENERATE FOLLOW-UP QUESTION ============
-                // Only for students (not teachers) and only for valid homework questions
-                const isStudent = !userInfo || userInfo.role !== 'teacher';
-                let followUpQuestion = null;
-
-                if (isStudent) {
-                    try {
-                        console.log('Generating follow-up question...');
-                        followUpQuestion = await generateFollowUpQuestion(body, topicInfo, teachingMethod);
-
-                        if (followUpQuestion && followUpQuestion.question) {
-                            // Save follow-up state for this user
-                            await db.saveFollowUpState(from, {
-                                question: followUpQuestion.question,
-                                correctAnswer: followUpQuestion.correctAnswer,
-                                hint: followUpQuestion.hint || '',
-                                originalQuestion: body,
-                                topicInfo: topicInfo,
-                                attempts: 0
-                            });
-
-                            // Append follow-up question to response
-                            response += `\n\n---\n📝 *Practice Question:*\n${followUpQuestion.question}\n\n_Reply with your answer!_`;
-                            console.log('Follow-up question added:', followUpQuestion.question);
-                        } else {
-                            // Fallback to old feedback prompt
-                            response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
-                        }
-                    } catch (err) {
-                        console.error('Error generating follow-up:', err);
-                        response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
-                    }
-                } else {
-                    // For teachers, just show feedback prompt
-                    response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
-                }
+                // ============ FOLLOW-UP QUESTIONS DISABLED ============
+                // Just show simple feedback prompt (no practice questions for now)
+                response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
                 // ============ END FOLLOW-UP QUESTION ============
 
                 console.log('Sending response to WhatsApp...');
