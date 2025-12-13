@@ -662,8 +662,11 @@ Feel free to ask me other questions! 📚`;
         }
         // ============ END FOLLOW-UP CHECK ============
 
-        // Handle welcome/help message
-        if (body.toLowerCase().includes('hi') || body.toLowerCase().includes('hello') || body.toLowerCase().includes('start')) {
+        // Handle welcome/help message (only match standalone greetings, not words containing hi/hello)
+        const greetingPatterns = /^(hi|hello|hey|start|namaste|hii+)[\s!.,?]*$/i;
+        const isGreeting = greetingPatterns.test(body.trim());
+
+        if (isGreeting) {
             let welcomeMsg = '';
 
             if (userInfo && userInfo.role === 'teacher') {
