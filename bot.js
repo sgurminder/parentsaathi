@@ -702,6 +702,14 @@ Send me any homework question or photo, and I'll help you! 📸`;
                 const topicInfo = await detectTopic(body, mediaUrl, userInfo?.class);
                 console.log('Detected topic:', topicInfo);
 
+                // Log the query for analytics
+                try {
+                    await db.logQuery(from, body, topicInfo, !!mediaUrl);
+                    console.log('Query logged successfully');
+                } catch (logErr) {
+                    console.error('Failed to log query:', logErr);
+                }
+
                 // TEMPORARILY DISABLED: Off-topic check (re-enable after fixing Economics detection)
                 // if (topicInfo.valid === false) {
                 //     const rejectionMsg = `I'm VidyaMitra - ${config.school.name}'s AI Study Companion. 📚
@@ -977,6 +985,25 @@ app.get('/api/activation-link/:phoneNumber', async (req, res) => {
         message: `Send this link to ${userInfo.name} to activate their account`,
         instructions: `When they click this link, it will open WhatsApp with "Hi" pre-filled. They just need to send it!`
     });
+});
+
+// =====================================================
+// QUERY LOGS API
+// =====================================================
+
+// Get recent queries (for admin panel)
+app.get('/api/queries', async (req, res) => {
+    const limit = parseInt(req.query.limit) || 50;
+    const queries = await db.getRecentQueries(limit);
+    res.json(queries);
+});
+
+// Get queries for a specific user
+app.get('/api/queries/:phoneNumber', async (req, res) => {
+    const phoneNumber = req.params.phoneNumber;
+    const limit = parseInt(req.query.limit) || 20;
+    const queries = await db.getUserQueries(phoneNumber, limit);
+    res.json(queries);
 });
 
 // =====================================================
@@ -1388,6 +1415,7 @@ app.get('/admin', (req, res) => {
         <div class="tabs">
             <button class="tab active" onclick="switchTab('add')">➕ Add User</button>
             <button class="tab" onclick="switchTab('view')">👥 View All Users</button>
+            <button class="tab" onclick="switchTab('queries')">📝 Recent Questions</button>
         </div>
 
         <div id="addTab" class="tab-content active">
@@ -1445,6 +1473,26 @@ app.get('/admin', (req, res) => {
                 </table>
             </div>
         </div>
+
+        <div id="queriesTab" class="tab-content">
+            <div class="loading" id="queriesLoading">Loading recent questions...</div>
+            <div class="table-container" id="queriesTableContainer" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Student</th>
+                            <th>Question</th>
+                            <th>Subject</th>
+                            <th>Class</th>
+                            <th>Chapter</th>
+                        </tr>
+                    </thead>
+                    <tbody id="queriesTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1455,10 +1503,14 @@ app.get('/admin', (req, res) => {
             if (tab === 'add') {
                 document.querySelectorAll('.tab')[0].classList.add('active');
                 document.getElementById('addTab').classList.add('active');
-            } else {
+            } else if (tab === 'view') {
                 document.querySelectorAll('.tab')[1].classList.add('active');
                 document.getElementById('viewTab').classList.add('active');
                 loadUsers();
+            } else if (tab === 'queries') {
+                document.querySelectorAll('.tab')[2].classList.add('active');
+                document.getElementById('queriesTab').classList.add('active');
+                loadQueries();
             }
         }
 
@@ -1720,6 +1772,62 @@ app.get('/admin', (req, res) => {
                 }
             } catch (err) {
                 showError('❌ Error: ' + err.message);
+            }
+        }
+
+        async function loadQueries() {
+            const loading = document.getElementById('queriesLoading');
+            const tableContainer = document.getElementById('queriesTableContainer');
+            const queriesTable = document.getElementById('queriesTable');
+
+            loading.style.display = 'block';
+            tableContainer.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/queries?limit=50');
+                const queries = await response.json();
+
+                queriesTable.innerHTML = '';
+
+                if (queries && queries.length > 0) {
+                    queries.forEach(q => {
+                        // Format timestamp
+                        const date = new Date(q.timestamp);
+                        const timeDisplay = date.toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+
+                        // Truncate question for display
+                        const questionDisplay = q.query.length > 60 ?
+                            q.query.substring(0, 60) + '...' : q.query;
+
+                        // Format phone number
+                        const phone = q.phoneNumber.replace('whatsapp:', '').replace('+91', '');
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = \`
+                            <td style="white-space: nowrap;">\${timeDisplay}</td>
+                            <td>\${phone}</td>
+                            <td title="\${q.query}">\${questionDisplay}\${q.hasImage ? ' 📷' : ''}</td>
+                            <td><span class="badge" style="background: #e3f2fd; color: #1976d2;">\${q.subject || '-'}</span></td>
+                            <td>\${q.class || '-'}</td>
+                            <td>\${q.chapter || '-'}</td>
+                        \`;
+                        queriesTable.appendChild(row);
+                    });
+
+                    tableContainer.style.display = 'block';
+                } else {
+                    queriesTable.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: #999;">No questions yet. Questions will appear here once students start asking!</td></tr>';
+                    tableContainer.style.display = 'block';
+                }
+            } catch (err) {
+                showError('❌ Failed to load queries: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
             }
         }
 

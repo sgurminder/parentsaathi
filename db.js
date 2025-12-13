@@ -445,6 +445,82 @@ class Database {
         return this.cache[key] || 0;
     }
 
+    // ==================== QUERY LOGGING ====================
+
+    async logQuery(phoneNumber, query, topicInfo, hasImage = false) {
+        const timestamp = new Date().toISOString();
+        const queryId = `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        const queryLog = {
+            id: queryId,
+            phoneNumber,
+            query: query.substring(0, 500), // Limit query length
+            subject: topicInfo?.subject || 'unknown',
+            class: topicInfo?.class || null,
+            chapter: topicInfo?.chapter || null,
+            hasImage,
+            timestamp
+        };
+
+        if (this.type === 'vercel-kv') {
+            // Store individual query
+            await this.kv.set(`query:${queryId}`, queryLog, {
+                ex: 60 * 60 * 24 * 30 // 30 days expiry
+            });
+
+            // Add to recent queries list (keep last 500)
+            await this.kv.lpush('queries:recent', queryId);
+            await this.kv.ltrim('queries:recent', 0, 499);
+
+            // Add to user's query list
+            await this.kv.lpush(`queries:user:${phoneNumber}`, queryId);
+            await this.kv.ltrim(`queries:user:${phoneNumber}`, 0, 99); // Keep last 100 per user
+        } else {
+            // In-memory storage
+            if (!this.cache.queryLogs) this.cache.queryLogs = [];
+            this.cache.queryLogs.unshift(queryLog);
+            if (this.cache.queryLogs.length > 500) {
+                this.cache.queryLogs = this.cache.queryLogs.slice(0, 500);
+            }
+        }
+
+        return queryLog;
+    }
+
+    async getRecentQueries(limit = 50) {
+        if (this.type === 'vercel-kv') {
+            const queryIds = await this.kv.lrange('queries:recent', 0, limit - 1);
+            const queries = [];
+
+            for (const id of queryIds || []) {
+                const query = await this.kv.get(`query:${id}`);
+                if (query) queries.push(query);
+            }
+
+            return queries;
+        }
+
+        return (this.cache.queryLogs || []).slice(0, limit);
+    }
+
+    async getUserQueries(phoneNumber, limit = 20) {
+        if (this.type === 'vercel-kv') {
+            const queryIds = await this.kv.lrange(`queries:user:${phoneNumber}`, 0, limit - 1);
+            const queries = [];
+
+            for (const id of queryIds || []) {
+                const query = await this.kv.get(`query:${id}`);
+                if (query) queries.push(query);
+            }
+
+            return queries;
+        }
+
+        return (this.cache.queryLogs || [])
+            .filter(q => q.phoneNumber === phoneNumber)
+            .slice(0, limit);
+    }
+
     // ==================== RATE LIMITING ====================
 
     async trackUnauthorizedAttempt(phoneNumber) {
