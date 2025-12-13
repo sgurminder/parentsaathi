@@ -1310,8 +1310,9 @@ app.post('/api/chat/message', async (req, res) => {
 
     try {
         // Detect topic
+        console.log(`[CHAT] Processing message for ${user.phone}: "${message}"`);
         const topicInfo = await detectTopicWithAI(message || 'Image question', user.class || 10);
-        console.log(`[CHAT] Topic detected for ${user.phone}:`, topicInfo);
+        console.log(`[CHAT] Topic detected:`, topicInfo);
 
         // Log query
         try {
@@ -1326,14 +1327,18 @@ app.post('/api/chat/message', async (req, res) => {
             topicInfo.class,
             topicInfo.chapter
         );
+        console.log(`[CHAT] Teaching method found: ${!!teachingMethod}`);
 
         // Generate AI response
         let aiResponse;
         if (teachingMethod) {
-            aiResponse = await generateResponse(message, teachingMethod, imageBase64);
+            console.log('[CHAT] Generating response with teaching method...');
+            aiResponse = await generateResponse(message, teachingMethod, null); // Don't pass base64 for now
         } else {
-            aiResponse = await generateGenericResponse(message, topicInfo, imageBase64);
+            console.log('[CHAT] Generating generic response...');
+            aiResponse = await generateGenericResponse(message, topicInfo, null); // Don't pass base64 for now
         }
+        console.log(`[CHAT] Response generated (${aiResponse.length} chars)`);
 
         // Find diagram if relevant
         const diagramUrl = findDiagram(message, topicInfo.chapter);
@@ -1371,7 +1376,7 @@ app.post('/api/chat/message', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[CHAT] Error generating response:', error);
+        console.error('[CHAT] Error generating response:', error.message, error.stack);
         res.status(500).json({ success: false, error: 'Failed to generate response' });
     }
 });
