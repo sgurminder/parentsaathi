@@ -1339,7 +1339,7 @@ app.post('/api/chat/message', async (req, res) => {
     try {
         // Detect topic
         console.log(`[CHAT] Processing message for ${userPhone}: "${message}"`);
-        const topicInfo = await detectTopicWithAI(message || 'Image question', userClass);
+        const topicInfo = await detectTopic(message || 'Image question', null, userClass);
         console.log(`[CHAT] Topic detected:`, JSON.stringify(topicInfo));
 
         // Log query (non-blocking)
