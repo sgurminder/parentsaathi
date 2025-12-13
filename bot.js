@@ -16,51 +16,114 @@ const db = require('./db');
 const config = require('./config');
 
 // =====================================================
-// MULTI-SCHOOL DEMO CONFIGURATION
+// MULTI-SCHOOL WHITE-LABEL CONFIGURATION
 // =====================================================
 const demoSchools = {
+    // ===== PRODUCTION SCHOOLS =====
+    'snps': {
+        id: 'snps',
+        name: 'Sant Nischal Singh Public School',
+        shortName: 'SNPS',
+        tagline: 'Your 24/7 AI Study Companion',
+        logo: null, // Will use school logo URL when provided
+        logoEmoji: '📚',
+        primaryColor: '#1e40af',
+        secondaryColor: '#fbbf24',
+        gradientFrom: '#1e40af',
+        gradientTo: '#3b82f6',
+        appName: 'SNPS AI'
+    },
+    'pragyan': {
+        id: 'pragyan',
+        name: 'Pragyan Sthali Public School',
+        shortName: 'Pragyan',
+        tagline: 'Learn Smarter, Not Harder',
+        logo: null, // Will use school logo URL when provided
+        logoEmoji: '🎓',
+        primaryColor: '#059669',
+        secondaryColor: '#f59e0b',
+        gradientFrom: '#059669',
+        gradientTo: '#10b981',
+        appName: 'Pragyan AI'
+    },
+    // ===== DEFAULT / VIDYAMITRA =====
+    'vidyamitra': {
+        id: 'vidyamitra',
+        name: 'VidyaMitra',
+        shortName: 'VidyaMitra',
+        tagline: 'AI-Powered School Solutions',
+        logo: null,
+        logoEmoji: '🎯',
+        primaryColor: '#7c3aed',
+        secondaryColor: '#fbbf24',
+        gradientFrom: '#7c3aed',
+        gradientTo: '#a855f7',
+        appName: 'VidyaMitra'
+    },
+    // ===== DEMO SCHOOLS (for testing) =====
     'springfields': {
         id: 'springfields',
         name: 'Springfields Academy',
         shortName: 'Springfields',
-        logo: '🏫',
+        tagline: 'Excellence in Education',
+        logo: null,
+        logoEmoji: '🏫',
         primaryColor: '#667eea',
+        secondaryColor: '#fbbf24',
         gradientFrom: '#667eea',
-        gradientTo: '#764ba2'
+        gradientTo: '#764ba2',
+        appName: 'Springfields AI'
     },
     'dps': {
         id: 'dps',
         name: 'Delhi Public School',
         shortName: 'DPS',
-        logo: '📚',
+        tagline: 'Service Before Self',
+        logo: null,
+        logoEmoji: '📚',
         primaryColor: '#1a56db',
+        secondaryColor: '#fbbf24',
         gradientFrom: '#1a56db',
-        gradientTo: '#1e40af'
+        gradientTo: '#1e40af',
+        appName: 'DPS AI'
     },
     'greenvalley': {
         id: 'greenvalley',
         name: 'Green Valley International',
         shortName: 'GVI',
-        logo: '🌿',
+        tagline: 'Growing Together',
+        logo: null,
+        logoEmoji: '🌿',
         primaryColor: '#059669',
+        secondaryColor: '#fbbf24',
         gradientFrom: '#059669',
-        gradientTo: '#047857'
+        gradientTo: '#047857',
+        appName: 'GVI AI'
     },
     'demo': {
         id: 'demo',
         name: 'Demo School',
         shortName: 'Demo',
-        logo: '🎓',
+        tagline: 'Demo Mode',
+        logo: null,
+        logoEmoji: '🎓',
         primaryColor: '#10b981',
+        secondaryColor: '#fbbf24',
         gradientFrom: '#10b981',
-        gradientTo: '#059669'
+        gradientTo: '#059669',
+        appName: 'Demo AI'
     }
 };
 
 // Helper to get school config from query param
 function getSchoolConfig(req) {
-    const schoolId = req.query.school || 'demo';
-    return demoSchools[schoolId] || demoSchools['demo'];
+    const schoolId = req.query.school || 'vidyamitra';
+    return demoSchools[schoolId] || demoSchools['vidyamitra'];
+}
+
+// Get school config by ID (for API use)
+function getSchoolById(schoolId) {
+    return demoSchools[schoolId] || demoSchools['vidyamitra'];
 }
 
 // Configure multer for memory storage (works on serverless)
@@ -1004,6 +1067,357 @@ app.get('/api/queries/:phoneNumber', async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const queries = await db.getUserQueries(phoneNumber, limit);
     res.json(queries);
+});
+
+// =====================================================
+// PWA AUTH ENDPOINTS (Mock OTP for MVP)
+// =====================================================
+
+// Send OTP (mock - always succeeds, any 6 digits work for verify)
+app.post('/api/auth/send-otp', async (req, res) => {
+    const { phone, schoolId } = req.body;
+
+    if (!phone) {
+        return res.status(400).json({ success: false, error: 'Phone number is required' });
+    }
+
+    // Validate phone format (10 digits for India)
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
+        return res.status(400).json({ success: false, error: 'Please enter a valid 10-digit phone number' });
+    }
+
+    // Get school config for branding
+    const school = getSchoolById(schoolId || 'vidyamitra');
+
+    // Mock OTP - in production, integrate with SMS gateway
+    console.log(`[AUTH] OTP requested for ${cleanPhone} (school: ${school.shortName})`);
+
+    // Store OTP request in Redis (for rate limiting in future)
+    try {
+        await db.kv.set(`otp:${cleanPhone}`, {
+            requested: new Date().toISOString(),
+            schoolId: school.id
+        }, { ex: 300 }); // 5 min expiry
+    } catch (e) {
+        console.log('[AUTH] Redis not available, continuing without storage');
+    }
+
+    res.json({
+        success: true,
+        message: 'OTP sent successfully',
+        // For demo: hint that any 6 digits work
+        demo: process.env.NODE_ENV !== 'production' ? 'Use any 6 digits (e.g., 123456)' : undefined
+    });
+});
+
+// Verify OTP (mock - any 6 digits succeed)
+app.post('/api/auth/verify-otp', async (req, res) => {
+    const { phone, otp, schoolId } = req.body;
+
+    if (!phone || !otp) {
+        return res.status(400).json({ success: false, error: 'Phone and OTP are required' });
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    const cleanOtp = otp.replace(/\D/g, '');
+
+    // Mock verification - any 6 digits work
+    if (cleanOtp.length !== 6) {
+        return res.status(400).json({ success: false, error: 'Please enter a valid 6-digit OTP' });
+    }
+
+    const school = getSchoolById(schoolId || 'vidyamitra');
+
+    // Get or create user
+    let user;
+    try {
+        user = await db.kv.get(`pwa_user:${cleanPhone}`);
+        if (!user) {
+            // New user - create profile
+            user = {
+                phone: cleanPhone,
+                schoolId: school.id,
+                createdAt: new Date().toISOString(),
+                name: null,
+                class: null,
+                section: null
+            };
+            await db.kv.set(`pwa_user:${cleanPhone}`, user);
+            console.log(`[AUTH] New user created: ${cleanPhone}`);
+        }
+    } catch (e) {
+        console.log('[AUTH] Redis not available, using temporary user');
+        user = { phone: cleanPhone, schoolId: school.id };
+    }
+
+    // Generate simple session token (in production, use JWT)
+    const sessionToken = `${cleanPhone}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    try {
+        await db.kv.set(`session:${sessionToken}`, {
+            phone: cleanPhone,
+            schoolId: school.id,
+            createdAt: new Date().toISOString()
+        }, { ex: 86400 * 30 }); // 30 day session
+    } catch (e) {
+        console.log('[AUTH] Session storage failed, continuing');
+    }
+
+    console.log(`[AUTH] User verified: ${cleanPhone} (school: ${school.shortName})`);
+
+    res.json({
+        success: true,
+        token: sessionToken,
+        user: {
+            phone: cleanPhone,
+            name: user.name,
+            class: user.class,
+            section: user.section,
+            schoolId: school.id,
+            schoolName: school.name,
+            isNewUser: !user.name
+        }
+    });
+});
+
+// Get/Update user profile
+app.get('/api/auth/profile', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        const session = await db.kv.get(`session:${token}`);
+        if (!session) {
+            return res.status(401).json({ success: false, error: 'Session expired' });
+        }
+
+        const user = await db.kv.get(`pwa_user:${session.phone}`);
+        const school = getSchoolById(session.schoolId);
+
+        res.json({
+            success: true,
+            user: {
+                phone: session.phone,
+                name: user?.name,
+                class: user?.class,
+                section: user?.section,
+                schoolId: school.id,
+                schoolName: school.name
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+app.put('/api/auth/profile', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { name, class: studentClass, section } = req.body;
+
+    try {
+        const session = await db.kv.get(`session:${token}`);
+        if (!session) {
+            return res.status(401).json({ success: false, error: 'Session expired' });
+        }
+
+        let user = await db.kv.get(`pwa_user:${session.phone}`) || {};
+
+        // Update fields
+        if (name !== undefined) user.name = name;
+        if (studentClass !== undefined) user.class = studentClass;
+        if (section !== undefined) user.section = section;
+        user.updatedAt = new Date().toISOString();
+
+        await db.kv.set(`pwa_user:${session.phone}`, user);
+
+        res.json({
+            success: true,
+            user: {
+                phone: session.phone,
+                name: user.name,
+                class: user.class,
+                section: user.section
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// Logout
+app.post('/api/auth/logout', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        try {
+            await db.kv.del(`session:${token}`);
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+    res.json({ success: true });
+});
+
+// =====================================================
+// PWA CHAT ENDPOINTS
+// =====================================================
+
+// Helper to validate session and get user
+async function validateSession(req) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return null;
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+        const session = await db.kv.get(`session:${token}`);
+        if (!session) return null;
+
+        const user = await db.kv.get(`pwa_user:${session.phone}`) || { phone: session.phone };
+        return { ...user, phone: session.phone, schoolId: session.schoolId };
+    } catch (e) {
+        return null;
+    }
+}
+
+// Send message and get AI response
+app.post('/api/chat/message', async (req, res) => {
+    const user = await validateSession(req);
+    if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { message, imageBase64 } = req.body;
+
+    if (!message && !imageBase64) {
+        return res.status(400).json({ success: false, error: 'Message or image is required' });
+    }
+
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = new Date().toISOString();
+    const school = getSchoolById(user.schoolId);
+
+    try {
+        // Detect topic
+        const topicInfo = await detectTopicWithAI(message || 'Image question', user.class || 10);
+        console.log(`[CHAT] Topic detected for ${user.phone}:`, topicInfo);
+
+        // Log query
+        try {
+            await db.logQuery(`pwa:${user.phone}`, message, topicInfo, !!imageBase64);
+        } catch (e) {
+            console.log('[CHAT] Query logging failed');
+        }
+
+        // Find teaching method
+        const teachingMethod = await findTeachingMethod(
+            topicInfo.subject,
+            topicInfo.class,
+            topicInfo.chapter
+        );
+
+        // Generate AI response
+        let aiResponse;
+        if (teachingMethod) {
+            aiResponse = await generateResponse(message, teachingMethod, imageBase64);
+        } else {
+            aiResponse = await generateGenericResponse(message, topicInfo, imageBase64);
+        }
+
+        // Find diagram if relevant
+        const diagramUrl = findDiagram(message, topicInfo.chapter);
+
+        // Store message in chat history
+        const chatMessage = {
+            id: messageId,
+            userMessage: message,
+            aiResponse,
+            timestamp,
+            topicInfo,
+            diagramUrl,
+            hasImage: !!imageBase64
+        };
+
+        try {
+            // Store in Redis list for this user
+            await db.kv.lpush(`chat:${user.phone}`, JSON.stringify(chatMessage));
+            // Keep only last 100 messages
+            await db.kv.ltrim(`chat:${user.phone}`, 0, 99);
+        } catch (e) {
+            console.log('[CHAT] Message storage failed');
+        }
+
+        res.json({
+            success: true,
+            message: {
+                id: messageId,
+                response: aiResponse,
+                timestamp,
+                subject: topicInfo.subject,
+                chapter: topicInfo.chapter,
+                diagramUrl
+            }
+        });
+
+    } catch (error) {
+        console.error('[CHAT] Error generating response:', error);
+        res.status(500).json({ success: false, error: 'Failed to generate response' });
+    }
+});
+
+// Get chat history
+app.get('/api/chat/history', async (req, res) => {
+    const user = await validateSession(req);
+    if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const limit = parseInt(req.query.limit) || 50;
+
+    try {
+        const messages = await db.kv.lrange(`chat:${user.phone}`, 0, limit - 1);
+        const history = messages.map(m => {
+            try {
+                return JSON.parse(m);
+            } catch (e) {
+                return m;
+            }
+        });
+
+        res.json({
+            success: true,
+            messages: history.reverse() // Oldest first for display
+        });
+    } catch (e) {
+        console.log('[CHAT] History fetch failed');
+        res.json({ success: true, messages: [] });
+    }
+});
+
+// Clear chat history
+app.delete('/api/chat/history', async (req, res) => {
+    const user = await validateSession(req);
+    if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    try {
+        await db.kv.del(`chat:${user.phone}`);
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: true });
+    }
 });
 
 // =====================================================
@@ -4254,6 +4668,991 @@ app.get('/api/status', (req, res) => {
             stats: 'GET /api/stats'
         }
     });
+});
+
+// =====================================================
+// PWA STUDENT APP
+// =====================================================
+
+// PWA Manifest
+app.get('/app/manifest.json', (req, res) => {
+    const schoolId = req.query.school || 'vidyamitra';
+    const school = getSchoolById(schoolId);
+
+    res.json({
+        name: school.appName || school.name,
+        short_name: school.shortName,
+        description: school.tagline,
+        start_url: `/app?school=${schoolId}`,
+        display: 'standalone',
+        background_color: '#ffffff',
+        theme_color: school.primaryColor,
+        orientation: 'portrait',
+        icons: [
+            {
+                src: `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${school.logoEmoji}</text></svg>`,
+                sizes: '192x192',
+                type: 'image/svg+xml'
+            },
+            {
+                src: `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${school.logoEmoji}</text></svg>`,
+                sizes: '512x512',
+                type: 'image/svg+xml'
+            }
+        ]
+    });
+});
+
+// Service Worker for offline support
+app.get('/app/sw.js', (req, res) => {
+    res.type('application/javascript');
+    res.send(`
+// Service Worker for PWA
+const CACHE_NAME = 'vidyamitra-v1';
+
+self.addEventListener('install', (e) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+    e.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', (e) => {
+    // Network first, fallback to cache
+    e.respondWith(
+        fetch(e.request).catch(() => caches.match(e.request))
+    );
+});
+    `);
+});
+
+// Main PWA App
+app.get('/app', (req, res) => {
+    const schoolId = req.query.school || 'vidyamitra';
+    const school = getSchoolById(schoolId);
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="${school.primaryColor}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="${school.shortName}">
+    <link rel="manifest" href="/app/manifest.json?school=${schoolId}">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${school.logoEmoji}</text></svg>">
+    <title>${school.appName || school.name}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: ${school.primaryColor};
+            --primary-light: ${school.gradientTo};
+            --secondary: ${school.secondaryColor};
+            --bg: #f5f5f5;
+            --card: #ffffff;
+            --text: #333333;
+            --text-light: #666666;
+            --border: #e0e0e0;
+            --success: #10b981;
+            --error: #ef4444;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* App Container */
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            padding: calc(var(--safe-top) + 12px) 16px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 100;
+        }
+
+        .header-logo {
+            font-size: 28px;
+        }
+
+        .header-title {
+            flex: 1;
+        }
+
+        .header-title h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-title p {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: calc(var(--safe-bottom) + 70px);
+        }
+
+        /* Bottom Navigation */
+        .nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 calc(var(--safe-bottom) + 8px);
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .nav-item span {
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* Screen Container */
+        .screen {
+            display: none;
+            height: 100%;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            min-height: 100vh;
+            background: linear-gradient(180deg, var(--primary) 0%, var(--primary-light) 100%);
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 20px;
+            padding: 32px 24px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+
+        .login-logo {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+
+        .login-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-light);
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+        }
+
+        .otp-container {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .otp-input {
+            width: 48px;
+            height: 56px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            outline: none;
+        }
+
+        .otp-input:focus {
+            border-color: var(--primary);
+        }
+
+        .error-msg {
+            color: var(--error);
+            font-size: 13px;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .demo-hint {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-light);
+            margin-top: 16px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        /* Chat Screen */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .message-user {
+            align-self: flex-end;
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-ai {
+            align-self: flex-start;
+            background: white;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .message-typing {
+            display: flex;
+            gap: 4px;
+            padding: 16px;
+        }
+
+        .message-typing span {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .message-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .message-typing span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        .chat-input-container {
+            padding: 12px 16px;
+            background: white;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 24px;
+            font-size: 16px;
+            resize: none;
+            max-height: 120px;
+            outline: none;
+        }
+
+        .chat-input:focus {
+            border-color: var(--primary);
+        }
+
+        .send-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 24px;
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-text {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        /* Profile Screen */
+        .profile-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            padding: 32px 24px;
+            text-align: center;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            margin: 0 auto 12px;
+        }
+
+        .profile-name {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .profile-phone {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .profile-section {
+            padding: 16px;
+        }
+
+        .profile-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .profile-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .profile-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .profile-row:last-child {
+            border-bottom: none;
+        }
+
+        .logout-btn {
+            background: var(--error);
+            color: white;
+            margin-top: 16px;
+        }
+
+        /* Tests Screen */
+        .tests-list {
+            padding: 16px;
+        }
+
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .test-subject {
+            display: inline-block;
+            padding: 4px 12px;
+            background: var(--primary);
+            color: white;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .test-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .test-meta {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hide when logged out */
+        .app.logged-out .header,
+        .app.logged-out .nav,
+        .app.logged-out .main {
+            display: none;
+        }
+
+        .app.logged-out .login-screen {
+            display: flex;
+        }
+
+        .app:not(.logged-out) .login-screen {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app logged-out" id="app">
+        <!-- Login Screen -->
+        <div class="login-screen" id="loginScreen">
+            <div class="login-card">
+                <div class="login-logo">${school.logoEmoji}</div>
+                <h1 class="login-title">${school.shortName} AI</h1>
+                <p class="login-subtitle">${school.tagline}</p>
+
+                <!-- Phone Step -->
+                <div id="phoneStep">
+                    <div class="form-group">
+                        <label class="form-label">Mobile Number</label>
+                        <input type="tel" id="phoneInput" class="form-input" placeholder="Enter 10-digit number" maxlength="10" inputmode="numeric">
+                    </div>
+                    <button class="btn btn-primary" id="sendOtpBtn">Send OTP</button>
+                    <div class="error-msg" id="phoneError"></div>
+                </div>
+
+                <!-- OTP Step -->
+                <div id="otpStep" style="display:none;">
+                    <p class="form-label" style="text-align:center;margin-bottom:16px;">Enter the 6-digit OTP sent to <span id="displayPhone"></span></p>
+                    <div class="otp-container">
+                        <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                    </div>
+                    <button class="btn btn-primary" id="verifyOtpBtn">Verify OTP</button>
+                    <div class="error-msg" id="otpError"></div>
+                    <div class="demo-hint">Demo: Enter any 6 digits (e.g., 123456)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-logo">${school.logoEmoji}</div>
+            <div class="header-title">
+                <h1>${school.shortName} AI</h1>
+                <p>Your 24/7 Study Companion</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Chat Screen -->
+            <div class="screen active" id="chatScreen">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="empty-state" id="chatEmpty">
+                        <div class="empty-state-icon">📚</div>
+                        <div class="empty-state-title">Ask me anything!</div>
+                        <div class="empty-state-text">I can help with homework, explain concepts, and solve problems.</div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <textarea class="chat-input" id="chatInput" placeholder="Type your question..." rows="1"></textarea>
+                    <button class="send-btn" id="sendBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tests Screen -->
+            <div class="screen" id="testsScreen">
+                <div class="tests-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📝</div>
+                        <div class="empty-state-title">Coming Soon</div>
+                        <div class="empty-state-text">Practice tests will be available here.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Screen -->
+            <div class="screen" id="profileScreen">
+                <div class="profile-header">
+                    <div class="profile-avatar" id="profileAvatar">👤</div>
+                    <div class="profile-name" id="profileName">Student</div>
+                    <div class="profile-phone" id="profilePhone"></div>
+                </div>
+                <div class="profile-section">
+                    <div class="profile-card">
+                        <div class="profile-card-title">Account</div>
+                        <div class="profile-row">
+                            <span>School</span>
+                            <span id="profileSchool">${school.name}</span>
+                        </div>
+                        <div class="profile-row">
+                            <span>Class</span>
+                            <span id="profileClass">-</span>
+                        </div>
+                    </div>
+                    <button class="btn logout-btn" id="logoutBtn">Logout</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="nav">
+            <button class="nav-item active" data-screen="chat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Chat</span>
+            </button>
+            <button class="nav-item" data-screen="tests">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"/>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                <span>Tests</span>
+            </button>
+            <button class="nav-item" data-screen="profile">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span>Profile</span>
+            </button>
+        </nav>
+    </div>
+
+    <script>
+        const SCHOOL_ID = '${schoolId}';
+        const API_BASE = '';
+
+        // State
+        let token = localStorage.getItem('token');
+        let user = JSON.parse(localStorage.getItem('user') || 'null');
+        let currentScreen = 'chat';
+
+        // Elements
+        const app = document.getElementById('app');
+        const phoneInput = document.getElementById('phoneInput');
+        const phoneStep = document.getElementById('phoneStep');
+        const otpStep = document.getElementById('otpStep');
+        const sendOtpBtn = document.getElementById('sendOtpBtn');
+        const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+        const phoneError = document.getElementById('phoneError');
+        const otpError = document.getElementById('otpError');
+        const displayPhone = document.getElementById('displayPhone');
+        const otpInputs = document.querySelectorAll('.otp-input');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatEmpty = document.getElementById('chatEmpty');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Initialize
+        if (token && user) {
+            app.classList.remove('logged-out');
+            updateProfile();
+            loadChatHistory();
+        }
+
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/app/sw.js').catch(() => {});
+        }
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const screen = item.dataset.screen;
+                switchScreen(screen);
+            });
+        });
+
+        function switchScreen(screen) {
+            currentScreen = screen;
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.querySelector('[data-screen="' + screen + '"]').classList.add('active');
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screen + 'Screen').classList.add('active');
+        }
+
+        // Login - Send OTP
+        sendOtpBtn.addEventListener('click', async () => {
+            const phone = phoneInput.value.replace(/\\D/g, '');
+            if (phone.length !== 10) {
+                phoneError.textContent = 'Please enter a valid 10-digit number';
+                return;
+            }
+            phoneError.textContent = '';
+            sendOtpBtn.disabled = true;
+            sendOtpBtn.textContent = 'Sending...';
+
+            try {
+                const res = await fetch(API_BASE + '/api/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, schoolId: SCHOOL_ID })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    phoneStep.style.display = 'none';
+                    otpStep.style.display = 'block';
+                    displayPhone.textContent = phone;
+                    otpInputs[0].focus();
+                } else {
+                    phoneError.textContent = data.error || 'Failed to send OTP';
+                }
+            } catch (e) {
+                phoneError.textContent = 'Network error. Please try again.';
+            }
+            sendOtpBtn.disabled = false;
+            sendOtpBtn.textContent = 'Send OTP';
+        });
+
+        // OTP input handling
+        otpInputs.forEach((input, i) => {
+            input.addEventListener('input', (e) => {
+                if (e.target.value && i < otpInputs.length - 1) {
+                    otpInputs[i + 1].focus();
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !e.target.value && i > 0) {
+                    otpInputs[i - 1].focus();
+                }
+            });
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\\D/g, '');
+                for (let j = 0; j < Math.min(paste.length, 6); j++) {
+                    otpInputs[j].value = paste[j];
+                }
+                otpInputs[Math.min(paste.length, 5)].focus();
+            });
+        });
+
+        // Verify OTP
+        verifyOtpBtn.addEventListener('click', async () => {
+            const otp = Array.from(otpInputs).map(i => i.value).join('');
+            if (otp.length !== 6) {
+                otpError.textContent = 'Please enter the 6-digit OTP';
+                return;
+            }
+            otpError.textContent = '';
+            verifyOtpBtn.disabled = true;
+            verifyOtpBtn.textContent = 'Verifying...';
+
+            try {
+                const res = await fetch(API_BASE + '/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phoneInput.value, otp, schoolId: SCHOOL_ID })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    token = data.token;
+                    user = data.user;
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    app.classList.remove('logged-out');
+                    updateProfile();
+                } else {
+                    otpError.textContent = data.error || 'Invalid OTP';
+                }
+            } catch (e) {
+                otpError.textContent = 'Network error. Please try again.';
+            }
+            verifyOtpBtn.disabled = false;
+            verifyOtpBtn.textContent = 'Verify OTP';
+        });
+
+        // Update profile display
+        function updateProfile() {
+            if (user) {
+                document.getElementById('profileName').textContent = user.name || 'Student';
+                document.getElementById('profilePhone').textContent = user.phone;
+                document.getElementById('profileClass').textContent = user.class || '-';
+                document.getElementById('profileAvatar').textContent = user.name ? user.name[0].toUpperCase() : '👤';
+            }
+        }
+
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch(API_BASE + '/api/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+            } catch (e) {}
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            token = null;
+            user = null;
+            app.classList.add('logged-out');
+            phoneStep.style.display = 'block';
+            otpStep.style.display = 'none';
+            phoneInput.value = '';
+            otpInputs.forEach(i => i.value = '');
+            chatMessages.innerHTML = chatEmpty.outerHTML;
+        });
+
+        // Chat - Auto resize input
+        chatInput.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        });
+
+        // Chat - Send message
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            // Hide empty state
+            if (chatEmpty) chatEmpty.style.display = 'none';
+
+            // Add user message
+            addMessage(message, 'user');
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+
+            // Show typing indicator
+            const typingEl = document.createElement('div');
+            typingEl.className = 'message message-ai message-typing';
+            typingEl.innerHTML = '<span></span><span></span><span></span>';
+            chatMessages.appendChild(typingEl);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            sendBtn.disabled = true;
+
+            try {
+                const res = await fetch(API_BASE + '/api/chat/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ message })
+                });
+                const data = await res.json();
+
+                // Remove typing indicator
+                typingEl.remove();
+
+                if (data.success) {
+                    addMessage(data.message.response, 'ai');
+                } else {
+                    addMessage('Sorry, something went wrong. Please try again.', 'ai');
+                }
+            } catch (e) {
+                typingEl.remove();
+                addMessage('Network error. Please check your connection.', 'ai');
+            }
+
+            sendBtn.disabled = false;
+        }
+
+        function addMessage(text, type) {
+            const el = document.createElement('div');
+            el.className = 'message message-' + type;
+            el.textContent = text;
+            chatMessages.appendChild(el);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Load chat history
+        async function loadChatHistory() {
+            try {
+                const res = await fetch(API_BASE + '/api/chat/history', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                if (data.success && data.messages.length > 0) {
+                    chatEmpty.style.display = 'none';
+                    data.messages.forEach(msg => {
+                        addMessage(msg.userMessage, 'user');
+                        addMessage(msg.aiResponse, 'ai');
+                    });
+                }
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>`);
 });
 
 // =====================================================
