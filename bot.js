@@ -566,52 +566,6 @@ Respond with ONLY "correct" or "incorrect" (lowercase, one word).`;
         return studentAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
     }
 }
-
-// Generate re-explanation with different approach
-async function generateReExplanation(originalQuestion, incorrectAnswer, correctAnswer, topicInfo, attempt = 1) {
-    const subject = topicInfo?.subject || 'general';
-    const classLevel = topicInfo?.class || 8;
-
-    const approaches = [
-        "Use a completely different analogy or real-life example",
-        "Break it down into smaller, simpler steps",
-        "Use a visual description or diagram explanation"
-    ];
-
-    const approach = approaches[Math.min(attempt - 1, approaches.length - 1)];
-
-    const systemPrompt = `You are helping a Class ${classLevel} student who got a ${subject} question wrong.
-
-Original Question: ${originalQuestion}
-Student's Wrong Answer: ${incorrectAnswer}
-Correct Answer: ${correctAnswer}
-
-The student didn't understand. ${approach}.
-
-Instructions:
-1. Don't criticize - be encouraging
-2. Explain WHY their answer was wrong (briefly)
-3. Re-explain the concept using ${approach.toLowerCase()}
-4. Keep it under 150 words
-5. End with the correct answer clearly stated`;
-
-    try {
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `Help me understand: ${originalQuestion}` }
-            ],
-            max_tokens: 250
-        });
-
-        return response.choices[0].message.content;
-    } catch (error) {
-        console.error('Error generating re-explanation:', error);
-        return `Let me explain differently:\n\nThe correct answer is: ${correctAnswer}\n\nWould you like me to explain step by step?`;
-    }
-}
-
 // =====================================================
 // WHATSAPP WEBHOOK (Twilio)
 // =====================================================
@@ -670,59 +624,32 @@ app.post('/webhook', async (req, res) => {
             // Check if student's answer is correct
             const isCorrect = await checkStudentAnswer(body, followUpState.correctAnswer, followUpState.question);
 
+            // Clear the follow-up state immediately (one attempt only)
+            await db.clearFollowUpState(from);
+
             if (isCorrect) {
                 // Correct answer!
-                await db.clearFollowUpState(from);
-                const successMsg = `✅ Correct! Great job! 🎉
+                const successMsg = `✅ Correct! Well done! 🎉
 
-You've understood the concept well.
+You've understood the concept. Keep practicing!
 
-Feel free to ask another question anytime!`;
+Feel free to ask another question anytime.`;
                 twiml.message(successMsg);
                 res.type('text/xml');
                 res.send(twiml.toString());
                 return;
             } else {
-                // Wrong answer - re-explain
-                const attempts = (followUpState.attempts || 0) + 1;
+                // Wrong answer - show correct answer and suggest teacher
+                const wrongMsg = `Not quite. The correct answer is:
 
-                if (attempts >= 3) {
-                    // After 3 attempts, just give the answer and move on
-                    await db.clearFollowUpState(from);
-                    const finalMsg = `Let's look at this together:
+*${followUpState.correctAnswer}*
 
-The correct answer is: ${followUpState.correctAnswer}
+${followUpState.hint ? `💡 ${followUpState.hint}` : ''}
 
-${followUpState.hint || ''}
+If this is still unclear, please ask your teacher to explain this topic in class.
 
-Don't worry! Learning takes practice. Feel free to ask more questions! 📚`;
-                    twiml.message(finalMsg);
-                    res.type('text/xml');
-                    res.send(twiml.toString());
-                    return;
-                }
-
-                // Re-explain with different approach
-                const reExplanation = await generateReExplanation(
-                    followUpState.originalQuestion,
-                    body,
-                    followUpState.correctAnswer,
-                    followUpState.topicInfo,
-                    attempts
-                );
-
-                // Update attempts count
-                await db.saveFollowUpState(from, {
-                    ...followUpState,
-                    attempts: attempts
-                });
-
-                const retryMsg = `${reExplanation}
-
-🔄 Try again! What's your answer?
-
-(Type "skip" to move on)`;
-                twiml.message(retryMsg);
+Feel free to ask me other questions! 📚`;
+                twiml.message(wrongMsg);
                 res.type('text/xml');
                 res.send(twiml.toString());
                 return;
@@ -814,26 +741,26 @@ Send me any homework question or photo, and I'll help you! 📸`;
                 const topicInfo = await detectTopic(body, mediaUrl, userInfo?.class);
                 console.log('Detected topic:', topicInfo);
 
-                // Check if question is valid homework query
-                if (topicInfo.valid === false) {
-                    const rejectionMsg = `I'm VidyaMitra - ${config.school.name}'s AI Study Companion. 📚
-
-I can only help with:
-✅ Homework questions
-✅ Chapter explanations
-✅ Practice problems
-✅ Textbook topics
-
-Please ask a specific homework-related question from your class ${userInfo.class || ''} subjects.
-
-Example: "How do I solve quadratic equations?" or "Explain photosynthesis"`;
-
-                    console.log('⚠️ Rejected off-topic query from', from);
-                    twiml.message(rejectionMsg);
-                    res.type('text/xml');
-                    res.send(twiml.toString());
-                    return;
-                }
+                // TEMPORARILY DISABLED: Off-topic check (re-enable after fixing Economics detection)
+                // if (topicInfo.valid === false) {
+                //     const rejectionMsg = `I'm VidyaMitra - ${config.school.name}'s AI Study Companion. 📚
+                //
+                // I can only help with:
+                // ✅ Homework questions
+                // ✅ Chapter explanations
+                // ✅ Practice problems
+                // ✅ Textbook topics
+                //
+                // Please ask a specific homework-related question from your class ${userInfo.class || ''} subjects.
+                //
+                // Example: "How do I solve quadratic equations?" or "Explain photosynthesis"`;
+                //
+                //     console.log('⚠️ Rejected off-topic query from', from);
+                //     twiml.message(rejectionMsg);
+                //     res.type('text/xml');
+                //     res.send(twiml.toString());
+                //     return;
+                // }
 
                 // Find teacher's method
                 const teachingMethod = await findTeachingMethod(
@@ -2373,821 +2300,137 @@ app.get('/presentation/vidyamitra', (req, res) => {
 });
 
 // =====================================================
-// EULEAN AI - Workshop Landing Page
+// REDIRECTS - Merged into main VidyaMitra page
 // =====================================================
 
 app.get('/workshops', (req, res) => {
-    res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Builder Workshops for Schools | Eulean AI</title>
-    <meta name="description" content="Beyond ChatGPT basics. Build Custom GPTs, AI workflows, and real products. Advanced AI workshops for students and teachers.">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, sans-serif; color: #1f2937; line-height: 1.6; }
-
-        /* Hero Section */
-        .hero {
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #0ea5e9 100%);
-            color: white;
-            padding: 80px 24px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-            opacity: 0.5;
-        }
-        .hero-content { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; }
-        .hero-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.2);
-            padding: 8px 16px;
-            border-radius: 50px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 24px;
-            backdrop-filter: blur(10px);
-        }
-        .hero h1 {
-            font-size: clamp(2rem, 5vw, 3.5rem);
-            font-weight: 800;
-            margin-bottom: 20px;
-            line-height: 1.2;
-        }
-        .hero-subtitle {
-            font-size: 1.25rem;
-            opacity: 0.9;
-            max-width: 600px;
-            margin: 0 auto 32px;
-        }
-        .hero-cta {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: white;
-            color: #1e3a8a;
-            padding: 16px 32px;
-            border-radius: 50px;
-            font-weight: 700;
-            font-size: 1.1rem;
-            text-decoration: none;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-        }
-        .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
-
-        /* Problem Section */
-        .problem {
-            padding: 80px 24px;
-            background: #fef3c7;
-            text-align: center;
-        }
-        .problem-icon { font-size: 3rem; margin-bottom: 16px; }
-        .problem h2 { font-size: 1.75rem; color: #92400e; margin-bottom: 16px; }
-        .problem p { font-size: 1.1rem; color: #78350f; max-width: 700px; margin: 0 auto; }
-
-        /* Container */
-        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
-
-        /* Section */
-        .section { padding: 80px 24px; }
-        .section-header { text-align: center; margin-bottom: 48px; }
-        .section-header h2 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
-        .section-header p { color: #6b7280; font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
-
-        /* Workshop Cards */
-        .workshops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
-        .workshop-card {
-            background: white;
-            border: 2px solid #e5e7eb;
-            border-radius: 16px;
-            padding: 32px;
-            transition: all 0.2s;
-        }
-        .workshop-card:hover { border-color: #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.15); }
-        .workshop-card.featured { border-color: #3b82f6; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); }
-        .workshop-badge {
-            display: inline-block;
-            background: #dbeafe;
-            color: #1e40af;
-            padding: 4px 12px;
-            border-radius: 50px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-        .workshop-card.featured .workshop-badge { background: #1e40af; color: white; }
-        .workshop-card h3 { font-size: 1.35rem; margin-bottom: 8px; }
-        .workshop-card .duration { color: #6b7280; font-size: 0.9rem; margin-bottom: 16px; }
-        .workshop-card .price { font-size: 1.5rem; font-weight: 700; color: #1e3a8a; margin-bottom: 16px; }
-        .workshop-card .price span { font-size: 0.9rem; font-weight: 400; color: #6b7280; }
-        .workshop-card ul { list-style: none; margin-bottom: 20px; }
-        .workshop-card li { padding: 8px 0; padding-left: 28px; position: relative; color: #374151; }
-        .workshop-card li::before { content: '✓'; position: absolute; left: 0; color: #10b981; font-weight: 700; }
-
-        /* What Students Learn */
-        .learn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; }
-        .learn-card {
-            background: #f9fafb;
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
-        }
-        .learn-icon { font-size: 2.5rem; margin-bottom: 12px; }
-        .learn-card h4 { font-size: 1.1rem; margin-bottom: 8px; }
-        .learn-card p { color: #6b7280; font-size: 0.9rem; }
-
-        /* Testimonial */
-        .testimonial {
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-            color: white;
-            padding: 60px 24px;
-            text-align: center;
-        }
-        .testimonial-quote {
-            font-size: 1.5rem;
-            font-style: italic;
-            max-width: 700px;
-            margin: 0 auto 24px;
-            line-height: 1.6;
-        }
-        .testimonial-author { font-weight: 600; }
-        .testimonial-role { opacity: 0.8; font-size: 0.9rem; }
-
-        /* About Founder */
-        .founder {
-            background: #f9fafb;
-            padding: 60px 24px;
-        }
-        .founder-content {
-            max-width: 800px;
-            margin: 0 auto;
-            display: flex;
-            gap: 32px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .founder-photo {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #3b82f6, #1e3a8a);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-            color: white;
-            flex-shrink: 0;
-        }
-        .founder-text { flex: 1; min-width: 300px; }
-        .founder-text h3 { font-size: 1.5rem; margin-bottom: 4px; }
-        .founder-text .title { color: #6b7280; margin-bottom: 12px; }
-        .founder-text p { color: #374151; }
-
-        /* Form Section */
-        .form-section {
-            background: white;
-            padding: 80px 24px;
-        }
-        .form-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #f9fafb;
-            border-radius: 16px;
-            padding: 40px;
-        }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #374151; }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-family: inherit;
-            transition: border-color 0.2s;
-        }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: #3b82f6;
-        }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
-        .form-submit {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .form-submit:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
-
-        /* Footer */
-        .footer {
-            background: #1f2937;
-            color: white;
-            padding: 40px 24px;
-            text-align: center;
-        }
-        .footer-brand { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
-        .footer-tagline { opacity: 0.7; margin-bottom: 24px; }
-        .footer-links { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
-        .footer-links a { color: white; text-decoration: none; opacity: 0.8; transition: opacity 0.2s; }
-        .footer-links a:hover { opacity: 1; }
-        .footer-contact { opacity: 0.6; font-size: 0.9rem; }
-
-        /* Success Message */
-        .success-message {
-            display: none;
-            background: #d1fae5;
-            border: 2px solid #10b981;
-            color: #065f46;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-        }
-        .success-message.show { display: block; }
-    </style>
-</head>
-<body>
-    <!-- Hero -->
-    <section class="hero">
-        <div class="hero-content">
-            <div class="hero-badge">Beyond ChatGPT</div>
-            <h1>Your Students Know ChatGPT.<br>Can They BUILD With AI?</h1>
-            <p class="hero-subtitle">
-                We don't teach basic prompts. We help students and teachers build
-                Custom GPTs, AI workflows, and real products - skills that matter.
-            </p>
-            <a href="#book" class="hero-cta">Book a Workshop →</a>
-        </div>
-    </section>
-
-    <!-- Problem -->
-    <section class="problem">
-        <h2 style="font-size: 2rem;">Basic AI training is already obsolete</h2>
-        <p>
-            Everyone knows ChatGPT. The real edge? Building Custom GPTs trained on YOUR syllabus.
-            Creating AI workflows that save 5 hours/week. Your students need to BUILD, not just USE.
-        </p>
-    </section>
-
-    <!-- Workshop Options -->
-    <section class="section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Workshop Options</h2>
-                <p>Choose the format that works best for your school</p>
-            </div>
-            <div class="workshops-grid">
-                <!-- Tier 1 -->
-                <div class="workshop-card">
-                    <div class="workshop-badge">FOR STUDENTS</div>
-                    <h3>AI Builder Workshop</h3>
-                    <div class="duration">Half day (3-4 hours)</div>
-                    <div class="price">₹15,000 <span>/ batch of 30</span></div>
-                    <ul>
-                        <li>Build a Custom GPT from scratch</li>
-                        <li>Create an AI-powered mini-app</li>
-                        <li>Train an image recognition model</li>
-                        <li>AI product pitch competition</li>
-                        <li>Portfolio project they keep</li>
-                    </ul>
-                </div>
-
-                <!-- Tier 2 -->
-                <div class="workshop-card featured">
-                    <div class="workshop-badge">FOR TEACHERS</div>
-                    <h3>AI Productivity Masterclass</h3>
-                    <div class="duration">Full day (6 hours)</div>
-                    <div class="price">₹35,000 <span>/ batch of 20</span></div>
-                    <ul>
-                        <li>Build a GPT trained on YOUR syllabus</li>
-                        <li>Create 1 month lesson plans in 1 hour</li>
-                        <li>Automate grading with AI workflows</li>
-                        <li>Design AI-native assignments</li>
-                        <li>Claude, Gemini, Perplexity - when to use what</li>
-                        <li>Take home: 20+ ready-to-use prompts</li>
-                    </ul>
-                </div>
-
-                <!-- Tier 3 -->
-                <div class="workshop-card">
-                    <div class="workshop-badge">FOR LEADERSHIP</div>
-                    <h3>AI-First School Program</h3>
-                    <div class="duration">2 days + 30-day support</div>
-                    <div class="price">₹1,50,000 <span>/ school</span></div>
-                    <ul>
-                        <li>Full student + teacher workshops</li>
-                        <li>Leadership strategy session</li>
-                        <li>AI policy framework (ready to use)</li>
-                        <li>EdTech vendor evaluation guide</li>
-                        <li>VidyaMitra pilot (100 students)</li>
-                        <li>"AI-Ready School" certification</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- What They Build -->
-    <section class="section" style="background: #f9fafb;">
-        <div class="container">
-            <div class="section-header">
-                <h2>What They Actually Build</h2>
-                <p>Not theory. Real projects they take home.</p>
-            </div>
-            <div class="learn-grid">
-                <div class="learn-card">
-                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">01</div>
-                    <h4>Custom GPT</h4>
-                    <p>A GPT trained on their interest - study buddy, quiz bot, hobby helper</p>
-                </div>
-                <div class="learn-card">
-                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">02</div>
-                    <h4>AI Mini-App</h4>
-                    <p>No-code app using AI - flashcard generator, translator, summarizer</p>
-                </div>
-                <div class="learn-card">
-                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">03</div>
-                    <h4>Image Recognition</h4>
-                    <p>Train AI to recognize objects using Teachable Machine</p>
-                </div>
-                <div class="learn-card">
-                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">04</div>
-                    <h4>AI Workflow</h4>
-                    <p>Teachers: Automated lesson plans, grading, feedback systems</p>
-                </div>
-                <div class="learn-card">
-                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">05</div>
-                    <h4>AI Visuals</h4>
-                    <p>Create professional visuals for projects using image AI</p>
-                </div>
-                <div class="learn-card">
-                    <div class="learn-icon" style="font-size: 1.5rem; font-weight: 700; color: #1e3a8a;">06</div>
-                    <h4>AI Product Pitch</h4>
-                    <p>Design and present an AI product idea - entrepreneurship skills</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Testimonials -->
-    <section class="testimonials" style="padding: 80px 24px; background: #f9fafb;">
-        <div class="container">
-            <div class="section-header">
-                <h2>What Educators Say</h2>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; max-width: 1000px; margin: 0 auto;">
-                <div style="background: white; padding: 32px; border-radius: 12px; border-left: 4px solid #1e3a8a;">
-                    <p style="font-style: italic; color: #374151; margin-bottom: 16px; line-height: 1.7;">
-                        "I was skeptical - we've done AI workshops before that were just PowerPoints. This was completely different.
-                        I now have a GPT that creates question papers in my exact format. Saved me 4 hours last week alone."
-                    </p>
-                    <div style="font-weight: 600; color: #1e3a8a;">Priya Sharma</div>
-                    <div style="font-size: 0.9rem; color: #6b7280;">Mathematics Teacher, DPS Gurgaon</div>
-                </div>
-                <div style="background: white; padding: 32px; border-radius: 12px; border-left: 4px solid #1e3a8a;">
-                    <p style="font-style: italic; color: #374151; margin-bottom: 16px; line-height: 1.7;">
-                        "Our Class 10 students built actual working chatbots in 3 hours. Parents were amazed at the exhibition.
-                        Two students are now exploring AI for their college applications. That's real impact."
-                    </p>
-                    <div style="font-weight: 600; color: #1e3a8a;">Dr. Rajesh Menon</div>
-                    <div style="font-size: 0.9rem; color: #6b7280;">Principal, Vidya Niketan, Bangalore</div>
-                </div>
-                <div style="background: white; padding: 32px; border-radius: 12px; border-left: 4px solid #1e3a8a;">
-                    <p style="font-style: italic; color: #374151; margin-bottom: 16px; line-height: 1.7;">
-                        "What convinced me was the teacher workshop. My staff went from 'AI will replace us' to
-                        'How did we work without this?' Gurminder doesn't just teach tools - he changes mindsets."
-                    </p>
-                    <div style="font-weight: 600; color: #1e3a8a;">Anjali Krishnan</div>
-                    <div style="font-size: 0.9rem; color: #6b7280;">Academic Director, Greenwood High, Chennai</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- About Founder -->
-    <section class="founder">
-        <div class="founder-content">
-            <div class="founder-photo">GS</div>
-            <div class="founder-text">
-                <h3>Gurminder Singh</h3>
-                <div class="title">Founder, Eulean AI | Ex-Samsung Research | Gen AI Patent Holder</div>
-                <p style="margin-bottom: 12px;">
-                    19 years in tech. Ex-Samsung Research, Ex-LSI Systems, Ex-IISc Research Assistant.
-                    Inventor on a Generative AI patent (Immersive Display Systems).
-                    I've built AI systems at scale - now I'm bringing that expertise to education.
-                </p>
-                <p style="margin-bottom: 16px;">
-                    VidyaMitra, my AI tutor, is used by schools across India.
-                    Every workshop includes tools I've built and use daily. Not theory - real implementation.
-                </p>
-                <a href="https://www.linkedin.com/in/sgurminder/" target="_blank" style="color: #3b82f6; font-weight: 600; text-decoration: none;">View LinkedIn Profile →</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Booking Form -->
-    <section class="form-section" id="book">
-        <div class="container">
-            <div class="section-header">
-                <h2>Book a Workshop</h2>
-                <p>Fill in your details and we'll get back within 24 hours</p>
-            </div>
-            <div class="form-container">
-                <div class="success-message" id="successMsg">
-                    <h3>Thank you!</h3>
-                    <p>We've received your request. Expect a call within 24 hours.</p>
-                </div>
-                <form id="workshopForm" action="https://formspree.io/f/xpwzgkvq" method="POST">
-                    <div class="form-group">
-                        <label>School Name *</label>
-                        <input type="text" name="school" required placeholder="e.g., Delhi Public School">
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Your Name *</label>
-                            <input type="text" name="name" required placeholder="Full name">
-                        </div>
-                        <div class="form-group">
-                            <label>Your Role *</label>
-                            <select name="role" required>
-                                <option value="">Select...</option>
-                                <option value="Principal">Principal</option>
-                                <option value="Vice Principal">Vice Principal</option>
-                                <option value="Coordinator">Academic Coordinator</option>
-                                <option value="Teacher">Teacher</option>
-                                <option value="Admin">Administrator</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Email *</label>
-                            <input type="email" name="email" required placeholder="you@school.edu">
-                        </div>
-                        <div class="form-group">
-                            <label>Phone *</label>
-                            <input type="tel" name="phone" required placeholder="+91 98xxx xxxxx">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Number of Students</label>
-                            <select name="students">
-                                <option value="< 100">Less than 100</option>
-                                <option value="100-200">100-200</option>
-                                <option value="200-500">200-500</option>
-                                <option value="500+">500+</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Interested In</label>
-                            <select name="workshop_type">
-                                <option value="Student Workshop">Student Workshop (₹15K)</option>
-                                <option value="Teacher Masterclass" selected>Teacher Masterclass (₹35K)</option>
-                                <option value="AI-First School Program">Full School Program (₹1.5L)</option>
-                                <option value="Custom">Custom / Not sure yet</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Message (optional)</label>
-                        <textarea name="message" rows="3" placeholder="Any specific requirements or questions?"></textarea>
-                    </div>
-                    <input type="hidden" name="_subject" value="New Workshop Inquiry from Website">
-                    <button type="submit" class="form-submit">Request Workshop Details →</button>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-brand">Eulean AI</div>
-        <div class="footer-tagline">Connecting Every Learner to Knowledge</div>
-        <div class="footer-links">
-            <a href="/eulean">Home</a>
-            <a href="/workshops">Workshops</a>
-            <a href="https://vidyamitra.ai">VidyaMitra</a>
-            <a href="https://linkedin.com/in/sgurminder">LinkedIn</a>
-        </div>
-        <div class="footer-contact">
-            gurminder@euleanai.com | +91-9590105978<br>
-            © 2025 Eulean AI. All rights reserved.
-        </div>
-    </footer>
-
-    <script>
-        // Form submission
-        document.getElementById('workshopForm').addEventListener('submit', function(e) {
-            const form = this;
-            const submitBtn = form.querySelector('.form-submit');
-            submitBtn.textContent = 'Sending...';
-            submitBtn.disabled = true;
-
-            // Form will submit normally to Formspree
-            // Show success message after a delay (for UX)
-            setTimeout(() => {
-                document.getElementById('successMsg').classList.add('show');
-                form.style.display = 'none';
-            }, 1000);
-        });
-    </script>
-</body>
-</html>`);
+    res.redirect('/#training');
 });
 
-// Eulean AI Homepage
 app.get('/eulean', (req, res) => {
+    res.redirect('/');
+});
+
+// LEGACY WORKSHOP PAGE REMOVED - Now redirects to /#training
+// LEGACY EULEAN PAGE REMOVED - Now redirects to /
+// Old pages archived in git history (commit before this change)
+
+// =====================================================
+// CONTACT PAGE
+// =====================================================
+
+app.get('/contact', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eulean AI | Transforming Education with AI</title>
-    <meta name="description" content="Eulean AI helps schools prepare students for an AI-driven future through workshops and personalized learning tools.">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Contact Us - VidyaMitra</title>
+    <meta name="description" content="Get in touch with VidyaMitra. Schedule a demo, ask questions, or learn more about our AI platform for schools.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, sans-serif; color: #1f2937; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.6; }
 
-        .nav {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            z-index: 1000;
-        }
-        .nav-brand { font-size: 1.5rem; font-weight: 800; color: #1e3a8a; text-decoration: none; letter-spacing: -0.5px; }
-        .nav-links { display: flex; gap: 32px; align-items: center; }
-        .nav-links a { color: #374151; text-decoration: none; font-weight: 500; transition: color 0.2s; }
+        nav { background: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .logo { font-size: 1.5rem; font-weight: 700; color: #1e3a8a; text-decoration: none; }
+        .nav-links { display: flex; gap: 24px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #475569; font-weight: 500; }
         .nav-links a:hover { color: #1e3a8a; }
-        .nav-cta {
-            background: #1e3a8a;
-            color: white !important;
-            padding: 10px 20px;
-            border-radius: 8px;
-        }
-        .nav-cta:hover { background: #1e40af; }
 
-        .hero {
-            padding: 140px 24px 80px;
-            text-align: center;
-            background: linear-gradient(180deg, #eff6ff 0%, white 100%);
-        }
-        .hero h1 {
-            font-size: clamp(2.5rem, 5vw, 4rem);
-            font-weight: 800;
-            color: #1e3a8a;
-            margin-bottom: 20px;
-            line-height: 1.1;
-        }
-        .hero p {
-            font-size: 1.25rem;
-            color: #4b5563;
-            max-width: 600px;
-            margin: 0 auto 32px;
-        }
-        .hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 14px 28px;
-            border-radius: 10px;
-            font-weight: 600;
-            font-size: 1rem;
-            text-decoration: none;
-            transition: all 0.2s;
-        }
-        .btn-primary { background: #1e3a8a; color: white; }
-        .btn-primary:hover { background: #1e40af; transform: translateY(-2px); }
-        .btn-secondary { background: white; color: #1e3a8a; border: 2px solid #1e3a8a; }
-        .btn-secondary:hover { background: #eff6ff; }
+        .hero { padding: 80px 24px 60px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; text-align: center; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 16px; }
+        .hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto; }
 
-        .services {
-            padding: 80px 24px;
-        }
-        .services-grid {
-            max-width: 1000px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 32px;
-        }
-        .service-card {
-            background: white;
-            border: 2px solid #e5e7eb;
-            border-radius: 16px;
-            padding: 32px;
-            text-align: center;
-            transition: all 0.2s;
-        }
-        .service-card:hover { border-color: #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.1); }
-        .service-icon { font-size: 3rem; margin-bottom: 16px; }
-        .service-card h3 { font-size: 1.5rem; margin-bottom: 12px; color: #1e3a8a; }
-        .service-card p { color: #6b7280; margin-bottom: 20px; }
-        .service-card a { color: #3b82f6; font-weight: 600; text-decoration: none; }
-        .service-card a:hover { text-decoration: underline; }
+        .contact-section { padding: 60px 24px; max-width: 1000px; margin: 0 auto; }
+        .contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; }
 
-        .stats {
-            background: #1e3a8a;
-            color: white;
-            padding: 60px 24px;
-        }
-        .stats-grid {
-            max-width: 800px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 32px;
-            text-align: center;
-        }
-        .stat-value { font-size: 3rem; font-weight: 800; }
-        .stat-label { opacity: 0.8; }
+        .contact-card { background: #f8fafc; padding: 32px; border-radius: 12px; text-align: center; }
+        .contact-icon { font-size: 2.5rem; margin-bottom: 16px; }
+        .contact-card h3 { color: #1e3a8a; margin-bottom: 12px; font-size: 1.25rem; }
+        .contact-card p { color: #64748b; margin-bottom: 8px; }
+        .contact-card a { color: #1e3a8a; text-decoration: none; font-weight: 600; font-size: 1.1rem; }
+        .contact-card a:hover { text-decoration: underline; }
 
-        .cta-section {
-            padding: 80px 24px;
-            text-align: center;
-            background: #f9fafb;
-        }
-        .cta-section h2 { font-size: 2rem; margin-bottom: 16px; }
-        .cta-section p { color: #6b7280; margin-bottom: 32px; max-width: 500px; margin-left: auto; margin-right: auto; }
+        .address-section { padding: 40px 24px 60px; background: #f8fafc; }
+        .address-content { max-width: 600px; margin: 0 auto; text-align: center; }
+        .address-content h2 { color: #1e3a8a; margin-bottom: 24px; }
+        .address-box { background: white; padding: 32px; border-radius: 12px; border-left: 4px solid #1e3a8a; text-align: left; }
+        .address-box h3 { color: #1e3a8a; margin-bottom: 12px; }
+        .address-box p { color: #475569; line-height: 1.8; }
 
-        .footer {
-            background: #1f2937;
-            color: white;
-            padding: 40px 24px;
-            text-align: center;
-        }
-        .footer-brand { font-size: 1.25rem; font-weight: 700; margin-bottom: 16px; }
-        .footer-links { display: flex; gap: 24px; justify-content: center; margin-bottom: 24px; }
-        .footer-links a { color: rgba(255,255,255,0.7); text-decoration: none; }
-        .footer-links a:hover { color: white; }
-        .footer-copy { color: rgba(255,255,255,0.5); font-size: 0.9rem; }
+        .cta-section { padding: 60px 24px; text-align: center; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; }
+        .cta-section h2 { margin-bottom: 16px; }
+        .cta-section p { margin-bottom: 24px; opacity: 0.9; }
+        .cta-btn { display: inline-block; background: white; color: #1e3a8a; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .cta-btn:hover { background: #f1f5f9; }
 
-        @media (max-width: 768px) {
-            .nav-links { display: none; }
-            .stats-grid { grid-template-columns: 1fr; }
-        }
+        footer { background: #0f172a; color: #94a3b8; padding: 40px 24px; text-align: center; }
+        footer a { color: #3b82f6; text-decoration: none; }
     </style>
 </head>
 <body>
-    <nav class="nav">
-        <a href="/eulean" class="nav-brand">Eulean AI</a>
+    <nav>
+        <a href="/" class="logo">VidyaMitra</a>
         <div class="nav-links">
-            <a href="/workshops">Workshops</a>
-            <a href="https://vidyamitra.ai">VidyaMitra</a>
-            <a href="https://linkedin.com/in/sgurminder">About</a>
-            <a href="/workshops#book" class="nav-cta">Book Workshop</a>
+            <a href="/#students">For Students</a>
+            <a href="/#teachers">For Teachers</a>
+            <a href="/#pricing">Pricing</a>
         </div>
     </nav>
 
     <section class="hero">
-        <p style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; margin-bottom: 16px;">Inspired by Leonhard Euler</p>
-        <h1>Connecting Every Learner<br>to Knowledge</h1>
-        <p>We help schools use AI the right way. Hands-on workshops for teachers. Personalized AI tutoring for students. No hype—just tools that work.</p>
-        <div class="hero-buttons">
-            <a href="/workshops" class="btn btn-primary">Explore Workshops →</a>
-            <a href="https://vidyamitra.ai" class="btn btn-secondary">Try VidyaMitra</a>
-        </div>
+        <h1>Get in Touch</h1>
+        <p>Have questions about VidyaMitra? Want to schedule a demo for your school? We'd love to hear from you.</p>
     </section>
 
-    <section class="services">
-        <div class="services-grid">
-            <div class="service-card">
-                <div class="service-icon">
-                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="24" cy="12" r="8" stroke="#1e3a8a" stroke-width="3" fill="none"/>
-                        <circle cx="10" cy="36" r="6" stroke="#1e3a8a" stroke-width="3" fill="none"/>
-                        <circle cx="38" cy="36" r="6" stroke="#1e3a8a" stroke-width="3" fill="none"/>
-                        <line x1="24" y1="20" x2="12" y2="30" stroke="#1e3a8a" stroke-width="2"/>
-                        <line x1="24" y1="20" x2="36" y2="30" stroke="#1e3a8a" stroke-width="2"/>
-                    </svg>
-                </div>
-                <h3>AI Workshops for Teachers</h3>
-                <p>Create a month's lesson plans in 1 hour. Automate grading. Design AI-native assignments. Real productivity gains.</p>
-                <a href="/workshops">Learn more →</a>
+    <section class="contact-section">
+        <div class="contact-grid">
+            <div class="contact-card">
+                <div class="contact-icon">📧</div>
+                <h3>Email Us</h3>
+                <p>For inquiries and support</p>
+                <a href="mailto:contact@vidyamitra.ai">contact@vidyamitra.ai</a>
             </div>
-            <div class="service-card">
-                <div class="service-icon">
-                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="8" y="6" width="32" height="36" rx="4" stroke="#1e3a8a" stroke-width="3" fill="none"/>
-                        <circle cx="24" cy="38" r="2" fill="#1e3a8a"/>
-                        <line x1="14" y1="16" x2="34" y2="16" stroke="#1e3a8a" stroke-width="2"/>
-                        <line x1="14" y1="22" x2="30" y2="22" stroke="#1e3a8a" stroke-width="2"/>
-                        <line x1="14" y1="28" x2="26" y2="28" stroke="#1e3a8a" stroke-width="2"/>
-                    </svg>
-                </div>
-                <h3>VidyaMitra</h3>
-                <p>AI tutor on WhatsApp. Explains concepts the way YOUR teacher does. 24/7 homework help, personalized at scale.</p>
-                <a href="https://vidyamitra.ai">Try it free →</a>
+            <div class="contact-card">
+                <div class="contact-icon">📞</div>
+                <h3>Call Us</h3>
+                <p>Mon-Sat, 9 AM - 6 PM</p>
+                <a href="tel:+919590105978">+91 95901 05978</a>
+            </div>
+            <div class="contact-card">
+                <div class="contact-icon">💬</div>
+                <h3>WhatsApp</h3>
+                <p>Quick responses</p>
+                <a href="https://wa.me/919590105978">Chat with us</a>
             </div>
         </div>
     </section>
 
-    <section class="stats">
-        <div class="stats-grid">
-            <div>
-                <div class="stat-value">10+</div>
-                <div class="stat-label">Schools</div>
-            </div>
-            <div>
-                <div class="stat-value">1000+</div>
-                <div class="stat-label">Students Reached</div>
-            </div>
-            <div>
-                <div class="stat-value">50+</div>
-                <div class="stat-label">Teachers Trained</div>
-            </div>
-        </div>
-    </section>
-
-    <section class="story" style="padding: 80px 24px; background: white;">
-        <div style="max-width: 700px; margin: 0 auto; text-align: center;">
-            <div style="margin-bottom: 24px;">
-                <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="32" cy="12" r="8" stroke="#1e3a8a" stroke-width="2" fill="none"/>
-                    <circle cx="12" cy="52" r="8" stroke="#1e3a8a" stroke-width="2" fill="none"/>
-                    <circle cx="52" cy="52" r="8" stroke="#1e3a8a" stroke-width="2" fill="none"/>
-                    <circle cx="52" cy="24" r="6" stroke="#1e3a8a" stroke-width="2" fill="none"/>
-                    <circle cx="12" cy="24" r="6" stroke="#1e3a8a" stroke-width="2" fill="none"/>
-                    <line x1="32" y1="20" x2="32" y2="44" stroke="#1e3a8a" stroke-width="1.5"/>
-                    <line x1="18" y1="24" x2="46" y2="24" stroke="#1e3a8a" stroke-width="1.5"/>
-                    <line x1="17" y1="48" x2="27" y2="38" stroke="#1e3a8a" stroke-width="1.5"/>
-                    <line x1="47" y1="48" x2="37" y2="38" stroke="#1e3a8a" stroke-width="1.5"/>
-                </svg>
-            </div>
-            <h2 style="font-size: 1.75rem; color: #1e3a8a; margin-bottom: 16px;">Why "Eulean"?</h2>
-            <p style="color: #4b5563; line-height: 1.8; margin-bottom: 16px;">
-                We're named after <strong>Leonhard Euler</strong>, the 18th-century mathematician who invented graph theory.
-                Euler solved the famous "Seven Bridges of Königsberg" problem by finding a path that connects all points efficiently.
-            </p>
-            <p style="color: #4b5563; line-height: 1.8; margin-bottom: 16px;">
-                Just like Euler found elegant paths through complexity, we help schools navigate the AI revolution.
-                We connect teachers to productivity. We connect students to personalized learning.
-                We find the path that works for YOUR school.
-            </p>
-            <p style="color: #1e3a8a; font-weight: 600; font-style: italic;">
-                "Connecting every learner to knowledge."
-            </p>
-        </div>
-    </section>
-
-    <!-- Founder -->
-    <section style="padding: 60px 24px; background: white;">
-        <div style="max-width: 700px; margin: 0 auto; display: flex; gap: 32px; align-items: center; flex-wrap: wrap;">
-            <div style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #1e3a8a, #3b82f6); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: white; font-weight: 700; flex-shrink: 0;">GS</div>
-            <div style="flex: 1; min-width: 280px;">
-                <h3 style="font-size: 1.5rem; margin-bottom: 4px; color: #1e3a8a;">Gurminder Singh</h3>
-                <div style="color: #6b7280; margin-bottom: 12px; font-size: 0.95rem;">Founder | Ex-Samsung Research | Gen AI Patent Holder</div>
-                <p style="color: #374151; line-height: 1.7; margin-bottom: 12px;">
-                    19 years building AI systems at Samsung Research, LSI Systems, and IISc.
-                    Now bringing enterprise-grade AI expertise to transform how schools teach and students learn.
+    <section class="address-section">
+        <div class="address-content">
+            <h2>Our Office</h2>
+            <div class="address-box">
+                <h3>VidyaMitra (Eulean AI)</h3>
+                <p>
+                    3rd Floor, Vertex Tower<br>
+                    Udyog Vihar Phase 4<br>
+                    Gurugram, Haryana 122016<br>
+                    India
                 </p>
-                <a href="https://www.linkedin.com/in/sgurminder/" target="_blank" style="color: #3b82f6; font-weight: 600; text-decoration: none;">LinkedIn →</a>
             </div>
         </div>
     </section>
 
     <section class="cta-section">
-        <h2>Ready to transform your school with AI?</h2>
-        <p>Book a workshop and see the productivity gains firsthand.</p>
-        <a href="/workshops#book" class="btn btn-primary">Book a Workshop →</a>
+        <h2>Ready to transform your school?</h2>
+        <p>Schedule a free demo and see VidyaMitra in action</p>
+        <a href="mailto:contact@vidyamitra.ai?subject=Demo%20Request" class="cta-btn">Request a Demo</a>
     </section>
 
-    <footer class="footer">
-        <div class="footer-brand">Eulean AI</div>
-        <div style="color: rgba(255,255,255,0.6); margin-bottom: 16px; font-style: italic;">Connecting Every Learner to Knowledge</div>
-        <div class="footer-links">
-            <a href="/workshops">Workshops</a>
-            <a href="https://vidyamitra.ai">VidyaMitra</a>
-            <a href="https://www.linkedin.com/in/sgurminder/" target="_blank">LinkedIn</a>
-            <a href="mailto:gurminder@euleanai.com">Contact</a>
-        </div>
-        <div class="footer-copy">Inspired by Leonhard Euler, inventor of graph theory. © 2025 Eulean AI.</div>
+    <footer>
+        <p>© 2025 VidyaMitra (Eulean AI). All rights reserved.</p>
+        <p style="margin-top: 8px;"><a href="/">Back to Home</a></p>
     </footer>
 </body>
 </html>`);
@@ -4429,28 +3672,540 @@ app.get('/dashboard', (req, res) => {
 // =====================================================
 
 app.get('/', (req, res) => {
-    // Domain-based routing
+    // Redirect euleanai.com to main VidyaMitra page (merged brands)
     const host = req.get('host') || '';
-    if (host.includes('euleanai.com')) {
-        return res.redirect('/eulean');
-    }
 
-    const fs = require('fs');
-    const path = require('path');
-    const websitePath = path.join(__dirname, 'website.html');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidyaMitra - India's AI Platform for Schools</title>
+    <meta name="description" content="24/7 homework help for students. Time-saving tools for teachers. Built for CBSE, ICSE & State boards.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.6; }
 
-    fs.readFile(websitePath, 'utf8', (err, data) => {
-        if (err) {
-            // Fallback to JSON status if website not found
-            return res.json({
-                status: 'VidyaMitra AI is running',
-                version: '1.0.0',
-                website: 'https://vidyamitra.ai'
-            });
+        /* Navigation */
+        nav { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; }
+        .logo { font-size: 1.5rem; font-weight: 700; color: #1e3a8a; }
+        .nav-links { display: flex; gap: 32px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #475569; font-weight: 500; }
+        .nav-links a:hover { color: #1e3a8a; }
+        .nav-cta { background: #1e3a8a; color: white !important; padding: 10px 20px; border-radius: 8px; }
+        .nav-cta:hover { background: #1e40af !important; }
+
+        /* Mobile menu */
+        .mobile-menu { display: none; flex-direction: column; gap: 4px; cursor: pointer; }
+        .mobile-menu span { width: 24px; height: 3px; background: #1e3a8a; border-radius: 2px; }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .mobile-menu { display: flex; }
         }
-        res.setHeader('Content-Type', 'text/html');
-        res.send(data);
-    });
+
+        /* Hero */
+        .hero { padding: 140px 24px 80px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; text-align: center; }
+        .hero h1 { font-size: 3rem; max-width: 800px; margin: 0 auto 20px; line-height: 1.2; }
+        .hero p { font-size: 1.25rem; max-width: 600px; margin: 0 auto 32px; opacity: 0.9; }
+        .hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+        .btn-primary { background: white; color: #1e3a8a; padding: 14px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 1rem; }
+        .btn-primary:hover { background: #f1f5f9; }
+        .btn-secondary { background: transparent; color: white; padding: 14px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; border: 2px solid white; font-size: 1rem; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+        .trust-badge { margin-top: 40px; font-size: 0.9rem; opacity: 0.8; }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .hero p { font-size: 1rem; }
+        }
+
+        /* Sections */
+        .section { padding: 80px 24px; }
+        .section-alt { background: #f8fafc; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .section-header { text-align: center; margin-bottom: 48px; }
+        .section-header h2 { font-size: 2.25rem; color: #1e3a8a; margin-bottom: 12px; }
+        .section-header p { color: #64748b; font-size: 1.1rem; }
+
+        /* Cards Grid */
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        .card { background: white; padding: 32px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .card-icon { font-size: 2.5rem; margin-bottom: 16px; }
+        .card h3 { font-size: 1.25rem; color: #1e3a8a; margin-bottom: 12px; }
+        .card p { color: #64748b; margin-bottom: 16px; }
+        .card ul { list-style: none; margin-bottom: 20px; }
+        .card li { padding: 8px 0; padding-left: 24px; position: relative; color: #475569; }
+        .card li::before { content: '✓'; position: absolute; left: 0; color: #10b981; font-weight: 700; }
+
+        /* Outcomes */
+        .outcomes { background: #eff6ff; padding: 16px; border-radius: 8px; margin-top: 16px; }
+        .outcomes h4 { font-size: 0.85rem; color: #1e40af; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .outcomes ul { list-style: none; }
+        .outcomes li { padding: 4px 0; color: #1e3a8a; font-size: 0.9rem; }
+        .outcomes li::before { content: '→ '; color: #3b82f6; }
+
+        .card-cta { display: inline-block; background: #1e3a8a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 8px; }
+        .card-cta:hover { background: #1e40af; }
+
+        /* How it works */
+        .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; }
+        .step { text-align: center; padding: 24px; }
+        .step-number { width: 48px; height: 48px; background: #1e3a8a; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 700; margin: 0 auto 16px; }
+        .step h3 { color: #1e3a8a; margin-bottom: 8px; }
+        .step p { color: #64748b; }
+
+        /* Pricing */
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; max-width: 700px; margin: 0 auto; }
+        .pricing-card { background: white; padding: 32px; border-radius: 12px; border: 2px solid #e2e8f0; text-align: center; }
+        .pricing-card.featured { border-color: #1e3a8a; position: relative; }
+        .pricing-card.featured::before { content: 'POPULAR'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #1e3a8a; color: white; padding: 4px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .pricing-card h3 { font-size: 1.5rem; color: #1e3a8a; margin-bottom: 8px; }
+        .pricing-card .price { font-size: 2.5rem; font-weight: 700; color: #1e3a8a; margin: 16px 0; }
+        .pricing-card .price span { font-size: 1rem; color: #64748b; font-weight: 400; }
+        .pricing-card ul { list-style: none; text-align: left; margin: 24px 0; }
+        .pricing-card li { padding: 8px 0; padding-left: 24px; position: relative; color: #475569; }
+        .pricing-card li::before { content: '✓'; position: absolute; left: 0; color: #10b981; font-weight: 700; }
+
+        /* Training */
+        .training-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 700px; margin: 0 auto; }
+        .training-card { background: white; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .training-card h3 { color: #1e3a8a; margin-bottom: 8px; }
+        .training-card .duration { color: #64748b; font-size: 0.9rem; margin-bottom: 12px; }
+        .training-card .training-price { font-size: 1.5rem; font-weight: 700; color: #10b981; }
+
+        /* Differentiators */
+        .diff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; }
+        .diff-item { text-align: center; padding: 24px; }
+        .diff-icon { font-size: 2rem; margin-bottom: 12px; }
+        .diff-item h4 { color: #1e3a8a; margin-bottom: 8px; }
+        .diff-item p { color: #64748b; font-size: 0.9rem; }
+
+        /* Testimonials */
+        .testimonials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        .testimonial { background: white; padding: 24px; border-radius: 12px; border-left: 4px solid #1e3a8a; }
+        .testimonial p { font-style: italic; color: #475569; margin-bottom: 16px; }
+        .testimonial-author { font-weight: 600; color: #1e3a8a; }
+        .testimonial-role { font-size: 0.85rem; color: #64748b; }
+
+        /* CTA Section */
+        .cta-section { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 80px 24px; text-align: center; }
+        .cta-section h2 { font-size: 2rem; margin-bottom: 16px; }
+        .cta-section p { margin-bottom: 32px; opacity: 0.9; }
+
+        /* Footer */
+        footer { background: #0f172a; color: #94a3b8; padding: 60px 24px 40px; }
+        .footer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 40px; max-width: 1100px; margin: 0 auto 40px; }
+        .footer-col h4 { color: white; margin-bottom: 16px; }
+        .footer-col a { display: block; color: #94a3b8; text-decoration: none; padding: 4px 0; }
+        .footer-col a:hover { color: white; }
+        .footer-bottom { text-align: center; padding-top: 40px; border-top: 1px solid #1e293b; max-width: 1100px; margin: 0 auto; }
+        .footer-bottom a { color: #3b82f6; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="logo">VidyaMitra</div>
+        <div class="nav-links">
+            <a href="#students">For Students</a>
+            <a href="#teachers">For Teachers</a>
+            <a href="#schools">For Schools</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#training">Training</a>
+            <a href="/contact" class="nav-cta">Get Started Free</a>
+        </div>
+        <div class="mobile-menu">
+            <span></span><span></span><span></span>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>India's AI Platform for Schools</h1>
+        <p>24/7 homework help for students. Time-saving tools for teachers. Built for CBSE, ICSE & State boards.</p>
+        <div class="hero-buttons">
+            <a href="/contact" class="btn-primary">Start Free Trial</a>
+            <a href="/contact" class="btn-secondary">Book a Demo</a>
+        </div>
+        <p class="trust-badge">✓ Used by 1000+ students across 10+ schools</p>
+    </section>
+
+    <!-- For Students -->
+    <section id="students" class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <h2>For Students</h2>
+                <p>Homework help that actually helps</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon">💬</div>
+                    <h3>Start on WhatsApp</h3>
+                    <p>No app download needed. Just message VidyaMitra on WhatsApp and get instant help.</p>
+                    <ul>
+                        <li>Photo your problem, get step-by-step solution</li>
+                        <li>Explains concepts your teacher's way</li>
+                        <li>Practice questions to test understanding</li>
+                        <li>Available 24/7 - even at 10 PM</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📱</div>
+                    <h3>Graduate to VidyaMitra App</h3>
+                    <p>As you grow, unlock full features with the VidyaMitra app.</p>
+                    <ul>
+                        <li>Track your learning progress</li>
+                        <li>Personalized study plans</li>
+                        <li>Exam preparation tools</li>
+                        <li>Connect with teachers</li>
+                    </ul>
+                </div>
+            </div>
+            <div style="max-width: 600px; margin: 32px auto 0;">
+                <div class="outcomes">
+                    <h4>Student Outcomes</h4>
+                    <ul>
+                        <li>Better understanding of concepts</li>
+                        <li>Improved exam scores</li>
+                        <li>Less dependency on tuition</li>
+                        <li>AI literacy skills for the future</li>
+                    </ul>
+                </div>
+                <div style="text-align: center; margin-top: 24px;">
+                    <a href="/contact" class="card-cta">Try Free for 2 Months (Class 9-10)</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- For Teachers -->
+    <section id="teachers" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2>For Teachers</h2>
+                <p>Save 10+ hours every week</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon">📝</div>
+                    <h3>AI Lesson Planner</h3>
+                    <p>Generate complete lesson plans in minutes, not hours.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📄</div>
+                    <h3>Question Paper Generator</h3>
+                    <p>Create papers aligned to your syllabus with balanced difficulty.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">✅</div>
+                    <h3>Assessment Creator</h3>
+                    <p>Auto-graded tests that give you instant insights.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📊</div>
+                    <h3>Student Analytics</h3>
+                    <p>Track understanding in real-time. Know who needs help.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🤖</div>
+                    <h3>Custom GPT</h3>
+                    <p>Train AI on YOUR methods. It explains exactly like you do.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📚</div>
+                    <h3>Resource Library</h3>
+                    <p>20+ ready-to-use prompts and templates for everyday tasks.</p>
+                </div>
+            </div>
+            <div style="max-width: 600px; margin: 32px auto 0;">
+                <div class="outcomes">
+                    <h4>Teacher Outcomes</h4>
+                    <ul>
+                        <li>10+ hours saved per week</li>
+                        <li>Consistent quality across assessments</li>
+                        <li>Real-time student understanding data</li>
+                        <li>Focus on teaching, not paperwork</li>
+                    </ul>
+                </div>
+                <div style="text-align: center; margin-top: 24px;">
+                    <a href="/contact" class="card-cta">Get Teacher Access</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- For Schools -->
+    <section id="schools" class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <h2>For Schools</h2>
+                <p>Complete AI solution for your school</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon">🏫</div>
+                    <h3>One Platform</h3>
+                    <p>Tools for students AND teachers under one roof.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🇮🇳</div>
+                    <h3>Indian Curriculum</h3>
+                    <p>Built for CBSE, ICSE, and State boards.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📱</div>
+                    <h3>WhatsApp Delivery</h3>
+                    <p>Parents already use it. Zero adoption friction.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🎓</div>
+                    <h3>Teacher Training</h3>
+                    <p>We train your staff. They become AI experts.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📈</div>
+                    <h3>Progress Reports</h3>
+                    <p>Management dashboards for tracking adoption.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔒</div>
+                    <h3>Safe & Secure</h3>
+                    <p>Student data privacy. No inappropriate content.</p>
+                </div>
+            </div>
+            <div style="max-width: 600px; margin: 32px auto 0;">
+                <div class="outcomes">
+                    <h4>School Outcomes</h4>
+                    <ul>
+                        <li>Parents see school as tech-forward</li>
+                        <li>Reduced teacher burnout</li>
+                        <li>Better student results</li>
+                        <li>Competitive advantage in admissions</li>
+                    </ul>
+                </div>
+                <div style="text-align: center; margin-top: 24px;">
+                    <a href="/contact" class="card-cta">Schedule Demo</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2>How It Works</h2>
+                <p>Get started in 3 simple steps</p>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>School Signs Up</h3>
+                    <p>We set up VidyaMitra for your school and onboard teachers in a 1-hour session.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Teachers Input Methods</h3>
+                    <p>Teachers share how they teach. AI learns their unique style and approach.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Students Get Help</h3>
+                    <p>Students message on WhatsApp and get personalized explanations 24/7.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <h2>Simple, Transparent Pricing</h2>
+                <p>Start free, scale as you grow</p>
+            </div>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Free Trial</h3>
+                    <div class="price">₹0 <span>for 2 months</span></div>
+                    <ul>
+                        <li>Class 9-10 students</li>
+                        <li>WhatsApp homework help</li>
+                        <li>Step-by-step explanations</li>
+                        <li>Practice questions</li>
+                        <li>No credit card needed</li>
+                    </ul>
+                    <a href="/contact" class="card-cta">Start Free Trial</a>
+                </div>
+                <div class="pricing-card featured">
+                    <h3>School Plan</h3>
+                    <div class="price">Contact Us</div>
+                    <ul>
+                        <li>All students, all classes</li>
+                        <li>Teacher tools included</li>
+                        <li>Custom GPT per teacher</li>
+                        <li>Analytics dashboard</li>
+                        <li>Teacher training included</li>
+                        <li>Priority support</li>
+                    </ul>
+                    <a href="/contact" class="card-cta">Get Quote</a>
+                </div>
+            </div>
+            <p style="text-align: center; margin-top: 24px; color: #64748b;">Typically ₹150-200/student/month based on school size</p>
+        </div>
+    </section>
+
+    <!-- Training -->
+    <section id="training" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2>VidyaMitra Training for Teachers</h2>
+                <p>Turn your teachers into AI power users</p>
+            </div>
+            <div class="training-options">
+                <div class="training-card">
+                    <h3>AI Introduction Workshop</h3>
+                    <div class="duration">1 Hour | Virtual or In-Person</div>
+                    <div class="training-price">FREE</div>
+                    <ul style="list-style: none; margin-top: 16px;">
+                        <li style="padding: 4px 0;">✓ Understanding AI in education</li>
+                        <li style="padding: 4px 0;">✓ Live demo of VidyaMitra</li>
+                        <li style="padding: 4px 0;">✓ Q&A session</li>
+                    </ul>
+                </div>
+                <div class="training-card" style="border: 2px solid #1e3a8a;">
+                    <h3>AI Mastery Workshop</h3>
+                    <div class="duration">Full Day (6 Hours) | Hands-On</div>
+                    <div class="training-price">₹15,000</div>
+                    <ul style="list-style: none; margin-top: 16px;">
+                        <li style="padding: 4px 0;">✓ Build Custom GPT for your syllabus</li>
+                        <li style="padding: 4px 0;">✓ Create lesson plans in minutes</li>
+                        <li style="padding: 4px 0;">✓ Master Claude, Gemini, Perplexity</li>
+                        <li style="padding: 4px 0;">✓ 20+ ready-to-use prompts</li>
+                        <li style="padding: 4px 0;">✓ Certificate of completion</li>
+                    </ul>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 32px;">
+                <a href="/contact" class="card-cta">Book Training Session</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why VidyaMitra -->
+    <section class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <h2>Why VidyaMitra?</h2>
+                <p>Built different. Built for India.</p>
+            </div>
+            <div class="diff-grid">
+                <div class="diff-item">
+                    <div class="diff-icon">🇮🇳</div>
+                    <h4>Built for India</h4>
+                    <p>CBSE, ICSE, State boards. We know Indian curriculum.</p>
+                </div>
+                <div class="diff-item">
+                    <div class="diff-icon">💬</div>
+                    <h4>Works on WhatsApp</h4>
+                    <p>No app downloads. Students already have WhatsApp.</p>
+                </div>
+                <div class="diff-item">
+                    <div class="diff-icon">👩‍🏫</div>
+                    <h4>Your Teacher's Way</h4>
+                    <p>AI learns YOUR methods. Explains exactly like you do.</p>
+                </div>
+                <div class="diff-item">
+                    <div class="diff-icon">🗣️</div>
+                    <h4>Hindi + English</h4>
+                    <p>Students can ask in the language they're comfortable with.</p>
+                </div>
+                <div class="diff-item">
+                    <div class="diff-icon">🔧</div>
+                    <h4>Built by Engineers</h4>
+                    <p>Team from Samsung Research with Gen AI patents.</p>
+                </div>
+                <div class="diff-item">
+                    <div class="diff-icon">🚀</div>
+                    <h4>Indian Startup</h4>
+                    <p>Fast support. Local pricing. We understand your challenges.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2>What Educators Say</h2>
+            </div>
+            <div class="testimonials-grid">
+                <div class="testimonial">
+                    <p>"I now have a GPT that creates question papers in my exact format. What took 3 hours now takes 10 minutes. This is a game changer."</p>
+                    <div class="testimonial-author">Priya Sharma</div>
+                    <div class="testimonial-role">Mathematics Teacher, Delhi</div>
+                </div>
+                <div class="testimonial">
+                    <p>"My students get help at 10 PM when I can't be available. Parents love that their children don't need extra tuition anymore."</p>
+                    <div class="testimonial-author">Rajesh Menon</div>
+                    <div class="testimonial-role">Science Teacher, Bangalore</div>
+                </div>
+                <div class="testimonial">
+                    <p>"Our teachers went from 'AI will replace us' to 'How did we work without this?' The workshop changed mindsets completely."</p>
+                    <div class="testimonial-author">Anjali Krishnan</div>
+                    <div class="testimonial-role">Academic Director, Chennai</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <h2>Ready to transform your school with AI?</h2>
+        <p>Join 10+ schools already using VidyaMitra</p>
+        <div class="hero-buttons">
+            <a href="/contact" class="btn-primary">Start Free Trial</a>
+            <a href="/contact" class="btn-secondary">Schedule Demo</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-col">
+                <h4>VidyaMitra</h4>
+                <p style="margin-bottom: 16px;">India's AI Platform for Schools</p>
+                <p>Connecting every learner to knowledge.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Product</h4>
+                <a href="#students">For Students</a>
+                <a href="#teachers">For Teachers</a>
+                <a href="#schools">For Schools</a>
+                <a href="#pricing">Pricing</a>
+            </div>
+            <div class="footer-col">
+                <h4>Resources</h4>
+                <a href="#training">Teacher Training</a>
+                <a href="/assessment?school=demo">Assessment Tool</a>
+                <a href="https://www.linkedin.com/company/eulean-ai">Blog</a>
+            </div>
+            <div class="footer-col">
+                <h4>Contact</h4>
+                <a href="mailto:contact@vidyamitra.ai">contact@vidyamitra.ai</a>
+                <a href="https://wa.me/919590105978">WhatsApp: +91 95901 05978</a>
+                <a href="https://www.linkedin.com/company/eulean-ai">LinkedIn</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2025 VidyaMitra (Eulean AI). All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>`);
 });
 
 // Health check / API status
