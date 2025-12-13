@@ -749,11 +749,7 @@ Send me any homework question or photo, and I'll help you! 📸`;
                 // Find relevant diagram for the topic
                 const diagramUrl = findDiagram(body, topicInfo.chapter);
 
-                // ============ GENERATE FOLLOW-UP QUESTION ============
-                // ============ FOLLOW-UP QUESTIONS DISABLED ============
-                // Just show simple feedback prompt (no practice questions for now)
-                response += `\n\n---\nWas this helpful? Reply 👍 or 👎`;
-                // ============ END FOLLOW-UP QUESTION ============
+                // Clean response - no feedback prompt needed
 
                 console.log('Sending response to WhatsApp...');
                 console.log('Response length:', response.length, 'characters');
