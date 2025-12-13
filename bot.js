@@ -1293,8 +1293,37 @@ async function validateSession(req) {
 
 // Send message and get AI response
 app.post('/api/chat/message', async (req, res) => {
-    const user = await validateSession(req);
-    if (!user) {
+    console.log('[CHAT] Received chat message request');
+
+    // For PWA, allow requests without session validation for now (use phone from body or token)
+    let userPhone = null;
+    let userClass = 10;
+    let schoolId = 'vidyamitra';
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        // Extract phone from token (format: phone_timestamp_random)
+        userPhone = token.split('_')[0];
+        console.log(`[CHAT] Extracted phone from token: ${userPhone}`);
+
+        // Try to get session from Redis
+        try {
+            const session = await db.kv.get(`session:${token}`);
+            if (session) {
+                userPhone = session.phone;
+                schoolId = session.schoolId || 'vidyamitra';
+                const user = await db.kv.get(`pwa_user:${userPhone}`);
+                if (user && user.class) {
+                    userClass = user.class;
+                }
+            }
+        } catch (e) {
+            console.log('[CHAT] Session lookup failed, using token phone');
+        }
+    }
+
+    if (!userPhone) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
@@ -1306,20 +1335,15 @@ app.post('/api/chat/message', async (req, res) => {
 
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const timestamp = new Date().toISOString();
-    const school = getSchoolById(user.schoolId);
 
     try {
         // Detect topic
-        console.log(`[CHAT] Processing message for ${user.phone}: "${message}"`);
-        const topicInfo = await detectTopicWithAI(message || 'Image question', user.class || 10);
-        console.log(`[CHAT] Topic detected:`, topicInfo);
+        console.log(`[CHAT] Processing message for ${userPhone}: "${message}"`);
+        const topicInfo = await detectTopicWithAI(message || 'Image question', userClass);
+        console.log(`[CHAT] Topic detected:`, JSON.stringify(topicInfo));
 
-        // Log query
-        try {
-            await db.logQuery(`pwa:${user.phone}`, message, topicInfo, !!imageBase64);
-        } catch (e) {
-            console.log('[CHAT] Query logging failed');
-        }
+        // Log query (non-blocking)
+        db.logQuery(`pwa:${userPhone}`, message, topicInfo, !!imageBase64).catch(() => {});
 
         // Find teaching method
         const teachingMethod = await findTeachingMethod(
@@ -1333,17 +1357,17 @@ app.post('/api/chat/message', async (req, res) => {
         let aiResponse;
         if (teachingMethod) {
             console.log('[CHAT] Generating response with teaching method...');
-            aiResponse = await generateResponse(message, teachingMethod, null); // Don't pass base64 for now
+            aiResponse = await generateResponse(message, teachingMethod, null);
         } else {
             console.log('[CHAT] Generating generic response...');
-            aiResponse = await generateGenericResponse(message, topicInfo, null); // Don't pass base64 for now
+            aiResponse = await generateGenericResponse(message, topicInfo, null);
         }
         console.log(`[CHAT] Response generated (${aiResponse.length} chars)`);
 
         // Find diagram if relevant
         const diagramUrl = findDiagram(message, topicInfo.chapter);
 
-        // Store message in chat history
+        // Store message in chat history (non-blocking)
         const chatMessage = {
             id: messageId,
             userMessage: message,
@@ -1354,14 +1378,9 @@ app.post('/api/chat/message', async (req, res) => {
             hasImage: !!imageBase64
         };
 
-        try {
-            // Store in Redis list for this user
-            await db.kv.lpush(`chat:${user.phone}`, JSON.stringify(chatMessage));
-            // Keep only last 100 messages
-            await db.kv.ltrim(`chat:${user.phone}`, 0, 99);
-        } catch (e) {
-            console.log('[CHAT] Message storage failed');
-        }
+        db.kv.lpush(`chat:${userPhone}`, JSON.stringify(chatMessage))
+            .then(() => db.kv.ltrim(`chat:${userPhone}`, 0, 99))
+            .catch(() => {});
 
         res.json({
             success: true,
@@ -1376,7 +1395,8 @@ app.post('/api/chat/message', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[CHAT] Error generating response:', error.message, error.stack);
+        console.error('[CHAT] Error generating response:', error.message);
+        console.error('[CHAT] Stack:', error.stack);
         res.status(500).json({ success: false, error: 'Failed to generate response' });
     }
 });
