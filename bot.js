@@ -1923,16 +1923,41 @@ app.post('/api/auth/verify-otp', async (req, res) => {
         console.log('[AUTH] Session storage failed, continuing');
     }
 
+    // Check authorization system for role (teachers are stored there)
+    // Try both with and without 91 prefix since phone formats may differ
+    let authUser = await db.getUserInfo(cleanPhone);
+    if (!authUser) {
+        const phoneWith91 = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+        authUser = await db.getUserInfo(phoneWith91);
+    }
+    if (!authUser) {
+        const phoneWithout91 = cleanPhone.startsWith('91') ? cleanPhone.slice(2) : cleanPhone;
+        authUser = await db.getUserInfo(phoneWithout91);
+    }
+
+    // Check if teacher is registered for this specific school (case-insensitive)
+    const authUserSchool = (authUser?.school || '').toLowerCase();
+    const sessionSchool = (school.id || '').toLowerCase();
+    const isTeacher = authUser?.role === 'teacher';
+    const schoolsMatch = authUserSchool === sessionSchool;
+    const isTeacherForThisSchool = isTeacher && schoolsMatch;
+
+    const role = isTeacherForThisSchool ? 'teacher' : (user?.role || 'student');
+    const teaches = isTeacherForThisSchool ? (authUser?.teaches || []) : [];
+
     console.log(`[AUTH] User verified: ${cleanPhone} (school: ${school.shortName})`);
+    console.log(`[AUTH] Role check - AuthUser: ${authUser ? 'found' : 'not found'}, AuthSchool: "${authUserSchool}", SessionSchool: "${sessionSchool}", isTeacher: ${isTeacher}, schoolsMatch: ${schoolsMatch}, finalRole: ${role}`);
 
     res.json({
         success: true,
         token: sessionToken,
         user: {
             phone: cleanPhone,
-            name: user.name,
+            name: authUser?.name || user.name,
             class: user.class,
             section: user.section,
+            role: role,
+            teaches: teaches,
             schoolId: school.id,
             schoolName: school.name,
             isNewUser: !user.name
