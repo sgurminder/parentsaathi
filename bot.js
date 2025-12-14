@@ -3136,8 +3136,14 @@ app.get('/admin', (req, res) => {
 // TEACHER FORM
 // =====================================================
 
-// Clean URL redirect
+// Teacher routes - if school param provided, go to dashboard, otherwise form
 app.get('/teacher', (req, res) => {
+    if (req.query.school) {
+        // Has school param - this will be handled by the teacher dashboard route below
+        // Use next() to pass to the next matching route
+        return res.redirect('/teacher-dashboard?school=' + req.query.school);
+    }
+    // No school param - old teacher form behavior
     res.redirect('/teacher-form');
 });
 
@@ -6321,9 +6327,14 @@ app.get('/app', async (req, res) => {
 
         // Initialize
         if (token && user) {
-            app.classList.remove('logged-out');
-            updateProfile();
-            loadChatHistory();
+            // If teacher is already logged in, redirect to teacher dashboard
+            if (user.role === 'teacher') {
+                window.location.href = '/teacher-dashboard?school=' + SCHOOL_ID;
+            } else {
+                app.classList.remove('logged-out');
+                updateProfile();
+                loadChatHistory();
+            }
         }
 
         // Register service worker
@@ -6437,6 +6448,13 @@ app.get('/app', async (req, res) => {
                     user = data.user;
                     localStorage.setItem('token', token);
                     localStorage.setItem('user', JSON.stringify(user));
+
+                    // If teacher, redirect to teacher dashboard
+                    if (user.role === 'teacher') {
+                        window.location.href = '/teacher-dashboard?school=' + SCHOOL_ID;
+                        return;
+                    }
+
                     app.classList.remove('logged-out');
                     updateProfile();
                 } else {
@@ -8970,7 +8988,7 @@ function getNCERTChapters(cls, subject) {
 // TEACHER DASHBOARD ROUTE
 // =====================================================
 
-app.get('/teacher', async (req, res) => {
+app.get('/teacher-dashboard', async (req, res) => {
     const schoolId = (req.query.school || '').toUpperCase();
 
     if (!schoolId) {
