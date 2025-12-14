@@ -6335,6 +6335,12 @@ app.get('/app', async (req, res) => {
                 updateProfile();
                 loadChatHistory();
             }
+        } else {
+            // Clear any stale data
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            token = null;
+            user = null;
         }
 
         // Register service worker
