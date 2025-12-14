@@ -31,20 +31,26 @@ const demoSchools = {
         secondaryColor: '#fbbf24',
         gradientFrom: '#1e40af',
         gradientTo: '#3b82f6',
-        appName: 'SNPS AI'
+        appName: 'SNPS AI',
+        board: 'CBSE',  // NEW: Education board
+        classes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        sections: ['A', 'B', 'C', 'D']
     },
     'pragyan': {
         id: 'pragyan',
         name: 'Pragyan Sthali Public School',
         shortName: 'Pragyan',
         tagline: 'Learn Smarter, Not Harder',
-        logo: null, // Will use school logo URL when provided
+        logo: null,
         logoEmoji: '🎓',
         primaryColor: '#059669',
         secondaryColor: '#f59e0b',
         gradientFrom: '#059669',
         gradientTo: '#10b981',
-        appName: 'Pragyan AI'
+        appName: 'Pragyan AI',
+        board: 'CBSE',
+        classes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        sections: ['A', 'B', 'C']
     },
     // ===== DEFAULT / VIDYAMITRA =====
     'vidyamitra': {
@@ -58,7 +64,10 @@ const demoSchools = {
         secondaryColor: '#fbbf24',
         gradientFrom: '#7c3aed',
         gradientTo: '#a855f7',
-        appName: 'VidyaMitra'
+        appName: 'VidyaMitra',
+        board: 'CBSE',
+        classes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        sections: ['A', 'B', 'C', 'D']
     },
     // ===== DEMO SCHOOLS (for testing) =====
     'springfields': {
@@ -399,7 +408,7 @@ If VALID, identify:
 }
 
 // Find matching teaching method
-async function findTeachingMethod(subject, classLevel, chapter) {
+async function findTeachingMethod(subject, classLevel, chapter, section = null) {
     // Handle null/undefined values
     if (!subject || !chapter) {
         console.log('Subject or chapter is null/undefined, cannot find teaching method');
@@ -411,23 +420,89 @@ async function findTeachingMethod(subject, classLevel, chapter) {
     if (normalizedSubject === 'mathematics' || normalizedSubject === 'maths') {
         normalizedSubject = 'math';
     }
+    if (normalizedSubject === 'social science' || normalizedSubject === 'social studies' || normalizedSubject === 'sst') {
+        normalizedSubject = 'social';
+    }
+    if (normalizedSubject === 'economics' || normalizedSubject === 'eco') {
+        normalizedSubject = 'economics';
+    }
 
-    const key = `${normalizedSubject}-${classLevel}-${chapter.toLowerCase().replace(/\s+/g, '-')}`;
-    console.log('Looking for teaching method with key:', key);
+    const normalizedChapter = chapter.toLowerCase().replace(/\s+/g, '-');
 
-    // Get from database
-    const method = await db.getTeachingMethod(key);
-    console.log('Found method:', method ? 'YES' : 'NO');
-
-    // Also log all available keys for debugging
+    // Get all methods for fuzzy matching
     const allMethods = await db.getAllTeachingMethods();
-    console.log('Available keys:', Object.keys(allMethods));
+    const allKeys = Object.keys(allMethods);
+    console.log('Available teaching method keys:', allKeys);
 
-    return method;
+    // PRIORITY 1: Exact match with section
+    if (section) {
+        const exactKeyWithSection = `${normalizedSubject}-${classLevel}-${section.toLowerCase()}-${normalizedChapter}`;
+        console.log('Looking for exact match with section:', exactKeyWithSection);
+        if (allMethods[exactKeyWithSection]) {
+            console.log('Found exact match with section');
+            return allMethods[exactKeyWithSection];
+        }
+    }
+
+    // PRIORITY 2: Exact match without section
+    const exactKey = `${normalizedSubject}-${classLevel}-${normalizedChapter}`;
+    console.log('Looking for exact match:', exactKey);
+    if (allMethods[exactKey]) {
+        console.log('Found exact match');
+        return allMethods[exactKey];
+    }
+
+    // PRIORITY 3: Same subject + chapter, any class (find closest class)
+    const chapterMatches = allKeys.filter(key => {
+        const parts = key.split('-');
+        const keySubject = parts[0];
+        const keyChapter = parts.slice(2).join('-'); // Everything after class
+        return keySubject === normalizedSubject && keyChapter.includes(normalizedChapter.split('-')[0]); // Partial chapter match
+    });
+
+    if (chapterMatches.length > 0) {
+        console.log('Found chapter matches:', chapterMatches);
+        // Find closest class level
+        let closestMatch = null;
+        let closestDiff = Infinity;
+        for (const key of chapterMatches) {
+            const parts = key.split('-');
+            const keyClass = parseInt(parts[1]);
+            const diff = Math.abs(keyClass - classLevel);
+            if (diff < closestDiff) {
+                closestDiff = diff;
+                closestMatch = key;
+            }
+        }
+        if (closestMatch) {
+            console.log(`Found closest class match: ${closestMatch} (diff: ${closestDiff})`);
+            return allMethods[closestMatch];
+        }
+    }
+
+    // PRIORITY 4: Fuzzy chapter name matching (search within chapter names)
+    const fuzzyMatches = allKeys.filter(key => {
+        const parts = key.split('-');
+        const keySubject = parts[0];
+        const keyChapter = parts.slice(2).join('-');
+        // Check if any word from the query chapter appears in stored chapter
+        const queryWords = normalizedChapter.split('-').filter(w => w.length > 3);
+        return keySubject === normalizedSubject &&
+               queryWords.some(word => keyChapter.includes(word));
+    });
+
+    if (fuzzyMatches.length > 0) {
+        console.log('Found fuzzy matches:', fuzzyMatches);
+        // Return the first match (could be improved with ranking)
+        return allMethods[fuzzyMatches[0]];
+    }
+
+    console.log('No teaching method found');
+    return null;
 }
 
 // Generate response using teacher's method
-async function generateResponse(question, teachingMethod, imageUrl = null) {
+async function generateResponse(question, teachingMethod, imageUrl = null, conversationHistory = []) {
     const systemPrompt = `You are ${config.school.name}'s AI homework assistant, helping students using their teacher's exact methods.
 
 CRITICAL IDENTITY RULES:
@@ -458,6 +533,7 @@ Instructions:
 5. End with an encouraging tip
 6. Keep response concise (under 350 words)
 7. NEVER mention ChatGPT, OpenAI, or being an AI language model
+8. Use conversation history for context when the student refers to previous questions
 
 ENRICHMENT (when helpful):
 - For visual concepts, describe a simple diagram: "📊 Imagine a diagram showing..."
@@ -466,6 +542,12 @@ ENRICHMENT (when helpful):
 - For math, show step-by-step working with proper formatting`;
 
     const messages = [{ role: "system", content: systemPrompt }];
+
+    // Add conversation history for context (last 5 exchanges)
+    for (const hist of conversationHistory) {
+        messages.push({ role: "user", content: hist.userMessage });
+        messages.push({ role: "assistant", content: hist.aiResponse });
+    }
 
     if (imageUrl) {
         messages.push({
@@ -492,7 +574,7 @@ ENRICHMENT (when helpful):
 }
 
 // Generate generic response (when no teacher method found)
-async function generateGenericResponse(question, topicInfo, imageUrl = null) {
+async function generateGenericResponse(question, topicInfo, imageUrl = null, conversationHistory = []) {
     const subject = topicInfo.subject || 'this';
     const classLevel = topicInfo.class || 8;
 
@@ -514,6 +596,7 @@ Instructions:
 5. Be helpful and encouraging
 6. End with: "Note: I'll notify your teacher to add their method!"
 7. NEVER mention ChatGPT, OpenAI, or being an AI language model
+8. Use conversation history for context when the student refers to previous questions
 
 ENRICHMENT (when helpful):
 - For visual concepts, describe a simple diagram: "📊 Imagine..."
@@ -522,6 +605,12 @@ ENRICHMENT (when helpful):
 - For math, show step-by-step working`;
 
     const messages = [{ role: "system", content: systemPrompt }];
+
+    // Add conversation history for context (last 5 exchanges)
+    for (const hist of conversationHistory) {
+        messages.push({ role: "user", content: hist.userMessage });
+        messages.push({ role: "assistant", content: hist.aiResponse });
+    }
 
     if (imageUrl) {
         messages.push({
@@ -1337,6 +1426,24 @@ app.post('/api/chat/message', async (req, res) => {
     const timestamp = new Date().toISOString();
 
     try {
+        // Fetch last 5 messages for conversation context
+        let conversationHistory = [];
+        try {
+            const historyRaw = await db.kv.lrange(`chat:${userPhone}`, 0, 4);
+            if (historyRaw && historyRaw.length > 0) {
+                // Parse and reverse (oldest first for chronological order)
+                conversationHistory = historyRaw
+                    .map(h => {
+                        try { return JSON.parse(h); } catch { return null; }
+                    })
+                    .filter(h => h && h.userMessage && h.aiResponse)
+                    .reverse();
+                console.log(`[CHAT] Loaded ${conversationHistory.length} messages for context`);
+            }
+        } catch (e) {
+            console.log('[CHAT] Could not load conversation history');
+        }
+
         // Detect topic
         console.log(`[CHAT] Processing message for ${userPhone}: "${message}"`);
         const topicInfo = await detectTopic(message || 'Image question', null, userClass);
@@ -1353,14 +1460,14 @@ app.post('/api/chat/message', async (req, res) => {
         );
         console.log(`[CHAT] Teaching method found: ${!!teachingMethod}`);
 
-        // Generate AI response
+        // Generate AI response with conversation context
         let aiResponse;
         if (teachingMethod) {
             console.log('[CHAT] Generating response with teaching method...');
-            aiResponse = await generateResponse(message, teachingMethod, null);
+            aiResponse = await generateResponse(message, teachingMethod, null, conversationHistory);
         } else {
             console.log('[CHAT] Generating generic response...');
-            aiResponse = await generateGenericResponse(message, topicInfo, null);
+            aiResponse = await generateGenericResponse(message, topicInfo, null, conversationHistory);
         }
         console.log(`[CHAT] Response generated (${aiResponse.length} chars)`);
 
@@ -5061,6 +5168,28 @@ app.get('/app', (req, res) => {
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
+        /* Markdown styles in AI messages */
+        .message-ai strong { font-weight: 600; }
+        .message-ai em { font-style: italic; }
+        .message-ai code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .message-ai h2, .message-ai h3, .message-ai h4 {
+            margin: 8px 0 4px;
+            font-weight: 600;
+        }
+        .message-ai h2 { font-size: 16px; }
+        .message-ai h3 { font-size: 15px; }
+        .message-ai h4 { font-size: 14px; }
+        .message-ai li {
+            margin-left: 16px;
+            list-style: disc;
+        }
+
         .message-typing {
             display: flex;
             gap: 4px;
@@ -5563,7 +5692,12 @@ app.get('/app', (req, res) => {
             if (user) {
                 document.getElementById('profileName').textContent = user.name || 'Student';
                 document.getElementById('profilePhone').textContent = user.phone;
-                document.getElementById('profileClass').textContent = user.class || '-';
+                // Show class with section if available (e.g., "10-A" or just "10")
+                let classDisplay = user.class || '-';
+                if (user.class && user.section) {
+                    classDisplay = user.class + '-' + user.section;
+                }
+                document.getElementById('profileClass').textContent = classDisplay;
                 document.getElementById('profileAvatar').textContent = user.name ? user.name[0].toUpperCase() : '👤';
             }
         }
@@ -5643,10 +5777,56 @@ app.get('/app', (req, res) => {
             sendBtn.disabled = false;
         }
 
+        // Simple markdown parser for chat messages
+        function parseMarkdown(text) {
+            if (!text) return '';
+            let html = text
+                // Escape HTML first
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Bold: **text** or __text__ (must come before italic)
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+            // Italic: *text* or _text_
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+            // Code: \`text\`
+            html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
+
+            // Headers: # ## ###
+            html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+            html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+
+            // Line breaks (handle actual newlines)
+            html = html.replace(/\\n/g, '<br>');
+            html = html.replace(/\n/g, '<br>');
+
+            // Bullet points
+            html = html.replace(/^[•\-\*] (.+)$/gm, '<li>$1</li>');
+
+            // Numbered lists
+            html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+
+            // Wrap consecutive li elements in ul
+            html = html.replace(/(<li>.*?<\/li>)(\s*<br>\s*)?(<li>)/g, '$1$3');
+
+            return html;
+        }
+
         function addMessage(text, type) {
             const el = document.createElement('div');
             el.className = 'message message-' + type;
-            el.textContent = text;
+            if (type === 'ai') {
+                // Parse markdown for AI responses
+                el.innerHTML = parseMarkdown(text);
+            } else {
+                el.textContent = text;
+            }
             chatMessages.appendChild(el);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
