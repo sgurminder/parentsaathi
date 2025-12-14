@@ -8939,6 +8939,1254 @@ app.get('/school-admin', async (req, res) => {
 });
 
 // =====================================================
+// NCERT CHAPTERS DATA
+// =====================================================
+
+function getNCERTChapters(cls, subject) {
+    const mathChapters = {
+        '6': ['Knowing Our Numbers', 'Whole Numbers', 'Playing with Numbers', 'Basic Geometrical Ideas', 'Understanding Elementary Shapes', 'Integers', 'Fractions', 'Decimals', 'Data Handling', 'Mensuration', 'Algebra', 'Ratio and Proportion', 'Symmetry', 'Practical Geometry'],
+        '7': ['Integers', 'Fractions and Decimals', 'Data Handling', 'Simple Equations', 'Lines and Angles', 'The Triangle and its Properties', 'Congruence of Triangles', 'Comparing Quantities', 'Rational Numbers', 'Practical Geometry', 'Perimeter and Area', 'Algebraic Expressions', 'Exponents and Powers', 'Symmetry', 'Visualising Solid Shapes'],
+        '8': ['Rational Numbers', 'Linear Equations in One Variable', 'Understanding Quadrilaterals', 'Practical Geometry', 'Data Handling', 'Squares and Square Roots', 'Cubes and Cube Roots', 'Comparing Quantities', 'Algebraic Expressions and Identities', 'Visualising Solid Shapes', 'Mensuration', 'Exponents and Powers', 'Direct and Inverse Proportions', 'Factorisation', 'Introduction to Graphs', 'Playing with Numbers'],
+        '9': ['Number Systems', 'Polynomials', 'Coordinate Geometry', 'Linear Equations in Two Variables', 'Introduction to Euclid\'s Geometry', 'Lines and Angles', 'Triangles', 'Quadrilaterals', 'Areas of Parallelograms and Triangles', 'Circles', 'Constructions', 'Heron\'s Formula', 'Surface Areas and Volumes', 'Statistics', 'Probability'],
+        '10': ['Real Numbers', 'Polynomials', 'Pair of Linear Equations in Two Variables', 'Quadratic Equations', 'Arithmetic Progressions', 'Triangles', 'Coordinate Geometry', 'Introduction to Trigonometry', 'Some Applications of Trigonometry', 'Circles', 'Constructions', 'Areas Related to Circles', 'Surface Areas and Volumes', 'Statistics', 'Probability']
+    };
+
+    const scienceChapters = {
+        '6': ['Food: Where Does It Come From?', 'Components of Food', 'Fibre to Fabric', 'Sorting Materials into Groups', 'Separation of Substances', 'Changes Around Us', 'Getting to Know Plants', 'Body Movements', 'The Living Organisms and Their Surroundings', 'Motion and Measurement of Distances', 'Light, Shadows and Reflections', 'Electricity and Circuits', 'Fun with Magnets', 'Water', 'Air Around Us', 'Garbage In, Garbage Out'],
+        '7': ['Nutrition in Plants', 'Nutrition in Animals', 'Fibre to Fabric', 'Heat', 'Acids, Bases and Salts', 'Physical and Chemical Changes', 'Weather, Climate and Adaptations of Animals to Climate', 'Winds, Storms and Cyclones', 'Soil', 'Respiration in Organisms', 'Transportation in Animals and Plants', 'Reproduction in Plants', 'Motion and Time', 'Electric Current and Its Effects', 'Light', 'Water: A Precious Resource', 'Forests: Our Lifeline', 'Wastewater Story'],
+        '8': ['Crop Production and Management', 'Microorganisms: Friend and Foe', 'Synthetic Fibres and Plastics', 'Materials: Metals and Non-Metals', 'Coal and Petroleum', 'Combustion and Flame', 'Conservation of Plants and Animals', 'Cell - Structure and Functions', 'Reproduction in Animals', 'Reaching the Age of Adolescence', 'Force and Pressure', 'Friction', 'Sound', 'Chemical Effects of Electric Current', 'Some Natural Phenomena', 'Light', 'Stars and the Solar System', 'Pollution of Air and Water']
+    };
+
+    const subjectLower = subject.toLowerCase();
+    if (subjectLower === 'math' || subjectLower === 'maths' || subjectLower === 'mathematics') {
+        return mathChapters[cls] || [];
+    } else if (subjectLower === 'science') {
+        return scienceChapters[cls] || [];
+    }
+    return [];
+}
+
+// =====================================================
+// TEACHER DASHBOARD ROUTE
+// =====================================================
+
+app.get('/teacher', async (req, res) => {
+    const schoolId = (req.query.school || '').toUpperCase();
+
+    if (!schoolId) {
+        return res.status(400).send('School ID required');
+    }
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Teacher Dashboard - VidyaMitra</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            color: #1a1a2e;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px 24px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .login-title {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+            color: #1a1a2e;
+        }
+        .login-subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #444;
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .error-msg {
+            color: #dc3545;
+            font-size: 13px;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        /* Dashboard */
+        .dashboard { display: none; min-height: 100vh; padding-bottom: 70px; }
+        .dashboard.active { display: block; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* Selectors */
+        .selector-row {
+            display: flex;
+            gap: 10px;
+        }
+        .selector {
+            flex: 1;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+        }
+        .selector option { color: #333; }
+
+        /* Main Content */
+        .main-content { padding: 16px; }
+
+        /* Screens */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* Section */
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Activity List */
+        .activity-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-icon {
+            width: 36px;
+            height: 36px;
+            background: #f0f4ff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .activity-text {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+        .activity-time {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* Chapter List */
+        .chapter-list { list-style: none; }
+        .chapter-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+        .chapter-item:last-child { border-bottom: none; }
+        .chapter-name {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .chapter-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-none {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        /* Test List */
+        .test-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .test-title {
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .test-status {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+        .test-meta {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: 85px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .fab.active { display: flex; }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 12px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: #999;
+            font-size: 11px;
+            transition: color 0.2s;
+        }
+        .nav-item.active { color: #667eea; }
+        .nav-icon { font-size: 22px; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 200;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: white;
+            width: 100%;
+            max-width: 500px;
+            max-height: 85vh;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #f0f0f0;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        /* Results */
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .result-score {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 300;
+        }
+        .toast.active {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-card">
+            <h1 class="login-title">Teacher Dashboard</h1>
+            <p class="login-subtitle">Sign in to manage your classes</p>
+
+            <div id="phoneStep">
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" id="phoneInput" class="form-input" placeholder="Enter your phone number" maxlength="10">
+                </div>
+                <button class="login-btn" id="sendOtpBtn" onclick="sendOTP()">Send OTP</button>
+            </div>
+
+            <div id="otpStep" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Enter OTP</label>
+                    <input type="text" id="otpInput" class="form-input" placeholder="Enter 6-digit OTP" maxlength="6">
+                </div>
+                <button class="login-btn" id="verifyOtpBtn" onclick="verifyOTP()">Verify & Login</button>
+            </div>
+
+            <p class="error-msg" id="loginError"></p>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-top">
+                <span class="header-title" id="teacherName">Teacher Dashboard</span>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+            <div class="selector-row">
+                <select class="selector" id="classSelector" onchange="onSelectionChange()">
+                    <option value="">Select Class</option>
+                    <option value="6">Class 6</option>
+                    <option value="7">Class 7</option>
+                    <option value="8">Class 8</option>
+                    <option value="9">Class 9</option>
+                    <option value="10">Class 10</option>
+                </select>
+                <select class="selector" id="subjectSelector" onchange="onSelectionChange()">
+                    <option value="">Select Subject</option>
+                    <option value="Math">Mathematics</option>
+                    <option value="Science">Science</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Home Screen -->
+            <div class="screen active" id="homeScreen">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statStudents">-</div>
+                        <div class="stat-label">Students</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statContent">-</div>
+                        <div class="stat-label">Content</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTests">-</div>
+                        <div class="stat-label">Tests</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Recent Activity</div>
+                    <div id="activityList">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Screen -->
+            <div class="screen" id="contentScreen">
+                <div class="section">
+                    <div class="section-title">
+                        <span>Chapters</span>
+                    </div>
+                    <div id="chapterList">
+                        <div class="empty-state">
+                            <div class="empty-icon">📚</div>
+                            <p>Select a class and subject to view chapters</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tests Screen -->
+            <div class="screen" id="testsScreen">
+                <div class="section">
+                    <div class="section-title">
+                        <span>Assessments</span>
+                    </div>
+                    <div id="testList">
+                        <div class="empty-state">
+                            <div class="empty-icon">📝</div>
+                            <p>No tests created yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Screen -->
+            <div class="screen" id="resultsScreen">
+                <div class="section">
+                    <div class="section-title">
+                        <span>Student Performance</span>
+                    </div>
+                    <div id="resultsList">
+                        <div class="empty-state">
+                            <div class="empty-icon">📊</div>
+                            <p>No results available yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FAB -->
+        <button class="fab" id="fab" onclick="openAddModal()">+</button>
+
+        <!-- Bottom Nav -->
+        <div class="bottom-nav">
+            <button class="nav-item active" data-screen="home" onclick="switchScreen('home')">
+                <span class="nav-icon">🏠</span>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" data-screen="content" onclick="switchScreen('content')">
+                <span class="nav-icon">📚</span>
+                <span>Content</span>
+            </button>
+            <button class="nav-item" data-screen="tests" onclick="switchScreen('tests')">
+                <span class="nav-icon">📝</span>
+                <span>Tests</span>
+            </button>
+            <button class="nav-item" data-screen="results" onclick="switchScreen('results')">
+                <span class="nav-icon">📊</span>
+                <span>Results</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title" id="modalTitle">Add Content</span>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalBody">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const schoolId = '${schoolId}';
+        const STORAGE_KEY = 'teacher_' + schoolId;
+        let currentScreen = 'home';
+        let teacherData = null;
+
+        // Check existing session
+        function init() {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const user = localStorage.getItem(STORAGE_KEY + '_user');
+
+            if (token && user) {
+                teacherData = JSON.parse(user);
+                showDashboard();
+            }
+        }
+
+        async function sendOTP() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            if (!/^[6-9]\\d{9}$/.test(phone)) {
+                document.getElementById('loginError').textContent = 'Enter valid 10-digit phone number';
+                return;
+            }
+
+            document.getElementById('sendOtpBtn').disabled = true;
+            document.getElementById('sendOtpBtn').textContent = 'Sending...';
+            document.getElementById('loginError').textContent = '';
+
+            try {
+                const res = await fetch('/api/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, schoolId })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('phoneStep').style.display = 'none';
+                    document.getElementById('otpStep').style.display = 'block';
+                } else {
+                    document.getElementById('loginError').textContent = data.error || 'Failed to send OTP';
+                }
+            } catch (e) {
+                document.getElementById('loginError').textContent = 'Network error';
+            }
+
+            document.getElementById('sendOtpBtn').disabled = false;
+            document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+        }
+
+        async function verifyOTP() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            const otp = document.getElementById('otpInput').value.trim();
+
+            if (otp.length !== 6) {
+                document.getElementById('loginError').textContent = 'Enter 6-digit OTP';
+                return;
+            }
+
+            document.getElementById('verifyOtpBtn').disabled = true;
+            document.getElementById('verifyOtpBtn').textContent = 'Verifying...';
+            document.getElementById('loginError').textContent = '';
+
+            try {
+                const res = await fetch('/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, otp, schoolId })
+                });
+                const data = await res.json();
+
+                if (data.success && data.user.role === 'teacher') {
+                    localStorage.setItem(STORAGE_KEY + '_token', data.token);
+                    localStorage.setItem(STORAGE_KEY + '_user', JSON.stringify(data.user));
+                    teacherData = data.user;
+                    showDashboard();
+                } else if (data.success) {
+                    document.getElementById('loginError').textContent = 'This phone is not registered as a teacher';
+                } else {
+                    document.getElementById('loginError').textContent = data.error || 'Invalid OTP';
+                }
+            } catch (e) {
+                document.getElementById('loginError').textContent = 'Network error';
+            }
+
+            document.getElementById('verifyOtpBtn').disabled = false;
+            document.getElementById('verifyOtpBtn').textContent = 'Verify & Login';
+        }
+
+        function showDashboard() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+            document.getElementById('teacherName').textContent = teacherData.name || 'Teacher';
+
+            // Load saved selections
+            const savedClass = localStorage.getItem(STORAGE_KEY + '_class');
+            const savedSubject = localStorage.getItem(STORAGE_KEY + '_subject');
+            if (savedClass) document.getElementById('classSelector').value = savedClass;
+            if (savedSubject) document.getElementById('subjectSelector').value = savedSubject;
+
+            loadDashboardData();
+        }
+
+        function logout() {
+            localStorage.removeItem(STORAGE_KEY + '_token');
+            localStorage.removeItem(STORAGE_KEY + '_user');
+            location.reload();
+        }
+
+        function switchScreen(screen) {
+            currentScreen = screen;
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+            document.getElementById(screen + 'Screen').classList.add('active');
+            document.querySelector('[data-screen="' + screen + '"]').classList.add('active');
+
+            // Show FAB for content and tests screens
+            const fab = document.getElementById('fab');
+            fab.classList.toggle('active', screen === 'content' || screen === 'tests');
+
+            if (screen === 'content') loadContent();
+            else if (screen === 'tests') loadTests();
+            else if (screen === 'results') loadResults();
+        }
+
+        function onSelectionChange() {
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            localStorage.setItem(STORAGE_KEY + '_class', cls);
+            localStorage.setItem(STORAGE_KEY + '_subject', subject);
+
+            if (currentScreen === 'content') loadContent();
+            else if (currentScreen === 'tests') loadTests();
+            else if (currentScreen === 'results') loadResults();
+        }
+
+        async function loadDashboardData() {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            try {
+                const res = await fetch('/api/teacher/dashboard?class=' + cls + '&subject=' + subject, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('statStudents').textContent = data.stats.activeStudents;
+                    document.getElementById('statContent').textContent = data.stats.pendingReviews;
+                    document.getElementById('statTests').textContent = data.stats.avgScore + '%';
+
+                    const activityHTML = data.activity.map(a =>
+                        '<div class="activity-item">' +
+                            '<div class="activity-icon">' + a.icon + '</div>' +
+                            '<div class="activity-text">' + a.text + '</div>' +
+                            '<div class="activity-time">' + a.time + '</div>' +
+                        '</div>'
+                    ).join('');
+                    document.getElementById('activityList').innerHTML = activityHTML || '<div class="empty-state">No recent activity</div>';
+                }
+            } catch (e) {
+                console.error('Dashboard load error:', e);
+            }
+        }
+
+        async function loadContent() {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            if (!cls || !subject) {
+                document.getElementById('chapterList').innerHTML =
+                    '<div class="empty-state"><div class="empty-icon">📚</div><p>Select a class and subject to view chapters</p></div>';
+                return;
+            }
+
+            document.getElementById('chapterList').innerHTML = '<div class="loading">Loading chapters...</div>';
+
+            try {
+                const res = await fetch('/api/teacher/content?class=' + cls + '&subject=' + subject, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+
+                if (data.success && data.chapters.length > 0) {
+                    const html = '<ul class="chapter-list">' + data.chapters.map(ch =>
+                        '<li class="chapter-item" onclick="openChapter(\\'' + ch.name.replace(/'/g, "\\\\'") + '\\')">' +
+                            '<span class="chapter-name">' + ch.name + '</span>' +
+                            '<span class="chapter-status status-' + (ch.status || 'none') + '">' +
+                                (ch.status === 'approved' ? 'Live' : ch.status === 'pending' ? 'Pending' : 'No content') +
+                            '</span>' +
+                        '</li>'
+                    ).join('') + '</ul>';
+                    document.getElementById('chapterList').innerHTML = html;
+                } else {
+                    document.getElementById('chapterList').innerHTML =
+                        '<div class="empty-state"><div class="empty-icon">📚</div><p>No chapters found for this selection</p></div>';
+                }
+            } catch (e) {
+                console.error('Content load error:', e);
+                document.getElementById('chapterList').innerHTML = '<div class="empty-state">Error loading chapters</div>';
+            }
+        }
+
+        async function loadTests() {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            document.getElementById('testList').innerHTML = '<div class="loading">Loading tests...</div>';
+
+            try {
+                const res = await fetch('/api/teacher/tests?class=' + cls + '&subject=' + subject, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+
+                if (data.success && data.tests.length > 0) {
+                    const html = data.tests.map(t =>
+                        '<div class="test-item">' +
+                            '<div class="test-header">' +
+                                '<span class="test-title">' + t.title + '</span>' +
+                                '<span class="test-status status-' + t.status + '">' + t.status + '</span>' +
+                            '</div>' +
+                            '<div class="test-meta">' + t.questions + ' questions | ' + t.chapter + '</div>' +
+                        '</div>'
+                    ).join('');
+                    document.getElementById('testList').innerHTML = html;
+                } else {
+                    document.getElementById('testList').innerHTML =
+                        '<div class="empty-state"><div class="empty-icon">📝</div><p>No tests created yet</p></div>';
+                }
+            } catch (e) {
+                document.getElementById('testList').innerHTML = '<div class="empty-state">Error loading tests</div>';
+            }
+        }
+
+        async function loadResults() {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            document.getElementById('resultsList').innerHTML = '<div class="loading">Loading results...</div>';
+
+            try {
+                const res = await fetch('/api/teacher/results?class=' + cls + '&subject=' + subject, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+
+                if (data.success && data.results.length > 0) {
+                    const html = data.results.map(r =>
+                        '<div class="result-card">' +
+                            '<div class="result-header">' +
+                                '<span>' + r.studentName + '</span>' +
+                                '<span class="result-score">' + r.score + '%</span>' +
+                            '</div>' +
+                            '<div class="test-meta">' + r.testName + ' | ' + r.date + '</div>' +
+                        '</div>'
+                    ).join('');
+                    document.getElementById('resultsList').innerHTML = html;
+                } else {
+                    document.getElementById('resultsList').innerHTML =
+                        '<div class="empty-state"><div class="empty-icon">📊</div><p>No results available yet</p></div>';
+                }
+            } catch (e) {
+                document.getElementById('resultsList').innerHTML = '<div class="empty-state">Error loading results</div>';
+            }
+        }
+
+        function openChapter(chapterName) {
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            document.getElementById('modalTitle').textContent = chapterName;
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group">' +
+                    '<label class="form-label">Teaching Method / Notes</label>' +
+                    '<textarea id="contentText" class="form-input" rows="6" placeholder="Enter your teaching method, examples, or notes for this chapter..."></textarea>' +
+                '</div>' +
+                '<button class="login-btn" onclick="saveContent(\\'' + chapterName.replace(/'/g, "\\\\'") + '\\')">Save Content</button>';
+
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function openAddModal() {
+            if (currentScreen === 'content') {
+                const cls = document.getElementById('classSelector').value;
+                const subject = document.getElementById('subjectSelector').value;
+                if (!cls || !subject) {
+                    showToast('Select class and subject first', 'error');
+                    return;
+                }
+                document.getElementById('modalTitle').textContent = 'Add Teaching Content';
+                document.getElementById('modalBody').innerHTML =
+                    '<div class="form-group">' +
+                        '<label class="form-label">Chapter</label>' +
+                        '<select id="chapterSelect" class="form-input"><option value="">Select chapter...</option></select>' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label class="form-label">Teaching Method / Notes</label>' +
+                        '<textarea id="contentText" class="form-input" rows="6" placeholder="Enter your teaching method..."></textarea>' +
+                    '</div>' +
+                    '<button class="login-btn" onclick="saveNewContent()">Save Content</button>';
+
+                // Populate chapters
+                loadChaptersForSelect();
+            } else if (currentScreen === 'tests') {
+                document.getElementById('modalTitle').textContent = 'Create Test';
+                document.getElementById('modalBody').innerHTML =
+                    '<div class="form-group">' +
+                        '<label class="form-label">Test Title</label>' +
+                        '<input type="text" id="testTitle" class="form-input" placeholder="e.g., Chapter 1 Quiz">' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label class="form-label">Chapter</label>' +
+                        '<select id="testChapter" class="form-input"><option value="">Select chapter...</option></select>' +
+                    '</div>' +
+                    '<p style="color:#666;font-size:13px;margin-top:16px;">Question builder coming soon!</p>' +
+                    '<button class="login-btn" disabled>Create Test</button>';
+
+                loadChaptersForSelect('testChapter');
+            }
+
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        async function loadChaptersForSelect(selectId = 'chapterSelect') {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            const res = await fetch('/api/teacher/content?class=' + cls + '&subject=' + subject, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                const select = document.getElementById(selectId);
+                data.chapters.forEach(ch => {
+                    const opt = document.createElement('option');
+                    opt.value = ch.name;
+                    opt.textContent = ch.name;
+                    select.appendChild(opt);
+                });
+            }
+        }
+
+        async function saveContent(chapterName) {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+            const content = document.getElementById('contentText').value.trim();
+
+            if (!content) {
+                showToast('Please enter content', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/teacher/content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        class: cls,
+                        subject: subject,
+                        chapter: chapterName,
+                        content: content
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Content saved!', 'success');
+                    closeModal();
+                    loadContent();
+                } else {
+                    showToast(data.error || 'Failed to save', 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function saveNewContent() {
+            const chapter = document.getElementById('chapterSelect').value;
+            if (!chapter) {
+                showToast('Select a chapter', 'error');
+                return;
+            }
+            saveContent(chapter);
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast active ' + type;
+            setTimeout(() => toast.classList.remove('active'), 3000);
+        }
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>`);
+});
+
+// =====================================================
+// TEACHER DASHBOARD API ENDPOINTS
+// =====================================================
+
+// Middleware to verify teacher session
+async function requireTeacher(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+        const session = await db.kv.get('session:' + token);
+        if (!session) {
+            return res.status(401).json({ success: false, error: 'Session expired' });
+        }
+
+        // Get user info to verify teacher role
+        let authUser = await db.getUserInfo(session.phone);
+        if (!authUser) {
+            const phoneWith91 = session.phone.startsWith('91') ? session.phone : '91' + session.phone;
+            authUser = await db.getUserInfo(phoneWith91);
+        }
+
+        const authUserSchool = (authUser?.school || '').toLowerCase();
+        const sessionSchool = (session.schoolId || '').toLowerCase();
+
+        if (authUser?.role !== 'teacher' || authUserSchool !== sessionSchool) {
+            return res.status(403).json({ success: false, error: 'Not authorized as teacher' });
+        }
+
+        req.teacher = {
+            phone: session.phone,
+            schoolId: session.schoolId,
+            name: authUser.name,
+            teaches: authUser.teaches || [],
+            teacherId: authUser.adminTeacherId
+        };
+        next();
+    } catch (e) {
+        console.error('[TEACHER] Auth error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+}
+
+// GET /api/teacher/dashboard - Dashboard stats and activity
+app.get('/api/teacher/dashboard', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId, teaches } = req.teacher;
+        const selectedClass = req.query.class;
+        const selectedSubject = req.query.subject;
+
+        // TODO: Calculate real stats from database
+        // For now, return sample data
+        const stats = {
+            activeStudents: Math.floor(Math.random() * 20) + 5,
+            pendingReviews: Math.floor(Math.random() * 5),
+            avgScore: Math.floor(Math.random() * 30) + 65
+        };
+
+        const activity = [
+            { icon: '❓', text: 'A student asked about "Fractions"', time: '2 hours ago' },
+            { icon: '📝', text: 'New test submission received', time: '4 hours ago' },
+            { icon: '📚', text: 'Content added for "Decimals"', time: 'Yesterday' }
+        ];
+
+        res.json({ success: true, stats, activity });
+    } catch (e) {
+        console.error('[TEACHER] Dashboard error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// GET /api/teacher/content - Get content/chapters for teacher
+app.get('/api/teacher/content', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.teacher;
+        const selectedClass = req.query.class;
+        const selectedSubject = req.query.subject;
+
+        if (!selectedClass || !selectedSubject) {
+            return res.json({ success: true, chapters: [] });
+        }
+
+        // Get NCERT chapters for this class/subject
+        const chapters = getNCERTChapters(selectedClass, selectedSubject);
+
+        // Get existing content for this teacher
+        const methodsKey = 'school:' + schoolId + ':teacher:' + teacherId + ':methods';
+        const methods = await db.kv.get(methodsKey) || [];
+
+        // Map chapters with their content status
+        const chaptersWithStatus = chapters.map(chapterName => {
+            const hasContent = methods.find(m =>
+                m.class === selectedClass &&
+                m.subject.toLowerCase() === selectedSubject.toLowerCase() &&
+                m.chapter === chapterName
+            );
+            return {
+                name: chapterName,
+                status: hasContent ? (hasContent.approved ? 'approved' : 'pending') : null
+            };
+        });
+
+        res.json({ success: true, chapters: chaptersWithStatus });
+    } catch (e) {
+        console.error('[TEACHER] Content error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/teacher/content - Add new teaching content
+app.post('/api/teacher/content', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId, name } = req.teacher;
+        const { class: cls, subject, chapter, content } = req.body;
+
+        if (!cls || !subject || !chapter || !content) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        // Get existing methods
+        const methodsKey = 'school:' + schoolId + ':teacher:' + teacherId + ':methods';
+        const methods = await db.kv.get(methodsKey) || [];
+
+        // Check if method already exists for this chapter
+        const existingIndex = methods.findIndex(m =>
+            m.class === cls &&
+            m.subject.toLowerCase() === subject.toLowerCase() &&
+            m.chapter === chapter
+        );
+
+        const newMethod = {
+            class: cls,
+            subject: subject,
+            chapter: chapter,
+            content: content,
+            teacherName: name,
+            createdAt: new Date().toISOString(),
+            approved: false
+        };
+
+        if (existingIndex >= 0) {
+            methods[existingIndex] = { ...methods[existingIndex], ...newMethod };
+        } else {
+            methods.push(newMethod);
+        }
+
+        await db.kv.set(methodsKey, methods);
+
+        console.log('[TEACHER] Content saved:', { schoolId, teacherId, chapter });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[TEACHER] Save content error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// GET /api/teacher/tests - Get tests for teacher
+app.get('/api/teacher/tests', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.teacher;
+        const selectedClass = req.query.class;
+        const selectedSubject = req.query.subject;
+
+        // TODO: Get real tests from database
+        const tests = [];
+
+        res.json({ success: true, tests });
+    } catch (e) {
+        console.error('[TEACHER] Tests error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// GET /api/teacher/results - Get student results
+app.get('/api/teacher/results', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.teacher;
+        const selectedClass = req.query.class;
+        const selectedSubject = req.query.subject;
+
+        // TODO: Get real results from database
+        const results = [];
+
+        res.json({ success: true, results });
+    } catch (e) {
+        console.error('[TEACHER] Results error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
 // START SERVER
 // =====================================================
 
