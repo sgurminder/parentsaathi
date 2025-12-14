@@ -152,7 +152,9 @@ async function getSchoolByIdAsync(schoolId) {
 
 // Sync version for non-async contexts (uses cache or hardcoded)
 function getSchoolById(schoolId) {
-    return demoSchools[schoolId] || demoSchools['vidyamitra'];
+    // Normalize to lowercase for case-insensitive lookup
+    const normalizedId = (schoolId || '').toLowerCase();
+    return demoSchools[normalizedId] || demoSchools['vidyamitra'];
 }
 
 // Configure multer for memory storage (works on serverless)
@@ -1953,21 +1955,48 @@ app.get('/api/auth/profile', async (req, res) => {
             return res.status(401).json({ success: false, error: 'Session expired' });
         }
 
-        const user = await db.kv.get(`pwa_user:${session.phone}`);
+        const pwaUser = await db.kv.get(`pwa_user:${session.phone}`);
         const school = getSchoolById(session.schoolId);
+
+        // Check authorization system for role (teachers are stored there)
+        // Try both with and without 91 prefix since phone formats may differ
+        let authUser = await db.getUserInfo(session.phone);
+        if (!authUser) {
+            // Try with 91 prefix if not found
+            const phoneWith91 = session.phone.startsWith('91') ? session.phone : `91${session.phone}`;
+            authUser = await db.getUserInfo(phoneWith91);
+        }
+        if (!authUser) {
+            // Try without 91 prefix if still not found
+            const phoneWithout91 = session.phone.startsWith('91') ? session.phone.slice(2) : session.phone;
+            authUser = await db.getUserInfo(phoneWithout91);
+        }
+
+        // Check if teacher is registered for this specific school (case-insensitive)
+        const authUserSchool = (authUser?.school || '').toLowerCase();
+        const sessionSchool = (session.schoolId || '').toLowerCase();
+        const isTeacherForThisSchool = authUser?.role === 'teacher' && authUserSchool === sessionSchool;
+
+        const role = isTeacherForThisSchool ? 'teacher' : (pwaUser?.role || 'student');
+        const teaches = isTeacherForThisSchool ? (authUser?.teaches || []) : [];
+
+        console.log(`[PROFILE] Phone: ${session.phone}, SessionSchool: ${sessionSchool}, AuthUserSchool: ${authUserSchool}, AuthUser: ${JSON.stringify(authUser)}, IsTeacherForSchool: ${isTeacherForThisSchool}, Role: ${role}`);
 
         res.json({
             success: true,
             user: {
                 phone: session.phone,
-                name: user?.name,
-                class: user?.class,
-                section: user?.section,
+                name: authUser?.name || pwaUser?.name,
+                class: pwaUser?.class,
+                section: pwaUser?.section,
+                role: role,
+                teaches: teaches,
                 schoolId: school.id,
                 schoolName: school.name
             }
         });
     } catch (e) {
+        console.error('[PROFILE] Error:', e);
         res.status(500).json({ success: false, error: 'Server error' });
     }
 });
@@ -6767,13 +6796,16 @@ app.post('/api/admin/teachers', requireAdmin, async (req, res) => {
         // Generate teacher ID
         const teacherId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
+        const subjectsArray = Array.isArray(subjects) ? subjects : (subjects ? subjects.split(',').map(s => s.trim()) : []);
+        const classesArray = Array.isArray(classes) ? classes : (classes ? classes.split(',').map(c => c.trim()) : []);
+
         const teacher = {
             id: teacherId,
             name,
             email: email || '',
             phone: phone || '',
-            subjects: Array.isArray(subjects) ? subjects : (subjects ? subjects.split(',').map(s => s.trim()) : []),
-            classes: Array.isArray(classes) ? classes : (classes ? classes.split(',').map(c => c.trim()) : []),
+            subjects: subjectsArray,
+            classes: classesArray,
             createdAt: Date.now(),
             createdBy: req.admin.username
         };
@@ -6785,6 +6817,39 @@ app.post('/api/admin/teachers', requireAdmin, async (req, res) => {
         const teacherIds = await db.kv.get(`school:${schoolId}:teachers`) || [];
         teacherIds.push(teacherId);
         await db.kv.set(`school:${schoolId}:teachers`, teacherIds);
+
+        // Auto-authorize teacher if phone number is provided
+        if (phone) {
+            const normalizedPhone = phone.replace(/\D/g, '');
+            // Get phone without 91 prefix (for PWA login which stores without country code)
+            const phoneWithout91 = normalizedPhone.startsWith('91') ? normalizedPhone.slice(2) : normalizedPhone;
+            // Get phone with 91 prefix (for WhatsApp which uses country code)
+            const phoneWith91 = normalizedPhone.startsWith('91') ? normalizedPhone : `91${normalizedPhone}`;
+
+            // Build teaches array from subjects and classes
+            const teaches = [];
+            subjectsArray.forEach(subject => {
+                classesArray.forEach(classNum => {
+                    teaches.push({ subject, class: parseInt(classNum) || classNum });
+                });
+            });
+
+            // Authorize in the user system for WhatsApp/PWA login
+            // Save with BOTH formats to handle different phone formats
+            const userInfo = {
+                name,
+                role: 'teacher',
+                school: schoolId,
+                teaches: teaches,
+                adminTeacherId: teacherId,
+                createdAt: new Date().toISOString()
+            };
+            // Save with 91 prefix (for WhatsApp)
+            await db.saveUserInfo(phoneWith91, userInfo);
+            // Also save without 91 prefix (for PWA)
+            await db.saveUserInfo(phoneWithout91, userInfo);
+            console.log(`[ADMIN] Auto-authorized teacher: ${name} (${phoneWith91} and ${phoneWithout91})`);
+        }
 
         console.log(`[ADMIN] Added teacher: ${name} @ ${schoolId}`);
 
@@ -6807,17 +6872,62 @@ app.put('/api/admin/teachers/:id', requireAdmin, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Teacher not found' });
         }
 
+        const subjectsArray = subjects !== undefined ? (Array.isArray(subjects) ? subjects : subjects.split(',').map(s => s.trim())) : existing.subjects;
+        const classesArray = classes !== undefined ? (Array.isArray(classes) ? classes : classes.split(',').map(c => c.trim())) : existing.classes;
+
         const updated = {
             ...existing,
             name: name || existing.name,
             email: email !== undefined ? email : existing.email,
             phone: phone !== undefined ? phone : existing.phone,
-            subjects: subjects !== undefined ? (Array.isArray(subjects) ? subjects : subjects.split(',').map(s => s.trim())) : existing.subjects,
-            classes: classes !== undefined ? (Array.isArray(classes) ? classes : classes.split(',').map(c => c.trim())) : existing.classes,
+            subjects: subjectsArray,
+            classes: classesArray,
             updatedAt: Date.now()
         };
 
         await db.kv.set(`school:${schoolId}:teacher:${teacherId}`, updated);
+
+        // Update authorization if phone changed or was added
+        const newPhone = phone !== undefined ? phone : existing.phone;
+        const oldPhone = existing.phone;
+
+        // If old phone existed and changed, remove old authorization
+        if (oldPhone && oldPhone !== newPhone) {
+            const normalizedOldPhone = oldPhone.replace(/\D/g, '');
+            const oldPhoneWith91 = normalizedOldPhone.startsWith('91') ? normalizedOldPhone : `91${normalizedOldPhone}`;
+            const oldPhoneWithout91 = normalizedOldPhone.startsWith('91') ? normalizedOldPhone.slice(2) : normalizedOldPhone;
+            await db.unauthorizeNumber(oldPhoneWith91);
+            await db.unauthorizeNumber(oldPhoneWithout91);
+            console.log(`[ADMIN] Removed old teacher auth: ${oldPhoneWith91} and ${oldPhoneWithout91}`);
+        }
+
+        // If new phone exists, add/update authorization
+        if (newPhone) {
+            const normalizedPhone = newPhone.replace(/\D/g, '');
+            const phoneWith91 = normalizedPhone.startsWith('91') ? normalizedPhone : `91${normalizedPhone}`;
+            const phoneWithout91 = normalizedPhone.startsWith('91') ? normalizedPhone.slice(2) : normalizedPhone;
+
+            // Build teaches array
+            const teaches = [];
+            subjectsArray.forEach(subject => {
+                classesArray.forEach(classNum => {
+                    teaches.push({ subject, class: parseInt(classNum) || classNum });
+                });
+            });
+
+            const userInfo = {
+                name: updated.name,
+                role: 'teacher',
+                school: schoolId,
+                teaches: teaches,
+                adminTeacherId: teacherId,
+                updatedAt: new Date().toISOString()
+            };
+            // Save with both formats
+            await db.saveUserInfo(phoneWith91, userInfo);
+            await db.saveUserInfo(phoneWithout91, userInfo);
+            console.log(`[ADMIN] Updated teacher auth: ${updated.name} (${phoneWith91} and ${phoneWithout91})`);
+        }
 
         res.json({ success: true, teacher: updated });
     } catch (error) {
@@ -6831,6 +6941,17 @@ app.delete('/api/admin/teachers/:id', requireAdmin, async (req, res) => {
     try {
         const schoolId = req.admin.schoolId;
         const teacherId = req.params.id;
+
+        // Get teacher to remove authorization
+        const teacher = await db.kv.get(`school:${schoolId}:teacher:${teacherId}`);
+
+        // Remove authorization if teacher has phone
+        if (teacher && teacher.phone) {
+            const normalizedPhone = teacher.phone.replace(/\D/g, '');
+            const fullPhone = normalizedPhone.startsWith('91') ? normalizedPhone : `91${normalizedPhone}`;
+            await db.unauthorizeNumber(fullPhone);
+            console.log(`[ADMIN] Removed teacher auth on delete: ${fullPhone}`);
+        }
 
         // Delete teacher record
         await db.kv.del(`school:${schoolId}:teacher:${teacherId}`);
@@ -6869,13 +6990,16 @@ app.post('/api/admin/teachers/import', requireAdmin, async (req, res) => {
             }
 
             const teacherId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+            const subjectsArray = row.subjects ? row.subjects.split(',').map(s => s.trim()) : [];
+            const classesArray = row.classes ? row.classes.split(',').map(c => c.trim()) : [];
+
             const teacher = {
                 id: teacherId,
                 name: row.name,
                 email: row.email || '',
                 phone: row.phone || '',
-                subjects: row.subjects ? row.subjects.split(',').map(s => s.trim()) : [],
-                classes: row.classes ? row.classes.split(',').map(c => c.trim()) : [],
+                subjects: subjectsArray,
+                classes: classesArray,
                 createdAt: Date.now(),
                 createdBy: req.admin.username
             };
@@ -6883,6 +7007,29 @@ app.post('/api/admin/teachers/import', requireAdmin, async (req, res) => {
             await db.kv.set(`school:${schoolId}:teacher:${teacherId}`, teacher);
             teacherIds.push(teacherId);
             added.push(teacher);
+
+            // Auto-authorize teacher if phone is provided
+            if (row.phone) {
+                const normalizedPhone = row.phone.replace(/\D/g, '');
+                const fullPhone = normalizedPhone.startsWith('91') ? normalizedPhone : `91${normalizedPhone}`;
+
+                const teaches = [];
+                subjectsArray.forEach(subject => {
+                    classesArray.forEach(classNum => {
+                        teaches.push({ subject, class: parseInt(classNum) || classNum });
+                    });
+                });
+
+                const userInfo = {
+                    name: row.name,
+                    role: 'teacher',
+                    school: schoolId,
+                    teaches: teaches,
+                    adminTeacherId: teacherId,
+                    createdAt: new Date().toISOString()
+                };
+                await db.saveUserInfo(fullPhone, userInfo);
+            }
         }
 
         await db.kv.set(`school:${schoolId}:teachers`, teacherIds);
@@ -7285,14 +7432,16 @@ app.delete('/api/admin/methods/:id', requireAdmin, async (req, res) => {
 });
 
 // =====================================================
-// ASSESSMENTS MANAGEMENT ENDPOINTS
+// ASSESSMENTS MANAGEMENT ENDPOINTS (PER-TEACHER)
 // =====================================================
 
-// GET /api/admin/assessments - List all assessments
-app.get('/api/admin/assessments', requireAdmin, async (req, res) => {
+// GET /api/admin/teachers/:teacherId/assessments - Get assessments for a teacher
+app.get('/api/admin/teachers/:teacherId/assessments', requireAdmin, async (req, res) => {
     try {
         const schoolId = req.admin.schoolId;
-        const assessmentIds = await db.kv.get(`school:${schoolId}:assessments`) || [];
+        const teacherId = req.params.teacherId;
+
+        const assessmentIds = await db.kv.get(`school:${schoolId}:teacher:${teacherId}:assessments`) || [];
 
         const assessments = [];
         for (const assessmentId of assessmentIds) {
@@ -7312,20 +7461,29 @@ app.get('/api/admin/assessments', requireAdmin, async (req, res) => {
     }
 });
 
-// POST /api/admin/assessments - Create an assessment
-app.post('/api/admin/assessments', requireAdmin, async (req, res) => {
+// POST /api/admin/teachers/:teacherId/assessments - Create assessment for a teacher
+app.post('/api/admin/teachers/:teacherId/assessments', requireAdmin, async (req, res) => {
     try {
         const schoolId = req.admin.schoolId;
+        const teacherId = req.params.teacherId;
         const { title, subject, class: assessmentClass, duration, questions } = req.body;
 
         if (!title || !subject) {
             return res.status(400).json({ success: false, error: 'Title and subject are required' });
         }
 
+        // Verify teacher exists
+        const teacher = await db.kv.get(`school:${schoolId}:teacher:${teacherId}`);
+        if (!teacher) {
+            return res.status(404).json({ success: false, error: 'Teacher not found' });
+        }
+
         const assessmentId = `a_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
         const assessment = {
             id: assessmentId,
+            teacherId,
+            teacherName: teacher.name,
             schoolId,
             title,
             subject,
@@ -7336,13 +7494,15 @@ app.post('/api/admin/assessments', requireAdmin, async (req, res) => {
             createdBy: req.admin.username
         };
 
+        // Save assessment
         await db.kv.set(`assessment:${assessmentId}`, assessment);
 
-        const assessmentIds = await db.kv.get(`school:${schoolId}:assessments`) || [];
+        // Add to teacher's assessments list
+        const assessmentIds = await db.kv.get(`school:${schoolId}:teacher:${teacherId}:assessments`) || [];
         assessmentIds.push(assessmentId);
-        await db.kv.set(`school:${schoolId}:assessments`, assessmentIds);
+        await db.kv.set(`school:${schoolId}:teacher:${teacherId}:assessments`, assessmentIds);
 
-        console.log(`[ADMIN] Created assessment: ${title} @ ${schoolId}`);
+        console.log(`[ADMIN] Created assessment: ${title} by ${teacher.name}`);
 
         res.json({ success: true, assessment });
     } catch (error) {
@@ -7405,11 +7565,13 @@ app.delete('/api/admin/assessments/:id', requireAdmin, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Assessment not found' });
         }
 
+        // Delete assessment
         await db.kv.del(`assessment:${assessmentId}`);
 
-        const assessmentIds = await db.kv.get(`school:${req.admin.schoolId}:assessments`) || [];
+        // Remove from teacher's assessments list
+        const assessmentIds = await db.kv.get(`school:${req.admin.schoolId}:teacher:${existing.teacherId}:assessments`) || [];
         const filtered = assessmentIds.filter(id => id !== assessmentId);
-        await db.kv.set(`school:${req.admin.schoolId}:assessments`, filtered);
+        await db.kv.set(`school:${req.admin.schoolId}:teacher:${existing.teacherId}:assessments`, filtered);
 
         res.json({ success: true });
     } catch (error) {
@@ -7425,13 +7587,15 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 
         const teacherIds = await db.kv.get(`school:${schoolId}:teachers`) || [];
         const studentIds = await db.kv.get(`school:${schoolId}:students`) || [];
-        const assessmentIds = await db.kv.get(`school:${schoolId}:assessments`) || [];
 
-        // Count methods across all teachers
+        // Count methods and assessments across all teachers
         let methodCount = 0;
+        let assessmentCount = 0;
         for (const teacherId of teacherIds) {
             const methodIds = await db.kv.get(`school:${schoolId}:teacher:${teacherId}:methods`) || [];
             methodCount += methodIds.length;
+            const assessmentIds = await db.kv.get(`school:${schoolId}:teacher:${teacherId}:assessments`) || [];
+            assessmentCount += assessmentIds.length;
         }
 
         res.json({
@@ -7439,7 +7603,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
             stats: {
                 teachers: teacherIds.length,
                 students: studentIds.length,
-                assessments: assessmentIds.length,
+                assessments: assessmentCount,
                 methods: methodCount
             }
         });
@@ -7873,8 +8037,7 @@ app.get('/school-admin', async (req, res) => {
                 <a href="#" data-section="home" class="active"><span>🏠</span> Dashboard</a>
                 <a href="#" data-section="teachers"><span>👩‍🏫</span> Teachers</a>
                 <a href="#" data-section="students"><span>👨‍🎓</span> Students</a>
-                <a href="#" data-section="methods"><span>📚</span> Teaching Methods</a>
-                <a href="#" data-section="assessments"><span>📝</span> Assessments</a>
+                <a href="#" data-section="methods"><span>📚</span> Teachers Content</a>
                 <a href="#" id="logoutBtn"><span>🚪</span> Logout</a>
             </nav>
         </div>
@@ -7971,35 +8134,13 @@ app.get('/school-admin', async (req, res) => {
                 <div id="studentCount" style="padding: 16px; color: #666;"></div>
             </div>
 
-            <!-- Methods Section -->
+            <!-- Methods & Assessments Section -->
             <div class="section" id="section-methods">
                 <div class="content-header">
-                    <h2>Teaching Methods</h2>
+                    <h2>Teachers Content</h2>
+                    <p style="color:#666;margin-top:4px;">Teaching methods and assessments by teacher</p>
                 </div>
                 <div id="methodsContainer"></div>
-            </div>
-
-            <!-- Assessments Section -->
-            <div class="section" id="section-assessments">
-                <div class="content-header">
-                    <h2>Assessments</h2>
-                    <button class="btn btn-sm" onclick="showAddAssessmentModal()">+ Create Assessment</button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Subject</th>
-                                <th>Class</th>
-                                <th>Questions</th>
-                                <th>Duration</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="assessmentsTable"></tbody>
-                    </table>
-                </div>
             </div>
         </div>
     </div>
@@ -8111,7 +8252,6 @@ app.get('/school-admin', async (req, res) => {
                 if (section === 'teachers') loadTeachers();
                 if (section === 'students') loadStudents();
                 if (section === 'methods') loadMethods();
-                if (section === 'assessments') loadAssessments();
                 if (section === 'home') loadStats();
             });
         });
@@ -8494,7 +8634,7 @@ app.get('/school-admin', async (req, res) => {
             }
         }
 
-        // Teaching Methods
+        // Teaching Methods & Assessments
         async function loadMethods() {
             const teachersData = await api('/api/admin/teachers');
             if (!teachersData.success) return;
@@ -8505,16 +8645,25 @@ app.get('/school-admin', async (req, res) => {
             for (const teacher of teachersData.teachers) {
                 const methodsData = await api('/api/admin/teachers/' + teacher.id + '/methods');
                 const methods = methodsData.success ? methodsData.methods : [];
+                const assessmentsData = await api('/api/admin/teachers/' + teacher.id + '/assessments');
+                const assessments = assessmentsData.success ? assessmentsData.assessments : [];
 
                 html += '<div class="teacher-methods-card">' +
                     '<div class="teacher-methods-header" onclick="toggleTeacherMethods(\\'' + teacher.id + '\\')">' +
                         '<div><strong>' + teacher.name + '</strong><br><small style="color:#666">' + (teacher.subjects || []).join(', ') + '</small></div>' +
-                        '<span class="badge">' + methods.length + ' methods</span>' +
+                        '<div style="display:flex;gap:8px">' +
+                            '<span class="badge">' + methods.length + ' methods</span>' +
+                            '<span class="badge" style="background:#e8f5e9;color:#2e7d32">' + assessments.length + ' assessments</span>' +
+                        '</div>' +
                     '</div>' +
                     '<div class="teacher-methods-content" id="methods-' + teacher.id + '">' +
-                        '<button class="btn btn-sm" onclick="showAddMethodModal(\\'' + teacher.id + '\\', \\'' + teacher.name + '\\')">+ Add Method</button>' +
-                        '<div style="margin-top:16px">' +
-                        methods.map(m =>
+                        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                            '<button class="btn btn-sm" onclick="showAddMethodModal(\\'' + teacher.id + '\\', \\'' + teacher.name + '\\')">+ Add Method</button>' +
+                            '<button class="btn btn-sm" style="background:#2e7d32" onclick="showAddAssessmentModal(\\'' + teacher.id + '\\', \\'' + teacher.name + '\\')">+ Add Assessment</button>' +
+                        '</div>' +
+                        '<h4 style="margin:20px 0 12px;color:#1a73e8;font-size:14px">Teaching Methods</h4>' +
+                        '<div>' +
+                        (methods.length ? methods.map(m =>
                             '<div class="method-item">' +
                                 '<div class="method-info"><h4>' + m.subject + ' - ' + m.chapter + '</h4><p>Class ' + m.class + '</p></div>' +
                                 '<div class="action-btns">' +
@@ -8522,13 +8671,25 @@ app.get('/school-admin', async (req, res) => {
                                     '<button class="delete-btn" onclick="deleteMethod(\\'' + m.id + '\\')">Delete</button>' +
                                 '</div>' +
                             '</div>'
-                        ).join('') +
+                        ).join('') : '<p style="color:#999;font-size:13px">No methods yet</p>') +
+                        '</div>' +
+                        '<h4 style="margin:20px 0 12px;color:#2e7d32;font-size:14px">Assessments</h4>' +
+                        '<div>' +
+                        (assessments.length ? assessments.map(a =>
+                            '<div class="method-item">' +
+                                '<div class="method-info"><h4>' + a.title + '</h4><p>' + a.subject + ' - Class ' + (a.class || 'All') + ' - ' + a.duration + ' min</p></div>' +
+                                '<div class="action-btns">' +
+                                    '<button class="edit-btn" onclick="editAssessment(\\'' + a.id + '\\', \\'' + teacher.id + '\\')">Edit</button>' +
+                                    '<button class="delete-btn" onclick="deleteAssessment(\\'' + a.id + '\\', \\'' + teacher.id + '\\')">Delete</button>' +
+                                '</div>' +
+                            '</div>'
+                        ).join('') : '<p style="color:#999;font-size:13px">No assessments yet</p>') +
                         '</div>' +
                     '</div>' +
                 '</div>';
             }
 
-            container.innerHTML = html || '<p style="color:#666">No teachers added yet. Add teachers first to create teaching methods.</p>';
+            container.innerHTML = html || '<p style="color:#666">No teachers added yet. Add teachers first to create content.</p>';
         }
 
         function toggleTeacherMethods(teacherId) {
@@ -8629,49 +8790,34 @@ app.get('/school-admin', async (req, res) => {
             }
         }
 
-        // Assessments
-        async function loadAssessments() {
-            const data = await api('/api/admin/assessments');
-            if (data.success) {
-                const tbody = document.getElementById('assessmentsTable');
-                tbody.innerHTML = data.assessments.map(a =>
-                    '<tr>' +
-                    '<td>' + a.title + '</td>' +
-                    '<td>' + a.subject + '</td>' +
-                    '<td>' + (a.class || 'All') + '</td>' +
-                    '<td>' + a.questionCount + '</td>' +
-                    '<td>' + a.duration + ' min</td>' +
-                    '<td class="action-btns">' +
-                        '<button class="edit-btn" onclick="editAssessment(\\'' + a.id + '\\')">Edit</button>' +
-                        '<button class="delete-btn" onclick="deleteAssessment(\\'' + a.id + '\\')">Delete</button>' +
-                    '</td>' +
-                    '</tr>'
-                ).join('');
-            }
-        }
+        // Assessments (per-teacher)
+        let currentAssessmentTeacherId = null;
 
-        function showAddAssessmentModal() {
+        function showAddAssessmentModal(teacherId, teacherName) {
             editingId = null;
-            document.getElementById('modalTitle').textContent = 'Create Assessment';
+            currentAssessmentTeacherId = teacherId;
+            document.getElementById('modalTitle').textContent = 'Add Assessment for ' + teacherName;
             document.getElementById('modalBody').innerHTML =
-                '<div class="form-group"><label>Title *</label><input type="text" id="assessmentTitle"></div>' +
-                '<div class="form-group"><label>Subject *</label><input type="text" id="assessmentSubject"></div>' +
+                '<input type="hidden" id="assessmentTeacherId" value="' + teacherId + '">' +
+                '<div class="form-group"><label>Title *</label><input type="text" id="assessmentTitle" placeholder="e.g., Unit Test 1"></div>' +
+                '<div class="form-group"><label>Subject *</label><input type="text" id="assessmentSubject" placeholder="e.g., Mathematics"></div>' +
                 '<div class="form-group"><label>Class</label><select id="assessmentClass"><option value="">All Classes</option>' +
                     ${JSON.stringify((school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join(''))} +
                 '</select></div>' +
                 '<div class="form-group"><label>Duration (minutes)</label><input type="number" id="assessmentDuration" value="30"></div>';
             document.getElementById('modalFooter').innerHTML =
                 '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
-                '<button class="btn btn-sm" onclick="saveAssessment()">Create</button>';
+                '<button class="btn btn-sm" onclick="saveAssessment()">Save</button>';
             document.getElementById('modalOverlay').classList.add('active');
         }
 
-        async function editAssessment(id) {
-            const data = await api('/api/admin/assessments/' + id);
+        async function editAssessment(assessmentId, teacherId) {
+            const data = await api('/api/admin/assessments/' + assessmentId);
             if (!data.success) return;
 
             const a = data.assessment;
-            editingId = id;
+            editingId = assessmentId;
+            currentAssessmentTeacherId = teacherId;
             document.getElementById('modalTitle').textContent = 'Edit Assessment';
             document.getElementById('modalBody').innerHTML =
                 '<div class="form-group"><label>Title *</label><input type="text" id="assessmentTitle" value="' + a.title + '"></div>' +
@@ -8703,25 +8849,32 @@ app.get('/school-admin', async (req, res) => {
                 return;
             }
 
-            const url = editingId ? '/api/admin/assessments/' + editingId : '/api/admin/assessments';
-            const method = editingId ? 'PUT' : 'POST';
+            let url, method;
+            if (editingId) {
+                url = '/api/admin/assessments/' + editingId;
+                method = 'PUT';
+            } else {
+                const teacherId = document.getElementById('assessmentTeacherId').value;
+                url = '/api/admin/teachers/' + teacherId + '/assessments';
+                method = 'POST';
+            }
 
             const data = await api(url, { method, body: JSON.stringify(payload) });
 
             if (data.success) {
                 closeModal();
-                loadAssessments();
+                loadMethods();
                 loadStats();
                 showToast(editingId ? 'Assessment updated' : 'Assessment created', 'success');
             }
         }
 
-        async function deleteAssessment(id) {
+        async function deleteAssessment(assessmentId, teacherId) {
             if (!confirm('Are you sure you want to delete this assessment?')) return;
 
-            const data = await api('/api/admin/assessments/' + id, { method: 'DELETE' });
+            const data = await api('/api/admin/assessments/' + assessmentId, { method: 'DELETE' });
             if (data.success) {
-                loadAssessments();
+                loadMethods();
                 loadStats();
                 showToast('Assessment deleted', 'success');
             }
