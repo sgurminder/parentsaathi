@@ -130,7 +130,22 @@ function getSchoolConfig(req) {
     return demoSchools[schoolId] || demoSchools['vidyamitra'];
 }
 
-// Get school config by ID (for API use)
+// Get school by ID - checks Redis first, then falls back to hardcoded
+async function getSchoolByIdAsync(schoolId) {
+    // Try Redis first for dynamic schools
+    try {
+        const dynamicSchool = await db.kv.get(`school:${schoolId}`);
+        if (dynamicSchool) {
+            return { ...dynamicSchool, id: schoolId };
+        }
+    } catch (e) {
+        console.log('[SCHOOL] Redis lookup failed, using hardcoded');
+    }
+    // Fall back to hardcoded schools
+    return demoSchools[schoolId] || demoSchools['vidyamitra'];
+}
+
+// Sync version for non-async contexts (uses cache or hardcoded)
 function getSchoolById(schoolId) {
     return demoSchools[schoolId] || demoSchools['vidyamitra'];
 }
@@ -1156,6 +1171,654 @@ app.get('/api/queries/:phoneNumber', async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const queries = await db.getUserQueries(phoneNumber, limit);
     res.json(queries);
+});
+
+// =====================================================
+// SUPER ADMIN SYSTEM
+// =====================================================
+
+// Admin credentials (in production, use env vars and proper auth)
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'vidyamitra2024';
+
+// Admin auth middleware
+function adminAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || authHeader !== `Bearer ${ADMIN_PASSWORD}`) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    next();
+}
+
+// List all schools (hardcoded + dynamic)
+app.get('/api/admin/schools', adminAuth, async (req, res) => {
+    try {
+        // Get all dynamic schools from Redis
+        const keys = await db.kv.keys('school:*');
+        const dynamicSchools = [];
+
+        for (const key of keys) {
+            const schoolId = key.replace('school:', '');
+            const school = await db.kv.get(key);
+            if (school) {
+                dynamicSchools.push({ ...school, id: schoolId, source: 'dynamic' });
+            }
+        }
+
+        // Get hardcoded schools
+        const hardcodedSchools = Object.values(demoSchools).map(s => ({ ...s, source: 'hardcoded' }));
+
+        // Merge (dynamic overrides hardcoded)
+        const allSchools = [...hardcodedSchools];
+        dynamicSchools.forEach(ds => {
+            const idx = allSchools.findIndex(s => s.id === ds.id);
+            if (idx >= 0) {
+                allSchools[idx] = ds;
+            } else {
+                allSchools.push(ds);
+            }
+        });
+
+        res.json({ success: true, schools: allSchools });
+    } catch (e) {
+        console.error('[ADMIN] Error listing schools:', e);
+        res.status(500).json({ success: false, error: 'Failed to list schools' });
+    }
+});
+
+// Get single school
+app.get('/api/admin/schools/:id', adminAuth, async (req, res) => {
+    try {
+        const school = await getSchoolByIdAsync(req.params.id);
+        res.json({ success: true, school });
+    } catch (e) {
+        res.status(500).json({ success: false, error: 'Failed to get school' });
+    }
+});
+
+// Create or update school
+app.post('/api/admin/schools', adminAuth, async (req, res) => {
+    try {
+        const { id, name, shortName, tagline, logo, logoEmoji, primaryColor, secondaryColor,
+                gradientFrom, gradientTo, appName, board, classes, sections, backgroundImage } = req.body;
+
+        if (!id || !name) {
+            return res.status(400).json({ success: false, error: 'ID and name are required' });
+        }
+
+        // Validate ID format (lowercase, alphanumeric, hyphens)
+        if (!/^[a-z0-9-]+$/.test(id)) {
+            return res.status(400).json({ success: false, error: 'ID must be lowercase alphanumeric with hyphens only' });
+        }
+
+        const schoolConfig = {
+            name,
+            shortName: shortName || name,
+            tagline: tagline || 'AI-Powered Learning',
+            logo: logo || null, // Base64 or URL
+            logoEmoji: logoEmoji || '📚',
+            primaryColor: primaryColor || '#7c3aed',
+            secondaryColor: secondaryColor || '#fbbf24',
+            gradientFrom: gradientFrom || primaryColor || '#7c3aed',
+            gradientTo: gradientTo || '#a855f7',
+            appName: appName || shortName || name,
+            board: board || 'CBSE',
+            classes: classes || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            sections: sections || ['A', 'B', 'C', 'D'],
+            backgroundImage: backgroundImage || null,
+            updatedAt: new Date().toISOString()
+        };
+
+        await db.kv.set(`school:${id}`, schoolConfig);
+
+        // Add to school list for quick lookup
+        await db.kv.sadd('schools:list', id);
+
+        console.log(`[ADMIN] School created/updated: ${id}`);
+        res.json({ success: true, school: { id, ...schoolConfig } });
+    } catch (e) {
+        console.error('[ADMIN] Error saving school:', e);
+        res.status(500).json({ success: false, error: 'Failed to save school' });
+    }
+});
+
+// Delete school
+app.delete('/api/admin/schools/:id', adminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Don't allow deleting hardcoded schools
+        if (demoSchools[id]) {
+            return res.status(400).json({ success: false, error: 'Cannot delete hardcoded school. Override it instead.' });
+        }
+
+        await db.kv.del(`school:${id}`);
+        await db.kv.srem('schools:list', id);
+
+        console.log(`[ADMIN] School deleted: ${id}`);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: 'Failed to delete school' });
+    }
+});
+
+// Upload logo (base64)
+app.post('/api/admin/schools/:id/logo', adminAuth, upload.single('logo'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+        }
+
+        // Convert to base64 data URL
+        const base64 = req.file.buffer.toString('base64');
+        const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+        // Check size (logos should be small, < 100KB recommended)
+        if (req.file.size > 500 * 1024) {
+            return res.status(400).json({ success: false, error: 'Logo too large. Max 500KB.' });
+        }
+
+        // Get existing school config and update logo
+        let school = await db.kv.get(`school:${id}`);
+        if (!school) {
+            // Create from hardcoded if exists
+            school = demoSchools[id] ? { ...demoSchools[id] } : {};
+        }
+
+        school.logo = dataUrl;
+        school.updatedAt = new Date().toISOString();
+
+        await db.kv.set(`school:${id}`, school);
+
+        res.json({ success: true, logo: dataUrl });
+    } catch (e) {
+        console.error('[ADMIN] Error uploading logo:', e);
+        res.status(500).json({ success: false, error: 'Failed to upload logo' });
+    }
+});
+
+// Admin Dashboard UI
+app.get('/admin', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidyaMitra Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { opacity: 0.9; }
+
+        .login-box { background: white; padding: 30px; border-radius: 12px; max-width: 400px; margin: 100px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .login-box h2 { margin-bottom: 20px; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; }
+        .form-group input:focus, .form-group select:focus { border-color: #7c3aed; outline: none; }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; }
+        .btn-primary { background: #7c3aed; color: white; }
+        .btn-primary:hover { background: #6d28d9; }
+        .btn-secondary { background: #e5e7eb; color: #374151; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-success { background: #10b981; color: white; }
+
+        .dashboard { display: none; }
+        .dashboard.active { display: block; }
+
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .card-header h3 { font-size: 18px; }
+
+        .school-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .school-card { background: white; border-radius: 12px; padding: 15px; border: 2px solid #e5e7eb; cursor: pointer; transition: all 0.2s; }
+        .school-card:hover { border-color: #7c3aed; transform: translateY(-2px); }
+        .school-card .logo { width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin-bottom: 10px; }
+        .school-card h4 { font-size: 16px; margin-bottom: 5px; }
+        .school-card p { color: #6b7280; font-size: 13px; }
+        .school-card .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-top: 8px; }
+        .badge-dynamic { background: #d1fae5; color: #059669; }
+        .badge-hardcoded { background: #e5e7eb; color: #6b7280; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 12px; padding: 25px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 20px; }
+        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280; }
+
+        .color-input { display: flex; gap: 10px; align-items: center; }
+        .color-input input[type="color"] { width: 50px; height: 40px; padding: 0; border: none; cursor: pointer; }
+        .color-input input[type="text"] { flex: 1; }
+
+        .logo-preview { width: 100px; height: 100px; border: 2px dashed #e5e7eb; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; overflow: hidden; }
+        .logo-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; border: none; background: #e5e7eb; border-radius: 8px; cursor: pointer; font-weight: 500; }
+        .tab.active { background: #7c3aed; color: white; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 200; }
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; }
+            .school-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login -->
+        <div class="login-box" id="loginBox">
+            <h2>VidyaMitra Admin</h2>
+            <div class="form-group">
+                <label>Admin Password</label>
+                <input type="password" id="passwordInput" placeholder="Enter admin password">
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="login()">Login</button>
+            <p id="loginError" style="color:#ef4444;margin-top:10px;text-align:center;display:none;"></p>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="dashboard" id="dashboard">
+            <div class="header">
+                <h1>VidyaMitra Admin</h1>
+                <p>Manage schools, configurations, and branding</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Schools</h3>
+                    <button class="btn btn-primary" onclick="openModal()">+ Add School</button>
+                </div>
+                <div class="school-grid" id="schoolGrid">
+                    <!-- Schools loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- School Modal -->
+    <div class="modal" id="schoolModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add School</h3>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('basic')">Basic Info</button>
+                <button class="tab" onclick="switchTab('branding')">Branding</button>
+                <button class="tab" onclick="switchTab('academic')">Academic</button>
+            </div>
+
+            <form id="schoolForm" onsubmit="saveSchool(event)">
+                <!-- Basic Info Tab -->
+                <div class="tab-content active" id="basicTab">
+                    <div class="form-group">
+                        <label>School ID (URL-friendly)*</label>
+                        <input type="text" id="schoolId" pattern="[a-z0-9-]+" placeholder="e.g., dps-rohini" required>
+                        <small style="color:#6b7280">Lowercase, no spaces. Used in URL: /app?school=<span id="idPreview">school-id</span></small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Full Name*</label>
+                            <input type="text" id="schoolName" placeholder="Delhi Public School, Rohini" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Short Name</label>
+                            <input type="text" id="shortName" placeholder="DPS Rohini">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Tagline</label>
+                        <input type="text" id="tagline" placeholder="Excellence in Education">
+                    </div>
+                    <div class="form-group">
+                        <label>App Name</label>
+                        <input type="text" id="appName" placeholder="DPS AI">
+                    </div>
+                </div>
+
+                <!-- Branding Tab -->
+                <div class="tab-content" id="brandingTab" style="display:none">
+                    <div class="form-group">
+                        <label>School Logo</label>
+                        <div class="logo-preview" id="logoPreview">
+                            <span id="logoEmoji" style="font-size:40px">📚</span>
+                        </div>
+                        <input type="file" id="logoFile" accept="image/*" onchange="previewLogo(this)">
+                        <small style="color:#6b7280">Max 500KB. PNG or JPG recommended.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Logo Emoji (fallback)</label>
+                        <input type="text" id="logoEmojiInput" placeholder="📚" maxlength="2">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Primary Color</label>
+                            <div class="color-input">
+                                <input type="color" id="primaryColorPicker" value="#7c3aed" onchange="syncColor('primary')">
+                                <input type="text" id="primaryColor" value="#7c3aed" onchange="syncColorPicker('primary')">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Secondary Color</label>
+                            <div class="color-input">
+                                <input type="color" id="secondaryColorPicker" value="#fbbf24" onchange="syncColor('secondary')">
+                                <input type="text" id="secondaryColor" value="#fbbf24" onchange="syncColorPicker('secondary')">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Gradient From</label>
+                            <div class="color-input">
+                                <input type="color" id="gradientFromPicker" value="#7c3aed" onchange="syncColor('gradientFrom')">
+                                <input type="text" id="gradientFrom" value="#7c3aed" onchange="syncColorPicker('gradientFrom')">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Gradient To</label>
+                            <div class="color-input">
+                                <input type="color" id="gradientToPicker" value="#a855f7" onchange="syncColor('gradientTo')">
+                                <input type="text" id="gradientTo" value="#a855f7" onchange="syncColorPicker('gradientTo')">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Academic Tab -->
+                <div class="tab-content" id="academicTab" style="display:none">
+                    <div class="form-group">
+                        <label>Board</label>
+                        <select id="board">
+                            <option value="CBSE">CBSE</option>
+                            <option value="ICSE">ICSE</option>
+                            <option value="State Board">State Board</option>
+                            <option value="IB">IB</option>
+                            <option value="Cambridge">Cambridge</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Classes (comma-separated)</label>
+                        <input type="text" id="classes" placeholder="1,2,3,4,5,6,7,8,9,10,11,12" value="1,2,3,4,5,6,7,8,9,10,11,12">
+                    </div>
+                    <div class="form-group">
+                        <label>Sections (comma-separated)</label>
+                        <input type="text" id="sections" placeholder="A,B,C,D" value="A,B,C,D">
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:10px;margin-top:20px">
+                    <button type="submit" class="btn btn-primary">Save School</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="deleteBtn" style="margin-left:auto;display:none" onclick="deleteSchool()">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('adminToken');
+        let currentSchool = null;
+        let logoBase64 = null;
+
+        // Check auth on load
+        if (authToken) {
+            verifyAuth();
+        }
+
+        async function verifyAuth() {
+            try {
+                const res = await fetch('/api/admin/schools', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                if (res.ok) {
+                    showDashboard();
+                    loadSchools();
+                } else {
+                    localStorage.removeItem('adminToken');
+                    authToken = null;
+                }
+            } catch (e) {
+                console.error('Auth verify failed:', e);
+            }
+        }
+
+        async function login() {
+            const password = document.getElementById('passwordInput').value;
+            authToken = password;
+
+            try {
+                const res = await fetch('/api/admin/schools', {
+                    headers: { 'Authorization': 'Bearer ' + password }
+                });
+
+                if (res.ok) {
+                    localStorage.setItem('adminToken', password);
+                    showDashboard();
+                    loadSchools();
+                } else {
+                    document.getElementById('loginError').textContent = 'Invalid password';
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (e) {
+                document.getElementById('loginError').textContent = 'Connection error';
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+
+        function showDashboard() {
+            document.getElementById('loginBox').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+        }
+
+        async function loadSchools() {
+            try {
+                const res = await fetch('/api/admin/schools', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+
+                const grid = document.getElementById('schoolGrid');
+                grid.innerHTML = data.schools.map(school => \`
+                    <div class="school-card" onclick="editSchool('\${school.id}')">
+                        <div class="logo" style="background: linear-gradient(135deg, \${school.gradientFrom || school.primaryColor}, \${school.gradientTo || school.primaryColor})">
+                            \${school.logo ? '<img src="' + school.logo + '" alt="Logo">' : school.logoEmoji || '📚'}
+                        </div>
+                        <h4>\${school.name}</h4>
+                        <p>\${school.shortName} • \${school.board || 'CBSE'}</p>
+                        <span class="badge badge-\${school.source}">\${school.source}</span>
+                    </div>
+                \`).join('');
+            } catch (e) {
+                console.error('Failed to load schools:', e);
+            }
+        }
+
+        function openModal(school = null) {
+            currentSchool = school;
+            logoBase64 = null;
+
+            document.getElementById('modalTitle').textContent = school ? 'Edit School' : 'Add School';
+            document.getElementById('deleteBtn').style.display = school && school.source !== 'hardcoded' ? 'block' : 'none';
+            document.getElementById('schoolId').disabled = !!school;
+
+            // Reset form
+            document.getElementById('schoolForm').reset();
+            document.getElementById('logoPreview').innerHTML = '<span id="logoEmoji" style="font-size:40px">📚</span>';
+
+            if (school) {
+                document.getElementById('schoolId').value = school.id;
+                document.getElementById('schoolName').value = school.name || '';
+                document.getElementById('shortName').value = school.shortName || '';
+                document.getElementById('tagline').value = school.tagline || '';
+                document.getElementById('appName').value = school.appName || '';
+                document.getElementById('logoEmojiInput').value = school.logoEmoji || '📚';
+                document.getElementById('primaryColor').value = school.primaryColor || '#7c3aed';
+                document.getElementById('primaryColorPicker').value = school.primaryColor || '#7c3aed';
+                document.getElementById('secondaryColor').value = school.secondaryColor || '#fbbf24';
+                document.getElementById('secondaryColorPicker').value = school.secondaryColor || '#fbbf24';
+                document.getElementById('gradientFrom').value = school.gradientFrom || school.primaryColor || '#7c3aed';
+                document.getElementById('gradientFromPicker').value = school.gradientFrom || school.primaryColor || '#7c3aed';
+                document.getElementById('gradientTo').value = school.gradientTo || '#a855f7';
+                document.getElementById('gradientToPicker').value = school.gradientTo || '#a855f7';
+                document.getElementById('board').value = school.board || 'CBSE';
+                document.getElementById('classes').value = (school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).join(',');
+                document.getElementById('sections').value = (school.sections || ['A','B','C','D']).join(',');
+
+                if (school.logo) {
+                    logoBase64 = school.logo;
+                    document.getElementById('logoPreview').innerHTML = '<img src="' + school.logo + '" alt="Logo">';
+                }
+            }
+
+            document.getElementById('schoolModal').classList.add('active');
+            switchTab('basic');
+        }
+
+        async function editSchool(id) {
+            try {
+                const res = await fetch('/api/admin/schools/' + id, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+                openModal(data.school);
+            } catch (e) {
+                showToast('Failed to load school', 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('schoolModal').classList.remove('active');
+            currentSchool = null;
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').style.display = 'block';
+        }
+
+        function syncColor(field) {
+            const picker = document.getElementById(field + 'Picker') || document.getElementById(field + 'ColorPicker');
+            const input = document.getElementById(field) || document.getElementById(field + 'Color');
+            input.value = picker.value;
+        }
+
+        function syncColorPicker(field) {
+            const picker = document.getElementById(field + 'Picker') || document.getElementById(field + 'ColorPicker');
+            const input = document.getElementById(field) || document.getElementById(field + 'Color');
+            if (/^#[0-9A-Fa-f]{6}$/.test(input.value)) {
+                picker.value = input.value;
+            }
+        }
+
+        function previewLogo(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    logoBase64 = e.target.result;
+                    document.getElementById('logoPreview').innerHTML = '<img src="' + logoBase64 + '" alt="Logo">';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Update ID preview
+        document.getElementById('schoolId').addEventListener('input', function() {
+            document.getElementById('idPreview').textContent = this.value || 'school-id';
+        });
+
+        async function saveSchool(e) {
+            e.preventDefault();
+
+            const schoolData = {
+                id: document.getElementById('schoolId').value,
+                name: document.getElementById('schoolName').value,
+                shortName: document.getElementById('shortName').value,
+                tagline: document.getElementById('tagline').value,
+                appName: document.getElementById('appName').value,
+                logoEmoji: document.getElementById('logoEmojiInput').value,
+                logo: logoBase64,
+                primaryColor: document.getElementById('primaryColor').value,
+                secondaryColor: document.getElementById('secondaryColor').value,
+                gradientFrom: document.getElementById('gradientFrom').value,
+                gradientTo: document.getElementById('gradientTo').value,
+                board: document.getElementById('board').value,
+                classes: document.getElementById('classes').value.split(',').map(c => parseInt(c.trim())).filter(c => !isNaN(c)),
+                sections: document.getElementById('sections').value.split(',').map(s => s.trim()).filter(s => s)
+            };
+
+            try {
+                const res = await fetch('/api/admin/schools', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify(schoolData)
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('School saved successfully!', 'success');
+                    closeModal();
+                    loadSchools();
+                } else {
+                    showToast(data.error || 'Failed to save school', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to save school', 'error');
+            }
+        }
+
+        async function deleteSchool() {
+            if (!currentSchool || !confirm('Are you sure you want to delete this school?')) return;
+
+            try {
+                const res = await fetch('/api/admin/schools/' + currentSchool.id, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('School deleted', 'success');
+                    closeModal();
+                    loadSchools();
+                } else {
+                    showToast(data.error || 'Failed to delete school', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to delete school', 'error');
+            }
+        }
+
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-' + type;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>`);
 });
 
 // =====================================================
@@ -4860,9 +5523,14 @@ self.addEventListener('fetch', (e) => {
 });
 
 // Main PWA App
-app.get('/app', (req, res) => {
+app.get('/app', async (req, res) => {
     const schoolId = req.query.school || 'vidyamitra';
-    const school = getSchoolById(schoolId);
+    const school = await getSchoolByIdAsync(schoolId);
+
+    // Generate logo HTML - use image if available, otherwise emoji
+    const logoHtml = school.logo
+        ? `<img src="${school.logo}" alt="${school.shortName}" style="width:40px;height:40px;border-radius:8px;object-fit:contain;">`
+        : school.logoEmoji;
 
     res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -5421,9 +6089,9 @@ app.get('/app', (req, res) => {
         <!-- Login Screen -->
         <div class="login-screen" id="loginScreen">
             <div class="login-card">
-                <div class="login-logo">${school.logoEmoji}</div>
-                <h1 class="login-title">${school.shortName} AI</h1>
-                <p class="login-subtitle">${school.tagline}</p>
+                <div class="login-logo">${school.logo ? `<img src="${school.logo}" alt="${school.shortName}" style="width:80px;height:80px;border-radius:12px;object-fit:contain;">` : school.logoEmoji}</div>
+                <h1 class="login-title">${school.appName || school.shortName}</h1>
+                <p class="login-subtitle">${school.tagline || 'AI-Powered Learning'}</p>
 
                 <!-- Phone Step -->
                 <div id="phoneStep">
@@ -5455,10 +6123,10 @@ app.get('/app', (req, res) => {
 
         <!-- Header -->
         <header class="header">
-            <div class="header-logo">${school.logoEmoji}</div>
+            <div class="header-logo">${logoHtml}</div>
             <div class="header-title">
-                <h1>${school.shortName} AI</h1>
-                <p>Your 24/7 Study Companion</p>
+                <h1>${school.appName || school.shortName}</h1>
+                <p>${school.tagline || 'Your 24/7 Study Companion'}</p>
             </div>
         </header>
 
