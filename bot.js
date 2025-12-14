@@ -5599,7 +5599,7 @@ app.get('/app', (req, res) => {
 
         // Login - Send OTP
         sendOtpBtn.addEventListener('click', async () => {
-            const phone = phoneInput.value.replace(/\\D/g, '');
+            const phone = phoneInput.value.replace(/[^0-9]/g, '');
             if (phone.length !== 10) {
                 phoneError.textContent = 'Please enter a valid 10-digit number';
                 return;
@@ -5644,7 +5644,7 @@ app.get('/app', (req, res) => {
             });
             input.addEventListener('paste', (e) => {
                 e.preventDefault();
-                const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\\D/g, '');
+                const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
                 for (let j = 0; j < Math.min(paste.length, 6); j++) {
                     otpInputs[j].value = paste[j];
                 }
