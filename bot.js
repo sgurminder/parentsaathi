@@ -1975,12 +1975,22 @@ app.get('/api/auth/profile', async (req, res) => {
         // Check if teacher is registered for this specific school (case-insensitive)
         const authUserSchool = (authUser?.school || '').toLowerCase();
         const sessionSchool = (session.schoolId || '').toLowerCase();
-        const isTeacherForThisSchool = authUser?.role === 'teacher' && authUserSchool === sessionSchool;
+        const isTeacher = authUser?.role === 'teacher';
+        const schoolsMatch = authUserSchool === sessionSchool;
+        const isTeacherForThisSchool = isTeacher && schoolsMatch;
 
         const role = isTeacherForThisSchool ? 'teacher' : (pwaUser?.role || 'student');
         const teaches = isTeacherForThisSchool ? (authUser?.teaches || []) : [];
 
-        console.log(`[PROFILE] Phone: ${session.phone}, SessionSchool: ${sessionSchool}, AuthUserSchool: ${authUserSchool}, AuthUser: ${JSON.stringify(authUser)}, IsTeacherForSchool: ${isTeacherForThisSchool}, Role: ${role}`);
+        console.log(`[PROFILE] Phone: ${session.phone}`);
+        console.log(`[PROFILE] Session: ${JSON.stringify(session)}`);
+        console.log(`[PROFILE] AuthUser found: ${authUser ? 'YES' : 'NO'}`);
+        if (authUser) {
+            console.log(`[PROFILE] AuthUser.role: "${authUser.role}", AuthUser.school: "${authUser.school}"`);
+        }
+        console.log(`[PROFILE] SessionSchool: "${sessionSchool}", AuthUserSchool: "${authUserSchool}"`);
+        console.log(`[PROFILE] isTeacher: ${isTeacher}, schoolsMatch: ${schoolsMatch}, isTeacherForThisSchool: ${isTeacherForThisSchool}`);
+        console.log(`[PROFILE] Final role: ${role}`);
 
         res.json({
             success: true,
