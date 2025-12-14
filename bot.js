@@ -14,6 +14,8 @@ const multer = require('multer');
 const { memoryStorage } = require('multer');
 const db = require('./db');
 const config = require('./config');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 // =====================================================
 // MULTI-SCHOOL WHITE-LABEL CONFIGURATION
@@ -132,17 +134,20 @@ function getSchoolConfig(req) {
 
 // Get school by ID - checks Redis first, then falls back to hardcoded
 async function getSchoolByIdAsync(schoolId) {
+    // Normalize to lowercase for case-insensitive lookup
+    const normalizedId = schoolId.toLowerCase();
+
     // Try Redis first for dynamic schools
     try {
-        const dynamicSchool = await db.kv.get(`school:${schoolId}`);
+        const dynamicSchool = await db.kv.get(`school:${normalizedId}`);
         if (dynamicSchool) {
-            return { ...dynamicSchool, id: schoolId };
+            return { ...dynamicSchool, id: normalizedId };
         }
     } catch (e) {
         console.log('[SCHOOL] Redis lookup failed, using hardcoded');
     }
     // Fall back to hardcoded schools
-    return demoSchools[schoolId] || demoSchools['vidyamitra'];
+    return demoSchools[normalizedId] || demoSchools['vidyamitra'];
 }
 
 // Sync version for non-async contexts (uses cache or hardcoded)
@@ -5503,14 +5508,20 @@ app.get('/app/sw.js', (req, res) => {
     res.type('application/javascript');
     res.send(`
 // Service Worker for PWA
-const CACHE_NAME = 'vidyamitra-v1';
+const CACHE_NAME = 'vidyamitra-v2';
 
 self.addEventListener('install', (e) => {
     self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
-    e.waitUntil(clients.claim());
+    e.waitUntil(
+        caches.keys().then((names) => {
+            return Promise.all(
+                names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+            );
+        }).then(() => clients.claim())
+    );
 });
 
 self.addEventListener('fetch', (e) => {
@@ -6212,6 +6223,13 @@ app.get('/app', async (req, res) => {
     </div>
 
     <script>
+        // Global error handler
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('[PWA Error]', msg, 'at', url + ':' + line + ':' + col);
+            return false;
+        };
+        console.log('[PWA] Script starting');
+
         const SCHOOL_ID = '${schoolId}';
         const API_BASE = '';
 
@@ -6266,37 +6284,49 @@ app.get('/app', async (req, res) => {
         }
 
         // Login - Send OTP
-        sendOtpBtn.addEventListener('click', async () => {
-            const phone = phoneInput.value.replace(/[^0-9]/g, '');
-            if (phone.length !== 10) {
-                phoneError.textContent = 'Please enter a valid 10-digit number';
-                return;
-            }
-            phoneError.textContent = '';
-            sendOtpBtn.disabled = true;
-            sendOtpBtn.textContent = 'Sending...';
-
-            try {
-                const res = await fetch(API_BASE + '/api/auth/send-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, schoolId: SCHOOL_ID })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    phoneStep.style.display = 'none';
-                    otpStep.style.display = 'block';
-                    displayPhone.textContent = phone;
-                    otpInputs[0].focus();
-                } else {
-                    phoneError.textContent = data.error || 'Failed to send OTP';
+        console.log('[PWA] Setting up sendOtpBtn listener');
+        if (!sendOtpBtn) {
+            console.error('[PWA] sendOtpBtn not found!');
+        } else {
+            sendOtpBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                console.log('[PWA] Send OTP clicked');
+                const phone = phoneInput.value.replace(/[^0-9]/g, '');
+                console.log('[PWA] Phone:', phone);
+                if (phone.length !== 10) {
+                    phoneError.textContent = 'Please enter a valid 10-digit number';
+                    return;
                 }
-            } catch (e) {
-                phoneError.textContent = 'Network error. Please try again.';
-            }
-            sendOtpBtn.disabled = false;
-            sendOtpBtn.textContent = 'Send OTP';
-        });
+                phoneError.textContent = '';
+                sendOtpBtn.disabled = true;
+                sendOtpBtn.textContent = 'Sending...';
+
+                try {
+                    console.log('[PWA] Fetching /api/auth/send-otp');
+                    const res = await fetch('/api/auth/send-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone, schoolId: SCHOOL_ID })
+                    });
+                    console.log('[PWA] Response status:', res.status);
+                    const data = await res.json();
+                    console.log('[PWA] Response data:', data);
+                    if (data.success) {
+                        phoneStep.style.display = 'none';
+                        otpStep.style.display = 'block';
+                        displayPhone.textContent = phone;
+                        otpInputs[0].focus();
+                    } else {
+                        phoneError.textContent = data.error || 'Failed to send OTP';
+                    }
+                } catch (e) {
+                    console.error('[PWA] Error:', e);
+                    phoneError.textContent = 'Network error. Please try again.';
+                }
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.textContent = 'Send OTP';
+            });
+        }
 
         // OTP input handling
         otpInputs.forEach((input, i) => {
@@ -6448,41 +6478,29 @@ app.get('/app', async (req, res) => {
         // Simple markdown parser for chat messages
         function parseMarkdown(text) {
             if (!text) return '';
-            let html = text
-                // Escape HTML first
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-
-            // Bold: **text** or __text__ (must come before italic)
-            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            let html = text;
+            // Escape HTML first
+            html = html.replace(/&/g, '&amp;');
+            html = html.replace(/</g, '&lt;');
+            html = html.replace(/>/g, '&gt;');
+            // Bold (double asterisks or underscores)
+            html = html.replace(/[*][*](.+?)[*][*]/g, '<strong>$1</strong>');
             html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
-
-            // Italic: *text* or _text_
-            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            // Italic (single asterisk or underscore)
+            html = html.replace(/[*]([^*]+)[*]/g, '<em>$1</em>');
             html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
-
-            // Code: \`text\`
-            html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
-
-            // Headers: # ## ###
+            // Code (backticks) - use character class to avoid escape issues
+            html = html.replace(/[\`]([^\`]+)[\`]/g, '<code>$1</code>');
+            // Headers
             html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
             html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
             html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
-
-            // Line breaks (handle actual newlines)
+            // Line breaks
             html = html.replace(/\\n/g, '<br>');
-            html = html.replace(/\n/g, '<br>');
-
             // Bullet points
-            html = html.replace(/^[•\-\*] (.+)$/gm, '<li>$1</li>');
-
+            html = html.replace(/^[•*-] (.+)$/gm, '<li>$1</li>');
             // Numbered lists
-            html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
-
-            // Wrap consecutive li elements in ul
-            html = html.replace(/(<li>.*?<\/li>)(\s*<br>\s*)?(<li>)/g, '$1$3');
-
+            html = html.replace(/^([0-9]+)[.] (.+)$/gm, '<li>$2</li>');
             return html;
         }
 
@@ -6523,6 +6541,2210 @@ app.get('/app', async (req, res) => {
                 }
             } catch (e) {}
         }
+    </script>
+</body>
+</html>`);
+});
+
+// =====================================================
+// SCHOOL ADMIN MANAGEMENT SYSTEM
+// =====================================================
+
+// Helper: Generate secure session token
+function generateSessionToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+// Helper: Verify admin session and return admin info
+async function verifyAdminSession(req) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return null;
+    }
+    const token = authHeader.substring(7);
+    try {
+        const session = await db.kv.get(`admin:session:${token}`);
+        if (!session || session.expires < Date.now()) {
+            return null;
+        }
+        return session;
+    } catch (e) {
+        console.error('[ADMIN] Session verification error:', e);
+        return null;
+    }
+}
+
+// Admin middleware for protected routes
+async function requireAdmin(req, res, next) {
+    const admin = await verifyAdminSession(req);
+    if (!admin) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    req.admin = admin;
+    next();
+}
+
+// =====================================================
+// ADMIN AUTH ENDPOINTS
+// =====================================================
+
+// POST /api/admin/login - Admin login
+app.post('/api/admin/login', async (req, res) => {
+    try {
+        const { username, password, schoolId } = req.body;
+
+        if (!username || !password) {
+            return res.status(400).json({ success: false, error: 'Username and password required' });
+        }
+
+        // Get admin record
+        const normalizedSchoolId = (schoolId || 'vidyamitra').toLowerCase();
+        const adminKey = `school:admin:${normalizedSchoolId}`;
+        const adminRecord = await db.kv.get(adminKey);
+
+        if (!adminRecord) {
+            console.log(`[ADMIN] No admin found for school: ${normalizedSchoolId}`);
+            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+
+        // Check username
+        if (adminRecord.username !== username) {
+            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+
+        // Verify password
+        const validPassword = await bcrypt.compare(password, adminRecord.passwordHash);
+        if (!validPassword) {
+            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+
+        // Generate session token
+        const token = generateSessionToken();
+        const session = {
+            schoolId: normalizedSchoolId,
+            username: adminRecord.username,
+            email: adminRecord.email,
+            expires: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+        };
+
+        await db.kv.set(`admin:session:${token}`, session, { ex: 86400 }); // 24hr TTL
+
+        // Get school info
+        const school = await getSchoolByIdAsync(normalizedSchoolId);
+
+        console.log(`[ADMIN] Login successful: ${username} @ ${normalizedSchoolId}`);
+
+        res.json({
+            success: true,
+            token,
+            admin: {
+                username: adminRecord.username,
+                email: adminRecord.email,
+                schoolId: normalizedSchoolId
+            },
+            school: {
+                id: school.id,
+                name: school.name,
+                shortName: school.shortName,
+                primaryColor: school.primaryColor
+            }
+        });
+    } catch (error) {
+        console.error('[ADMIN] Login error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/admin/logout - Admin logout
+app.post('/api/admin/logout', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+            await db.kv.del(`admin:session:${token}`);
+        } catch (e) {}
+    }
+    res.json({ success: true });
+});
+
+// GET /api/admin/me - Get current admin info
+app.get('/api/admin/me', requireAdmin, async (req, res) => {
+    const school = await getSchoolByIdAsync(req.admin.schoolId);
+    res.json({
+        success: true,
+        admin: {
+            username: req.admin.username,
+            email: req.admin.email,
+            schoolId: req.admin.schoolId
+        },
+        school: {
+            id: school.id,
+            name: school.name,
+            shortName: school.shortName,
+            primaryColor: school.primaryColor
+        }
+    });
+});
+
+// POST /api/admin/setup - Initialize admin for a school (one-time setup)
+app.post('/api/admin/setup', async (req, res) => {
+    try {
+        const { schoolId, username, password, email, setupKey } = req.body;
+
+        // Require setup key for security (set in environment)
+        const validSetupKey = process.env.ADMIN_SETUP_KEY || 'vidyamitra2024setup';
+        if (setupKey !== validSetupKey) {
+            return res.status(403).json({ success: false, error: 'Invalid setup key' });
+        }
+
+        const normalizedSchoolId = schoolId.toLowerCase();
+        const adminKey = `school:admin:${normalizedSchoolId}`;
+
+        // Check if admin already exists
+        const existing = await db.kv.get(adminKey);
+        if (existing) {
+            return res.status(400).json({ success: false, error: 'Admin already exists for this school' });
+        }
+
+        // Hash password
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Create admin record
+        const adminRecord = {
+            username,
+            passwordHash,
+            email,
+            schoolId: normalizedSchoolId,
+            createdAt: Date.now()
+        };
+
+        await db.kv.set(adminKey, adminRecord);
+
+        console.log(`[ADMIN] Created admin for school: ${normalizedSchoolId}`);
+
+        res.json({ success: true, message: 'Admin created successfully' });
+    } catch (error) {
+        console.error('[ADMIN] Setup error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
+// TEACHER MANAGEMENT ENDPOINTS
+// =====================================================
+
+// GET /api/admin/teachers - List all teachers
+app.get('/api/admin/teachers', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const teacherIds = await db.kv.get(`school:${schoolId}:teachers`) || [];
+
+        const teachers = [];
+        for (const teacherId of teacherIds) {
+            const teacher = await db.kv.get(`school:${schoolId}:teacher:${teacherId}`);
+            if (teacher) {
+                teachers.push(teacher);
+            }
+        }
+
+        res.json({ success: true, teachers });
+    } catch (error) {
+        console.error('[ADMIN] Get teachers error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/admin/teachers - Add a teacher
+app.post('/api/admin/teachers', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const { name, email, phone, subjects, classes } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ success: false, error: 'Name is required' });
+        }
+
+        // Generate teacher ID
+        const teacherId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+        const teacher = {
+            id: teacherId,
+            name,
+            email: email || '',
+            phone: phone || '',
+            subjects: Array.isArray(subjects) ? subjects : (subjects ? subjects.split(',').map(s => s.trim()) : []),
+            classes: Array.isArray(classes) ? classes : (classes ? classes.split(',').map(c => c.trim()) : []),
+            createdAt: Date.now(),
+            createdBy: req.admin.username
+        };
+
+        // Save teacher
+        await db.kv.set(`school:${schoolId}:teacher:${teacherId}`, teacher);
+
+        // Add to teacher list
+        const teacherIds = await db.kv.get(`school:${schoolId}:teachers`) || [];
+        teacherIds.push(teacherId);
+        await db.kv.set(`school:${schoolId}:teachers`, teacherIds);
+
+        console.log(`[ADMIN] Added teacher: ${name} @ ${schoolId}`);
+
+        res.json({ success: true, teacher });
+    } catch (error) {
+        console.error('[ADMIN] Add teacher error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// PUT /api/admin/teachers/:id - Update a teacher
+app.put('/api/admin/teachers/:id', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const teacherId = req.params.id;
+        const { name, email, phone, subjects, classes } = req.body;
+
+        const existing = await db.kv.get(`school:${schoolId}:teacher:${teacherId}`);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'Teacher not found' });
+        }
+
+        const updated = {
+            ...existing,
+            name: name || existing.name,
+            email: email !== undefined ? email : existing.email,
+            phone: phone !== undefined ? phone : existing.phone,
+            subjects: subjects !== undefined ? (Array.isArray(subjects) ? subjects : subjects.split(',').map(s => s.trim())) : existing.subjects,
+            classes: classes !== undefined ? (Array.isArray(classes) ? classes : classes.split(',').map(c => c.trim())) : existing.classes,
+            updatedAt: Date.now()
+        };
+
+        await db.kv.set(`school:${schoolId}:teacher:${teacherId}`, updated);
+
+        res.json({ success: true, teacher: updated });
+    } catch (error) {
+        console.error('[ADMIN] Update teacher error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// DELETE /api/admin/teachers/:id - Delete a teacher
+app.delete('/api/admin/teachers/:id', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const teacherId = req.params.id;
+
+        // Delete teacher record
+        await db.kv.del(`school:${schoolId}:teacher:${teacherId}`);
+
+        // Remove from teacher list
+        const teacherIds = await db.kv.get(`school:${schoolId}:teachers`) || [];
+        const filtered = teacherIds.filter(id => id !== teacherId);
+        await db.kv.set(`school:${schoolId}:teachers`, filtered);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[ADMIN] Delete teacher error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/admin/teachers/import - Bulk import teachers from CSV
+app.post('/api/admin/teachers/import', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const { teachers: teachersData } = req.body;
+
+        if (!Array.isArray(teachersData) || teachersData.length === 0) {
+            return res.status(400).json({ success: false, error: 'No teachers data provided' });
+        }
+
+        const added = [];
+        const errors = [];
+        const teacherIds = await db.kv.get(`school:${schoolId}:teachers`) || [];
+
+        for (let i = 0; i < teachersData.length; i++) {
+            const row = teachersData[i];
+            if (!row.name) {
+                errors.push({ row: i + 1, error: 'Name is required' });
+                continue;
+            }
+
+            const teacherId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+            const teacher = {
+                id: teacherId,
+                name: row.name,
+                email: row.email || '',
+                phone: row.phone || '',
+                subjects: row.subjects ? row.subjects.split(',').map(s => s.trim()) : [],
+                classes: row.classes ? row.classes.split(',').map(c => c.trim()) : [],
+                createdAt: Date.now(),
+                createdBy: req.admin.username
+            };
+
+            await db.kv.set(`school:${schoolId}:teacher:${teacherId}`, teacher);
+            teacherIds.push(teacherId);
+            added.push(teacher);
+        }
+
+        await db.kv.set(`school:${schoolId}:teachers`, teacherIds);
+
+        console.log(`[ADMIN] Imported ${added.length} teachers @ ${schoolId}`);
+
+        res.json({ success: true, added: added.length, errors });
+    } catch (error) {
+        console.error('[ADMIN] Import teachers error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
+// STUDENT MANAGEMENT ENDPOINTS
+// =====================================================
+
+// GET /api/admin/students - List students with optional filters
+app.get('/api/admin/students', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const { class: classFilter, section, search } = req.query;
+
+        const studentIds = await db.kv.get(`school:${schoolId}:students`) || [];
+
+        let students = [];
+        for (const studentId of studentIds) {
+            const student = await db.kv.get(`school:${schoolId}:student:${studentId}`);
+            if (student) {
+                // Apply filters
+                if (classFilter && student.class !== classFilter) continue;
+                if (section && student.section !== section) continue;
+                if (search) {
+                    const searchLower = search.toLowerCase();
+                    if (!student.name.toLowerCase().includes(searchLower) &&
+                        !student.phone.includes(search)) continue;
+                }
+                students.push(student);
+            }
+        }
+
+        // Sort by class, section, rollNo
+        students.sort((a, b) => {
+            if (a.class !== b.class) return String(a.class).localeCompare(String(b.class));
+            if (a.section !== b.section) return a.section.localeCompare(b.section);
+            return (a.rollNo || 0) - (b.rollNo || 0);
+        });
+
+        res.json({ success: true, students, total: students.length });
+    } catch (error) {
+        console.error('[ADMIN] Get students error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/admin/students - Add a student
+app.post('/api/admin/students', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const { name, phone, class: studentClass, section, rollNo, parentPhone } = req.body;
+
+        if (!name || !studentClass) {
+            return res.status(400).json({ success: false, error: 'Name and class are required' });
+        }
+
+        // Generate student ID
+        const studentId = `s_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+        const student = {
+            id: studentId,
+            name,
+            phone: phone || '',
+            class: studentClass,
+            section: section || 'A',
+            rollNo: rollNo || null,
+            parentPhone: parentPhone || '',
+            createdAt: Date.now(),
+            createdBy: req.admin.username
+        };
+
+        // Save student
+        await db.kv.set(`school:${schoolId}:student:${studentId}`, student);
+
+        // Add phone lookup if provided
+        if (phone) {
+            await db.kv.set(`school:${schoolId}:student:phone:${phone}`, studentId);
+        }
+
+        // Add to student list
+        const studentIds = await db.kv.get(`school:${schoolId}:students`) || [];
+        studentIds.push(studentId);
+        await db.kv.set(`school:${schoolId}:students`, studentIds);
+
+        console.log(`[ADMIN] Added student: ${name} @ ${schoolId}`);
+
+        res.json({ success: true, student });
+    } catch (error) {
+        console.error('[ADMIN] Add student error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// PUT /api/admin/students/:id - Update a student
+app.put('/api/admin/students/:id', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const studentId = req.params.id;
+        const { name, phone, class: studentClass, section, rollNo, parentPhone } = req.body;
+
+        const existing = await db.kv.get(`school:${schoolId}:student:${studentId}`);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'Student not found' });
+        }
+
+        // Update phone lookup if changed
+        if (phone !== existing.phone) {
+            if (existing.phone) {
+                await db.kv.del(`school:${schoolId}:student:phone:${existing.phone}`);
+            }
+            if (phone) {
+                await db.kv.set(`school:${schoolId}:student:phone:${phone}`, studentId);
+            }
+        }
+
+        const updated = {
+            ...existing,
+            name: name || existing.name,
+            phone: phone !== undefined ? phone : existing.phone,
+            class: studentClass || existing.class,
+            section: section !== undefined ? section : existing.section,
+            rollNo: rollNo !== undefined ? rollNo : existing.rollNo,
+            parentPhone: parentPhone !== undefined ? parentPhone : existing.parentPhone,
+            updatedAt: Date.now()
+        };
+
+        await db.kv.set(`school:${schoolId}:student:${studentId}`, updated);
+
+        res.json({ success: true, student: updated });
+    } catch (error) {
+        console.error('[ADMIN] Update student error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// DELETE /api/admin/students/:id - Delete a student
+app.delete('/api/admin/students/:id', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const studentId = req.params.id;
+
+        const existing = await db.kv.get(`school:${schoolId}:student:${studentId}`);
+
+        // Delete student record
+        await db.kv.del(`school:${schoolId}:student:${studentId}`);
+
+        // Delete phone lookup
+        if (existing && existing.phone) {
+            await db.kv.del(`school:${schoolId}:student:phone:${existing.phone}`);
+        }
+
+        // Remove from student list
+        const studentIds = await db.kv.get(`school:${schoolId}:students`) || [];
+        const filtered = studentIds.filter(id => id !== studentId);
+        await db.kv.set(`school:${schoolId}:students`, filtered);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[ADMIN] Delete student error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/admin/students/import - Bulk import students from CSV
+app.post('/api/admin/students/import', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const { students: studentsData } = req.body;
+
+        if (!Array.isArray(studentsData) || studentsData.length === 0) {
+            return res.status(400).json({ success: false, error: 'No students data provided' });
+        }
+
+        const added = [];
+        const errors = [];
+        const studentIds = await db.kv.get(`school:${schoolId}:students`) || [];
+
+        for (let i = 0; i < studentsData.length; i++) {
+            const row = studentsData[i];
+            if (!row.name || !row.class) {
+                errors.push({ row: i + 1, error: 'Name and class are required' });
+                continue;
+            }
+
+            const studentId = `s_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+            const student = {
+                id: studentId,
+                name: row.name,
+                phone: row.phone || '',
+                class: row.class,
+                section: row.section || 'A',
+                rollNo: row.rollNo || null,
+                parentPhone: row.parentPhone || '',
+                createdAt: Date.now(),
+                createdBy: req.admin.username
+            };
+
+            await db.kv.set(`school:${schoolId}:student:${studentId}`, student);
+
+            if (row.phone) {
+                await db.kv.set(`school:${schoolId}:student:phone:${row.phone}`, studentId);
+            }
+
+            studentIds.push(studentId);
+            added.push(student);
+        }
+
+        await db.kv.set(`school:${schoolId}:students`, studentIds);
+
+        console.log(`[ADMIN] Imported ${added.length} students @ ${schoolId}`);
+
+        res.json({ success: true, added: added.length, errors });
+    } catch (error) {
+        console.error('[ADMIN] Import students error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// GET /api/admin/students/export - Export students as CSV data
+app.get('/api/admin/students/export', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const studentIds = await db.kv.get(`school:${schoolId}:students`) || [];
+
+        const students = [];
+        for (const studentId of studentIds) {
+            const student = await db.kv.get(`school:${schoolId}:student:${studentId}`);
+            if (student) {
+                students.push({
+                    name: student.name,
+                    phone: student.phone,
+                    class: student.class,
+                    section: student.section,
+                    rollNo: student.rollNo || '',
+                    parentPhone: student.parentPhone
+                });
+            }
+        }
+
+        res.json({ success: true, students });
+    } catch (error) {
+        console.error('[ADMIN] Export students error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
+// TEACHING METHODS (PER-TEACHER) ENDPOINTS
+// =====================================================
+
+// GET /api/admin/teachers/:teacherId/methods - Get methods for a teacher
+app.get('/api/admin/teachers/:teacherId/methods', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const teacherId = req.params.teacherId;
+
+        const methodIds = await db.kv.get(`school:${schoolId}:teacher:${teacherId}:methods`) || [];
+
+        const methods = [];
+        for (const methodId of methodIds) {
+            const method = await db.kv.get(`method:${methodId}`);
+            if (method) {
+                methods.push(method);
+            }
+        }
+
+        res.json({ success: true, methods });
+    } catch (error) {
+        console.error('[ADMIN] Get methods error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/admin/teachers/:teacherId/methods - Add method for a teacher
+app.post('/api/admin/teachers/:teacherId/methods', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const teacherId = req.params.teacherId;
+        const { subject, class: methodClass, chapter, content, tips, examples } = req.body;
+
+        if (!subject || !methodClass || !chapter) {
+            return res.status(400).json({ success: false, error: 'Subject, class, and chapter are required' });
+        }
+
+        // Verify teacher exists
+        const teacher = await db.kv.get(`school:${schoolId}:teacher:${teacherId}`);
+        if (!teacher) {
+            return res.status(404).json({ success: false, error: 'Teacher not found' });
+        }
+
+        const methodId = `m_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+        const method = {
+            id: methodId,
+            teacherId,
+            teacherName: teacher.name,
+            schoolId,
+            subject,
+            class: methodClass,
+            chapter,
+            content: content || '',
+            tips: tips || '',
+            examples: examples || '',
+            createdAt: Date.now(),
+            createdBy: req.admin.username
+        };
+
+        // Save method
+        await db.kv.set(`method:${methodId}`, method);
+
+        // Add to teacher's methods list
+        const methodIds = await db.kv.get(`school:${schoolId}:teacher:${teacherId}:methods`) || [];
+        methodIds.push(methodId);
+        await db.kv.set(`school:${schoolId}:teacher:${teacherId}:methods`, methodIds);
+
+        // Also add to school-wide methods index for AI lookup
+        const schoolMethodKey = `school:${schoolId}:method:${subject.toLowerCase()}:${methodClass}:${chapter.toLowerCase().replace(/\s+/g, '_')}`;
+        await db.kv.set(schoolMethodKey, method);
+
+        console.log(`[ADMIN] Added method: ${subject}/${chapter} by ${teacher.name}`);
+
+        res.json({ success: true, method });
+    } catch (error) {
+        console.error('[ADMIN] Add method error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// PUT /api/admin/methods/:id - Update a method
+app.put('/api/admin/methods/:id', requireAdmin, async (req, res) => {
+    try {
+        const methodId = req.params.id;
+        const { subject, class: methodClass, chapter, content, tips, examples } = req.body;
+
+        const existing = await db.kv.get(`method:${methodId}`);
+        if (!existing || existing.schoolId !== req.admin.schoolId) {
+            return res.status(404).json({ success: false, error: 'Method not found' });
+        }
+
+        const updated = {
+            ...existing,
+            subject: subject || existing.subject,
+            class: methodClass || existing.class,
+            chapter: chapter || existing.chapter,
+            content: content !== undefined ? content : existing.content,
+            tips: tips !== undefined ? tips : existing.tips,
+            examples: examples !== undefined ? examples : existing.examples,
+            updatedAt: Date.now()
+        };
+
+        await db.kv.set(`method:${methodId}`, updated);
+
+        // Update school-wide index
+        const schoolMethodKey = `school:${req.admin.schoolId}:method:${updated.subject.toLowerCase()}:${updated.class}:${updated.chapter.toLowerCase().replace(/\s+/g, '_')}`;
+        await db.kv.set(schoolMethodKey, updated);
+
+        res.json({ success: true, method: updated });
+    } catch (error) {
+        console.error('[ADMIN] Update method error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// DELETE /api/admin/methods/:id - Delete a method
+app.delete('/api/admin/methods/:id', requireAdmin, async (req, res) => {
+    try {
+        const methodId = req.params.id;
+
+        const existing = await db.kv.get(`method:${methodId}`);
+        if (!existing || existing.schoolId !== req.admin.schoolId) {
+            return res.status(404).json({ success: false, error: 'Method not found' });
+        }
+
+        // Delete method
+        await db.kv.del(`method:${methodId}`);
+
+        // Remove from teacher's methods list
+        const methodIds = await db.kv.get(`school:${req.admin.schoolId}:teacher:${existing.teacherId}:methods`) || [];
+        const filtered = methodIds.filter(id => id !== methodId);
+        await db.kv.set(`school:${req.admin.schoolId}:teacher:${existing.teacherId}:methods`, filtered);
+
+        // Delete school-wide index
+        const schoolMethodKey = `school:${req.admin.schoolId}:method:${existing.subject.toLowerCase()}:${existing.class}:${existing.chapter.toLowerCase().replace(/\s+/g, '_')}`;
+        await db.kv.del(schoolMethodKey);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[ADMIN] Delete method error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
+// ASSESSMENTS MANAGEMENT ENDPOINTS
+// =====================================================
+
+// GET /api/admin/assessments - List all assessments
+app.get('/api/admin/assessments', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const assessmentIds = await db.kv.get(`school:${schoolId}:assessments`) || [];
+
+        const assessments = [];
+        for (const assessmentId of assessmentIds) {
+            const assessment = await db.kv.get(`assessment:${assessmentId}`);
+            if (assessment) {
+                assessments.push({
+                    ...assessment,
+                    questionCount: assessment.questions ? assessment.questions.length : 0
+                });
+            }
+        }
+
+        res.json({ success: true, assessments });
+    } catch (error) {
+        console.error('[ADMIN] Get assessments error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/admin/assessments - Create an assessment
+app.post('/api/admin/assessments', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+        const { title, subject, class: assessmentClass, duration, questions } = req.body;
+
+        if (!title || !subject) {
+            return res.status(400).json({ success: false, error: 'Title and subject are required' });
+        }
+
+        const assessmentId = `a_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+        const assessment = {
+            id: assessmentId,
+            schoolId,
+            title,
+            subject,
+            class: assessmentClass || '',
+            duration: duration || 30,
+            questions: questions || [],
+            createdAt: Date.now(),
+            createdBy: req.admin.username
+        };
+
+        await db.kv.set(`assessment:${assessmentId}`, assessment);
+
+        const assessmentIds = await db.kv.get(`school:${schoolId}:assessments`) || [];
+        assessmentIds.push(assessmentId);
+        await db.kv.set(`school:${schoolId}:assessments`, assessmentIds);
+
+        console.log(`[ADMIN] Created assessment: ${title} @ ${schoolId}`);
+
+        res.json({ success: true, assessment });
+    } catch (error) {
+        console.error('[ADMIN] Create assessment error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// GET /api/admin/assessments/:id - Get assessment details
+app.get('/api/admin/assessments/:id', requireAdmin, async (req, res) => {
+    try {
+        const assessment = await db.kv.get(`assessment:${req.params.id}`);
+        if (!assessment || assessment.schoolId !== req.admin.schoolId) {
+            return res.status(404).json({ success: false, error: 'Assessment not found' });
+        }
+        res.json({ success: true, assessment });
+    } catch (error) {
+        console.error('[ADMIN] Get assessment error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// PUT /api/admin/assessments/:id - Update an assessment
+app.put('/api/admin/assessments/:id', requireAdmin, async (req, res) => {
+    try {
+        const assessmentId = req.params.id;
+        const { title, subject, class: assessmentClass, duration, questions } = req.body;
+
+        const existing = await db.kv.get(`assessment:${assessmentId}`);
+        if (!existing || existing.schoolId !== req.admin.schoolId) {
+            return res.status(404).json({ success: false, error: 'Assessment not found' });
+        }
+
+        const updated = {
+            ...existing,
+            title: title || existing.title,
+            subject: subject || existing.subject,
+            class: assessmentClass !== undefined ? assessmentClass : existing.class,
+            duration: duration !== undefined ? duration : existing.duration,
+            questions: questions !== undefined ? questions : existing.questions,
+            updatedAt: Date.now()
+        };
+
+        await db.kv.set(`assessment:${assessmentId}`, updated);
+
+        res.json({ success: true, assessment: updated });
+    } catch (error) {
+        console.error('[ADMIN] Update assessment error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// DELETE /api/admin/assessments/:id - Delete an assessment
+app.delete('/api/admin/assessments/:id', requireAdmin, async (req, res) => {
+    try {
+        const assessmentId = req.params.id;
+
+        const existing = await db.kv.get(`assessment:${assessmentId}`);
+        if (!existing || existing.schoolId !== req.admin.schoolId) {
+            return res.status(404).json({ success: false, error: 'Assessment not found' });
+        }
+
+        await db.kv.del(`assessment:${assessmentId}`);
+
+        const assessmentIds = await db.kv.get(`school:${req.admin.schoolId}:assessments`) || [];
+        const filtered = assessmentIds.filter(id => id !== assessmentId);
+        await db.kv.set(`school:${req.admin.schoolId}:assessments`, filtered);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[ADMIN] Delete assessment error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// GET /api/admin/stats - Get dashboard statistics
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+    try {
+        const schoolId = req.admin.schoolId;
+
+        const teacherIds = await db.kv.get(`school:${schoolId}:teachers`) || [];
+        const studentIds = await db.kv.get(`school:${schoolId}:students`) || [];
+        const assessmentIds = await db.kv.get(`school:${schoolId}:assessments`) || [];
+
+        // Count methods across all teachers
+        let methodCount = 0;
+        for (const teacherId of teacherIds) {
+            const methodIds = await db.kv.get(`school:${schoolId}:teacher:${teacherId}:methods`) || [];
+            methodCount += methodIds.length;
+        }
+
+        res.json({
+            success: true,
+            stats: {
+                teachers: teacherIds.length,
+                students: studentIds.length,
+                assessments: assessmentIds.length,
+                methods: methodCount
+            }
+        });
+    } catch (error) {
+        console.error('[ADMIN] Get stats error:', error);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
+// SCHOOL ADMIN DASHBOARD UI
+// =====================================================
+
+app.get('/school-admin', async (req, res) => {
+    const schoolId = req.query.school || 'vidyamitra';
+    const school = await getSchoolByIdAsync(schoolId);
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${school.shortName || school.name} Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+
+        /* Login Page */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, ${school.gradientFrom || school.primaryColor} 0%, ${school.gradientTo || school.primaryColor} 100%);
+        }
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-card h1 {
+            text-align: center;
+            color: ${school.primaryColor};
+            margin-bottom: 8px;
+        }
+        .login-card p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: ${school.primaryColor};
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: ${school.primaryColor};
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 14px;
+            width: auto;
+        }
+        .error-msg {
+            background: #fee;
+            color: #c00;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        /* Dashboard Layout */
+        .dashboard { display: none; }
+        .dashboard.active { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 250px;
+            background: ${school.primaryColor};
+            color: white;
+            padding: 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .sidebar-logo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .sidebar-subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: background 0.2s;
+        }
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background: rgba(255,255,255,0.2);
+        }
+        .sidebar-nav a span { font-size: 20px; }
+        .main-content {
+            flex: 1;
+            margin-left: 250px;
+            padding: 30px;
+        }
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .content-header h2 {
+            font-size: 28px;
+            color: #333;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .stat-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: bold;
+            color: ${school.primaryColor};
+        }
+
+        /* Tables */
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .table-header h3 {
+            font-size: 18px;
+            color: #333;
+        }
+        .table-actions {
+            display: flex;
+            gap: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 16px 20px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: #f9f9f9;
+            font-weight: 600;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        td {
+            color: #333;
+        }
+        tr:hover {
+            background: #f9f9f9;
+        }
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+        .action-btns button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .edit-btn { background: #e3f2fd; color: #1976d2; }
+        .delete-btn { background: #ffebee; color: #c62828; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .modal-header h3 {
+            font-size: 20px;
+            color: #333;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filters input, .filters select {
+            padding: 10px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        /* Section visibility */
+        .section { display: none; }
+        .section.active { display: block; }
+
+        /* Teacher methods expansion */
+        .teacher-methods-card {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .teacher-methods-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            cursor: pointer;
+            background: #f9f9f9;
+        }
+        .teacher-methods-header:hover {
+            background: #f0f0f0;
+        }
+        .teacher-methods-content {
+            display: none;
+            padding: 20px;
+        }
+        .teacher-methods-content.active {
+            display: block;
+        }
+        .method-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .method-info h4 {
+            font-size: 14px;
+            color: #333;
+        }
+        .method-info p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            display: none;
+            z-index: 2000;
+        }
+        .toast.success { background: #4caf50; }
+        .toast.error { background: #f44336; }
+        .toast.active { display: block; }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: ${school.primaryColor}20;
+            color: ${school.primaryColor};
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .dashboard.active {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Page -->
+    <div class="login-container" id="loginPage">
+        <div class="login-card">
+            <h1>${school.logoEmoji || '🎓'} ${school.shortName || school.name}</h1>
+            <p>School Admin Portal</p>
+            <div class="error-msg" id="loginError"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="username" required placeholder="Enter username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <div class="sidebar">
+            <div class="sidebar-logo">${school.logoEmoji || '🎓'} ${school.shortName || school.name}</div>
+            <div class="sidebar-subtitle">Admin Dashboard</div>
+            <nav class="sidebar-nav">
+                <a href="#" data-section="home" class="active"><span>🏠</span> Dashboard</a>
+                <a href="#" data-section="teachers"><span>👩‍🏫</span> Teachers</a>
+                <a href="#" data-section="students"><span>👨‍🎓</span> Students</a>
+                <a href="#" data-section="methods"><span>📚</span> Teaching Methods</a>
+                <a href="#" data-section="assessments"><span>📝</span> Assessments</a>
+                <a href="#" id="logoutBtn"><span>🚪</span> Logout</a>
+            </nav>
+        </div>
+
+        <div class="main-content">
+            <!-- Home Section -->
+            <div class="section active" id="section-home">
+                <div class="content-header">
+                    <h2>Dashboard</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Teachers</h3>
+                        <div class="value" id="stat-teachers">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Students</h3>
+                        <div class="value" id="stat-students">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Teaching Methods</h3>
+                        <div class="value" id="stat-methods">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Assessments</h3>
+                        <div class="value" id="stat-assessments">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Teachers Section -->
+            <div class="section" id="section-teachers">
+                <div class="content-header">
+                    <h2>Teachers</h2>
+                    <div class="table-actions">
+                        <button class="btn btn-sm" onclick="showAddTeacherModal()">+ Add Teacher</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showImportTeachersModal()">📥 Import CSV</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Subjects</th>
+                                <th>Classes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teachersTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Students Section -->
+            <div class="section" id="section-students">
+                <div class="content-header">
+                    <h2>Students</h2>
+                    <div class="table-actions">
+                        <button class="btn btn-sm" onclick="showAddStudentModal()">+ Add Student</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showImportStudentsModal()">📥 Import CSV</button>
+                        <button class="btn btn-sm btn-secondary" onclick="exportStudents()">📤 Export CSV</button>
+                    </div>
+                </div>
+                <div class="filters">
+                    <input type="text" id="studentSearch" placeholder="Search by name or phone..." oninput="loadStudents()">
+                    <select id="studentClassFilter" onchange="loadStudents()">
+                        <option value="">All Classes</option>
+                        ${(school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join('')}
+                    </select>
+                    <select id="studentSectionFilter" onchange="loadStudents()">
+                        <option value="">All Sections</option>
+                        ${(school.sections || ['A','B','C','D']).map(s => '<option value="' + s + '">' + s + '</option>').join('')}
+                    </select>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Class</th>
+                                <th>Section</th>
+                                <th>Roll No</th>
+                                <th>Phone</th>
+                                <th>Parent Phone</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentsTable"></tbody>
+                    </table>
+                </div>
+                <div id="studentCount" style="padding: 16px; color: #666;"></div>
+            </div>
+
+            <!-- Methods Section -->
+            <div class="section" id="section-methods">
+                <div class="content-header">
+                    <h2>Teaching Methods</h2>
+                </div>
+                <div id="methodsContainer"></div>
+            </div>
+
+            <!-- Assessments Section -->
+            <div class="section" id="section-assessments">
+                <div class="content-header">
+                    <h2>Assessments</h2>
+                    <button class="btn btn-sm" onclick="showAddAssessmentModal()">+ Create Assessment</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Subject</th>
+                                <th>Class</th>
+                                <th>Questions</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assessmentsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add Teacher</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer" id="modalFooter"></div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const schoolId = '${schoolId}';
+        let authToken = localStorage.getItem('adminToken_' + schoolId);
+        let currentTeachers = [];
+        let currentStudents = [];
+        let editingId = null;
+
+        // Check if already logged in
+        if (authToken) {
+            checkAuth();
+        }
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/me', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                if (res.ok) {
+                    showDashboard();
+                } else {
+                    localStorage.removeItem('adminToken_' + schoolId);
+                    authToken = null;
+                }
+            } catch (e) {
+                localStorage.removeItem('adminToken_' + schoolId);
+                authToken = null;
+            }
+        }
+
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('loginError');
+
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, schoolId })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    authToken = data.token;
+                    localStorage.setItem('adminToken_' + schoolId, authToken);
+                    showDashboard();
+                } else {
+                    errorEl.textContent = data.error || 'Login failed';
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.style.display = 'block';
+            }
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/admin/logout', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            localStorage.removeItem('adminToken_' + schoolId);
+            authToken = null;
+            location.reload();
+        });
+
+        // Show dashboard
+        function showDashboard() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+            loadStats();
+            loadTeachers();
+        }
+
+        // Navigation
+        document.querySelectorAll('.sidebar-nav a[data-section]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = e.currentTarget.dataset.section;
+
+                document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+                document.getElementById('section-' + section).classList.add('active');
+
+                if (section === 'teachers') loadTeachers();
+                if (section === 'students') loadStudents();
+                if (section === 'methods') loadMethods();
+                if (section === 'assessments') loadAssessments();
+                if (section === 'home') loadStats();
+            });
+        });
+
+        // API helper
+        async function api(endpoint, options = {}) {
+            const res = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + authToken,
+                    ...options.headers
+                }
+            });
+            return res.json();
+        }
+
+        // Load stats
+        async function loadStats() {
+            const data = await api('/api/admin/stats');
+            if (data.success) {
+                document.getElementById('stat-teachers').textContent = data.stats.teachers;
+                document.getElementById('stat-students').textContent = data.stats.students;
+                document.getElementById('stat-methods').textContent = data.stats.methods;
+                document.getElementById('stat-assessments').textContent = data.stats.assessments;
+            }
+        }
+
+        // Teachers
+        async function loadTeachers() {
+            const data = await api('/api/admin/teachers');
+            if (data.success) {
+                currentTeachers = data.teachers;
+                const tbody = document.getElementById('teachersTable');
+                tbody.innerHTML = data.teachers.map(t =>
+                    '<tr>' +
+                    '<td>' + t.name + '</td>' +
+                    '<td>' + (t.email || '-') + '</td>' +
+                    '<td>' + (t.phone || '-') + '</td>' +
+                    '<td>' + (t.subjects || []).join(', ') + '</td>' +
+                    '<td>' + (t.classes || []).join(', ') + '</td>' +
+                    '<td class="action-btns">' +
+                        '<button class="edit-btn" onclick="editTeacher(\\'' + t.id + '\\')">Edit</button>' +
+                        '<button class="delete-btn" onclick="deleteTeacher(\\'' + t.id + '\\')">Delete</button>' +
+                    '</td>' +
+                    '</tr>'
+                ).join('');
+            }
+        }
+
+        function showAddTeacherModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Add Teacher';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group"><label>Name *</label><input type="text" id="teacherName" required></div>' +
+                '<div class="form-group"><label>Email</label><input type="email" id="teacherEmail"></div>' +
+                '<div class="form-group"><label>Phone</label><input type="tel" id="teacherPhone"></div>' +
+                '<div class="form-group"><label>Subjects (comma-separated)</label><input type="text" id="teacherSubjects" placeholder="Math, Science"></div>' +
+                '<div class="form-group"><label>Classes (comma-separated)</label><input type="text" id="teacherClasses" placeholder="9, 10"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveTeacher()">Save</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function editTeacher(id) {
+            const teacher = currentTeachers.find(t => t.id === id);
+            if (!teacher) return;
+
+            editingId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Teacher';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group"><label>Name *</label><input type="text" id="teacherName" value="' + teacher.name + '" required></div>' +
+                '<div class="form-group"><label>Email</label><input type="email" id="teacherEmail" value="' + (teacher.email || '') + '"></div>' +
+                '<div class="form-group"><label>Phone</label><input type="tel" id="teacherPhone" value="' + (teacher.phone || '') + '"></div>' +
+                '<div class="form-group"><label>Subjects</label><input type="text" id="teacherSubjects" value="' + (teacher.subjects || []).join(', ') + '"></div>' +
+                '<div class="form-group"><label>Classes</label><input type="text" id="teacherClasses" value="' + (teacher.classes || []).join(', ') + '"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveTeacher()">Update</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        async function saveTeacher() {
+            const payload = {
+                name: document.getElementById('teacherName').value,
+                email: document.getElementById('teacherEmail').value,
+                phone: document.getElementById('teacherPhone').value,
+                subjects: document.getElementById('teacherSubjects').value,
+                classes: document.getElementById('teacherClasses').value
+            };
+
+            if (!payload.name) {
+                showToast('Name is required', 'error');
+                return;
+            }
+
+            const url = editingId ? '/api/admin/teachers/' + editingId : '/api/admin/teachers';
+            const method = editingId ? 'PUT' : 'POST';
+
+            const data = await api(url, { method, body: JSON.stringify(payload) });
+
+            if (data.success) {
+                closeModal();
+                loadTeachers();
+                loadStats();
+                showToast(editingId ? 'Teacher updated' : 'Teacher added', 'success');
+            } else {
+                showToast(data.error || 'Error saving teacher', 'error');
+            }
+        }
+
+        async function deleteTeacher(id) {
+            if (!confirm('Are you sure you want to delete this teacher?')) return;
+
+            const data = await api('/api/admin/teachers/' + id, { method: 'DELETE' });
+            if (data.success) {
+                loadTeachers();
+                loadStats();
+                showToast('Teacher deleted', 'success');
+            }
+        }
+
+        function showImportTeachersModal() {
+            document.getElementById('modalTitle').textContent = 'Import Teachers from CSV';
+            document.getElementById('modalBody').innerHTML =
+                '<p style="margin-bottom:16px;color:#666;">Upload a CSV file with columns: name, email, phone, subjects, classes</p>' +
+                '<div class="form-group"><label>CSV File</label><input type="file" id="teacherCsvFile" accept=".csv"></div>' +
+                '<div id="csvPreview"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="importTeachers()">Import</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+
+            document.getElementById('teacherCsvFile').addEventListener('change', previewTeacherCsv);
+        }
+
+        function previewTeacherCsv(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const csv = event.target.result;
+                const lines = csv.split('\\n').filter(l => l.trim());
+                const preview = document.getElementById('csvPreview');
+                preview.innerHTML = '<p style="color:#666;">' + (lines.length - 1) + ' teachers found</p>';
+            };
+            reader.readAsText(file);
+        }
+
+        async function importTeachers() {
+            const file = document.getElementById('teacherCsvFile').files[0];
+            if (!file) {
+                showToast('Please select a file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function(event) {
+                const csv = event.target.result;
+                const lines = csv.split('\\n').filter(l => l.trim());
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+                const teachers = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    const teacher = {};
+                    headers.forEach((h, idx) => {
+                        teacher[h] = values[idx] ? values[idx].trim() : '';
+                    });
+                    teachers.push(teacher);
+                }
+
+                const data = await api('/api/admin/teachers/import', {
+                    method: 'POST',
+                    body: JSON.stringify({ teachers })
+                });
+
+                if (data.success) {
+                    closeModal();
+                    loadTeachers();
+                    loadStats();
+                    showToast(data.added + ' teachers imported', 'success');
+                } else {
+                    showToast(data.error || 'Import failed', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Students
+        async function loadStudents() {
+            const search = document.getElementById('studentSearch').value;
+            const classFilter = document.getElementById('studentClassFilter').value;
+            const section = document.getElementById('studentSectionFilter').value;
+
+            let url = '/api/admin/students?';
+            if (search) url += 'search=' + encodeURIComponent(search) + '&';
+            if (classFilter) url += 'class=' + classFilter + '&';
+            if (section) url += 'section=' + section;
+
+            const data = await api(url);
+            if (data.success) {
+                currentStudents = data.students;
+                const tbody = document.getElementById('studentsTable');
+                tbody.innerHTML = data.students.map(s =>
+                    '<tr>' +
+                    '<td>' + s.name + '</td>' +
+                    '<td>' + s.class + '</td>' +
+                    '<td>' + s.section + '</td>' +
+                    '<td>' + (s.rollNo || '-') + '</td>' +
+                    '<td>' + (s.phone || '-') + '</td>' +
+                    '<td>' + (s.parentPhone || '-') + '</td>' +
+                    '<td class="action-btns">' +
+                        '<button class="edit-btn" onclick="editStudent(\\'' + s.id + '\\')">Edit</button>' +
+                        '<button class="delete-btn" onclick="deleteStudent(\\'' + s.id + '\\')">Delete</button>' +
+                    '</td>' +
+                    '</tr>'
+                ).join('');
+                document.getElementById('studentCount').textContent = 'Showing ' + data.total + ' students';
+            }
+        }
+
+        function showAddStudentModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Add Student';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group"><label>Name *</label><input type="text" id="studentName" required></div>' +
+                '<div class="form-group"><label>Class *</label><select id="studentClass">' +
+                    ${JSON.stringify((school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Section</label><select id="studentSection">' +
+                    ${JSON.stringify((school.sections || ['A','B','C','D']).map(s => '<option value="' + s + '">' + s + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Roll No</label><input type="number" id="studentRollNo"></div>' +
+                '<div class="form-group"><label>Phone</label><input type="tel" id="studentPhone"></div>' +
+                '<div class="form-group"><label>Parent Phone</label><input type="tel" id="studentParentPhone"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveStudent()">Save</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function editStudent(id) {
+            const student = currentStudents.find(s => s.id === id);
+            if (!student) return;
+
+            editingId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Student';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group"><label>Name *</label><input type="text" id="studentName" value="' + student.name + '" required></div>' +
+                '<div class="form-group"><label>Class *</label><select id="studentClass">' +
+                    ${JSON.stringify((school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Section</label><select id="studentSection">' +
+                    ${JSON.stringify((school.sections || ['A','B','C','D']).map(s => '<option value="' + s + '">' + s + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Roll No</label><input type="number" id="studentRollNo" value="' + (student.rollNo || '') + '"></div>' +
+                '<div class="form-group"><label>Phone</label><input type="tel" id="studentPhone" value="' + (student.phone || '') + '"></div>' +
+                '<div class="form-group"><label>Parent Phone</label><input type="tel" id="studentParentPhone" value="' + (student.parentPhone || '') + '"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveStudent()">Update</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+
+            // Set values after DOM is ready
+            setTimeout(() => {
+                document.getElementById('studentClass').value = student.class;
+                document.getElementById('studentSection').value = student.section;
+            }, 0);
+        }
+
+        async function saveStudent() {
+            const payload = {
+                name: document.getElementById('studentName').value,
+                class: document.getElementById('studentClass').value,
+                section: document.getElementById('studentSection').value,
+                rollNo: document.getElementById('studentRollNo').value || null,
+                phone: document.getElementById('studentPhone').value,
+                parentPhone: document.getElementById('studentParentPhone').value
+            };
+
+            if (!payload.name || !payload.class) {
+                showToast('Name and class are required', 'error');
+                return;
+            }
+
+            const url = editingId ? '/api/admin/students/' + editingId : '/api/admin/students';
+            const method = editingId ? 'PUT' : 'POST';
+
+            const data = await api(url, { method, body: JSON.stringify(payload) });
+
+            if (data.success) {
+                closeModal();
+                loadStudents();
+                loadStats();
+                showToast(editingId ? 'Student updated' : 'Student added', 'success');
+            } else {
+                showToast(data.error || 'Error saving student', 'error');
+            }
+        }
+
+        async function deleteStudent(id) {
+            if (!confirm('Are you sure you want to delete this student?')) return;
+
+            const data = await api('/api/admin/students/' + id, { method: 'DELETE' });
+            if (data.success) {
+                loadStudents();
+                loadStats();
+                showToast('Student deleted', 'success');
+            }
+        }
+
+        function showImportStudentsModal() {
+            document.getElementById('modalTitle').textContent = 'Import Students from CSV';
+            document.getElementById('modalBody').innerHTML =
+                '<p style="margin-bottom:16px;color:#666;">Upload a CSV file with columns: name, phone, class, section, rollNo, parentPhone</p>' +
+                '<div class="form-group"><label>CSV File</label><input type="file" id="studentCsvFile" accept=".csv"></div>' +
+                '<div id="studentCsvPreview"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="importStudents()">Import</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        async function importStudents() {
+            const file = document.getElementById('studentCsvFile').files[0];
+            if (!file) {
+                showToast('Please select a file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function(event) {
+                const csv = event.target.result;
+                const lines = csv.split('\\n').filter(l => l.trim());
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+                const students = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    const student = {};
+                    headers.forEach((h, idx) => {
+                        student[h] = values[idx] ? values[idx].trim() : '';
+                    });
+                    students.push(student);
+                }
+
+                const data = await api('/api/admin/students/import', {
+                    method: 'POST',
+                    body: JSON.stringify({ students })
+                });
+
+                if (data.success) {
+                    closeModal();
+                    loadStudents();
+                    loadStats();
+                    showToast(data.added + ' students imported', 'success');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function exportStudents() {
+            const data = await api('/api/admin/students/export');
+            if (data.success) {
+                const headers = ['name', 'phone', 'class', 'section', 'rollNo', 'parentPhone'];
+                let csv = headers.join(',') + '\\n';
+                data.students.forEach(s => {
+                    csv += headers.map(h => s[h] || '').join(',') + '\\n';
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'students_export.csv';
+                a.click();
+            }
+        }
+
+        // Teaching Methods
+        async function loadMethods() {
+            const teachersData = await api('/api/admin/teachers');
+            if (!teachersData.success) return;
+
+            const container = document.getElementById('methodsContainer');
+            let html = '';
+
+            for (const teacher of teachersData.teachers) {
+                const methodsData = await api('/api/admin/teachers/' + teacher.id + '/methods');
+                const methods = methodsData.success ? methodsData.methods : [];
+
+                html += '<div class="teacher-methods-card">' +
+                    '<div class="teacher-methods-header" onclick="toggleTeacherMethods(\\'' + teacher.id + '\\')">' +
+                        '<div><strong>' + teacher.name + '</strong><br><small style="color:#666">' + (teacher.subjects || []).join(', ') + '</small></div>' +
+                        '<span class="badge">' + methods.length + ' methods</span>' +
+                    '</div>' +
+                    '<div class="teacher-methods-content" id="methods-' + teacher.id + '">' +
+                        '<button class="btn btn-sm" onclick="showAddMethodModal(\\'' + teacher.id + '\\', \\'' + teacher.name + '\\')">+ Add Method</button>' +
+                        '<div style="margin-top:16px">' +
+                        methods.map(m =>
+                            '<div class="method-item">' +
+                                '<div class="method-info"><h4>' + m.subject + ' - ' + m.chapter + '</h4><p>Class ' + m.class + '</p></div>' +
+                                '<div class="action-btns">' +
+                                    '<button class="edit-btn" onclick="editMethod(\\'' + m.id + '\\')">Edit</button>' +
+                                    '<button class="delete-btn" onclick="deleteMethod(\\'' + m.id + '\\')">Delete</button>' +
+                                '</div>' +
+                            '</div>'
+                        ).join('') +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            container.innerHTML = html || '<p style="color:#666">No teachers added yet. Add teachers first to create teaching methods.</p>';
+        }
+
+        function toggleTeacherMethods(teacherId) {
+            const content = document.getElementById('methods-' + teacherId);
+            content.classList.toggle('active');
+        }
+
+        function showAddMethodModal(teacherId, teacherName) {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Add Method for ' + teacherName;
+            document.getElementById('modalBody').innerHTML =
+                '<input type="hidden" id="methodTeacherId" value="' + teacherId + '">' +
+                '<div class="form-group"><label>Subject *</label><input type="text" id="methodSubject" placeholder="e.g., Mathematics"></div>' +
+                '<div class="form-group"><label>Class *</label><select id="methodClass">' +
+                    ${JSON.stringify((school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Chapter *</label><input type="text" id="methodChapter" placeholder="e.g., Quadratic Equations"></div>' +
+                '<div class="form-group"><label>Teaching Method/Content</label><textarea id="methodContent" rows="4" placeholder="How do you explain this topic?"></textarea></div>' +
+                '<div class="form-group"><label>Tips for Students</label><textarea id="methodTips" rows="3" placeholder="Special tips or tricks"></textarea></div>' +
+                '<div class="form-group"><label>Examples</label><textarea id="methodExamples" rows="3" placeholder="Example problems and solutions"></textarea></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveMethod()">Save</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        async function editMethod(methodId) {
+            const data = await api('/api/admin/methods/' + methodId);
+            if (!data.success) return;
+
+            const m = data.method || (await api('/api/admin/methods/' + methodId)).method;
+            if (!m) return;
+
+            editingId = methodId;
+            document.getElementById('modalTitle').textContent = 'Edit Method';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group"><label>Subject *</label><input type="text" id="methodSubject" value="' + m.subject + '"></div>' +
+                '<div class="form-group"><label>Class *</label><select id="methodClass">' +
+                    ${JSON.stringify((school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Chapter *</label><input type="text" id="methodChapter" value="' + m.chapter + '"></div>' +
+                '<div class="form-group"><label>Teaching Method/Content</label><textarea id="methodContent" rows="4">' + (m.content || '') + '</textarea></div>' +
+                '<div class="form-group"><label>Tips</label><textarea id="methodTips" rows="3">' + (m.tips || '') + '</textarea></div>' +
+                '<div class="form-group"><label>Examples</label><textarea id="methodExamples" rows="3">' + (m.examples || '') + '</textarea></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveMethod()">Update</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+
+            setTimeout(() => {
+                document.getElementById('methodClass').value = m.class;
+            }, 0);
+        }
+
+        async function saveMethod() {
+            const payload = {
+                subject: document.getElementById('methodSubject').value,
+                class: document.getElementById('methodClass').value,
+                chapter: document.getElementById('methodChapter').value,
+                content: document.getElementById('methodContent').value,
+                tips: document.getElementById('methodTips').value,
+                examples: document.getElementById('methodExamples').value
+            };
+
+            if (!payload.subject || !payload.class || !payload.chapter) {
+                showToast('Subject, class, and chapter are required', 'error');
+                return;
+            }
+
+            let url, method;
+            if (editingId) {
+                url = '/api/admin/methods/' + editingId;
+                method = 'PUT';
+            } else {
+                const teacherId = document.getElementById('methodTeacherId').value;
+                url = '/api/admin/teachers/' + teacherId + '/methods';
+                method = 'POST';
+            }
+
+            const data = await api(url, { method, body: JSON.stringify(payload) });
+
+            if (data.success) {
+                closeModal();
+                loadMethods();
+                loadStats();
+                showToast(editingId ? 'Method updated' : 'Method added', 'success');
+            }
+        }
+
+        async function deleteMethod(methodId) {
+            if (!confirm('Are you sure you want to delete this method?')) return;
+
+            const data = await api('/api/admin/methods/' + methodId, { method: 'DELETE' });
+            if (data.success) {
+                loadMethods();
+                loadStats();
+                showToast('Method deleted', 'success');
+            }
+        }
+
+        // Assessments
+        async function loadAssessments() {
+            const data = await api('/api/admin/assessments');
+            if (data.success) {
+                const tbody = document.getElementById('assessmentsTable');
+                tbody.innerHTML = data.assessments.map(a =>
+                    '<tr>' +
+                    '<td>' + a.title + '</td>' +
+                    '<td>' + a.subject + '</td>' +
+                    '<td>' + (a.class || 'All') + '</td>' +
+                    '<td>' + a.questionCount + '</td>' +
+                    '<td>' + a.duration + ' min</td>' +
+                    '<td class="action-btns">' +
+                        '<button class="edit-btn" onclick="editAssessment(\\'' + a.id + '\\')">Edit</button>' +
+                        '<button class="delete-btn" onclick="deleteAssessment(\\'' + a.id + '\\')">Delete</button>' +
+                    '</td>' +
+                    '</tr>'
+                ).join('');
+            }
+        }
+
+        function showAddAssessmentModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Create Assessment';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group"><label>Title *</label><input type="text" id="assessmentTitle"></div>' +
+                '<div class="form-group"><label>Subject *</label><input type="text" id="assessmentSubject"></div>' +
+                '<div class="form-group"><label>Class</label><select id="assessmentClass"><option value="">All Classes</option>' +
+                    ${JSON.stringify((school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Duration (minutes)</label><input type="number" id="assessmentDuration" value="30"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveAssessment()">Create</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        async function editAssessment(id) {
+            const data = await api('/api/admin/assessments/' + id);
+            if (!data.success) return;
+
+            const a = data.assessment;
+            editingId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Assessment';
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group"><label>Title *</label><input type="text" id="assessmentTitle" value="' + a.title + '"></div>' +
+                '<div class="form-group"><label>Subject *</label><input type="text" id="assessmentSubject" value="' + a.subject + '"></div>' +
+                '<div class="form-group"><label>Class</label><select id="assessmentClass"><option value="">All Classes</option>' +
+                    ${JSON.stringify((school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).map(c => '<option value="' + c + '">Class ' + c + '</option>').join(''))} +
+                '</select></div>' +
+                '<div class="form-group"><label>Duration (minutes)</label><input type="number" id="assessmentDuration" value="' + a.duration + '"></div>';
+            document.getElementById('modalFooter').innerHTML =
+                '<button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn btn-sm" onclick="saveAssessment()">Update</button>';
+            document.getElementById('modalOverlay').classList.add('active');
+
+            setTimeout(() => {
+                document.getElementById('assessmentClass').value = a.class || '';
+            }, 0);
+        }
+
+        async function saveAssessment() {
+            const payload = {
+                title: document.getElementById('assessmentTitle').value,
+                subject: document.getElementById('assessmentSubject').value,
+                class: document.getElementById('assessmentClass').value,
+                duration: parseInt(document.getElementById('assessmentDuration').value) || 30
+            };
+
+            if (!payload.title || !payload.subject) {
+                showToast('Title and subject are required', 'error');
+                return;
+            }
+
+            const url = editingId ? '/api/admin/assessments/' + editingId : '/api/admin/assessments';
+            const method = editingId ? 'PUT' : 'POST';
+
+            const data = await api(url, { method, body: JSON.stringify(payload) });
+
+            if (data.success) {
+                closeModal();
+                loadAssessments();
+                loadStats();
+                showToast(editingId ? 'Assessment updated' : 'Assessment created', 'success');
+            }
+        }
+
+        async function deleteAssessment(id) {
+            if (!confirm('Are you sure you want to delete this assessment?')) return;
+
+            const data = await api('/api/admin/assessments/' + id, { method: 'DELETE' });
+            if (data.success) {
+                loadAssessments();
+                loadStats();
+                showToast('Assessment deleted', 'success');
+            }
+        }
+
+        // Modal helpers
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            editingId = null;
+        }
+
+        // Toast
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast active ' + type;
+            setTimeout(() => toast.classList.remove('active'), 3000);
+        }
+
+        // Close modal on overlay click
+        document.getElementById('modalOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
     </script>
 </body>
 </html>`);
