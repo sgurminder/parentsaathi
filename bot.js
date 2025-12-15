@@ -9286,6 +9286,365 @@ app.get('/teacher-dashboard', async (req, res) => {
             color: #666;
         }
 
+        /* Assessment Card - Enhanced */
+        .assessment-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #eee;
+        }
+        .assessment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .assessment-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+        }
+        .assessment-badge {
+            font-size: 10px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-active { background: #e8f5e9; color: #2e7d32; }
+        .badge-draft { background: #fff3e0; color: #ef6c00; }
+        .badge-completed { background: #e3f2fd; color: #1565c0; }
+        .assessment-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #666;
+        }
+        .assessment-info span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .assessment-topics {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+        .assessment-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-action {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn-share {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-share:hover { opacity: 0.9; }
+        .btn-view { background: #f0f0f0; color: #333; }
+        .btn-view:hover { background: #e0e0e0; }
+        .btn-delete { background: #ffebee; color: #c62828; }
+        .btn-delete:hover { background: #ffcdd2; }
+
+        /* Assessment Form Styles */
+        .form-row {
+            display: flex;
+            gap: 12px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        .difficulty-selector {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .difficulty-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .difficulty-btn:hover { border-color: #667eea; }
+        .difficulty-btn.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
+        }
+        .difficulty-label { font-size: 12px; font-weight: 600; display: block; }
+        .difficulty-desc { font-size: 10px; color: #888; }
+        .time-presets {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .time-preset {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 16px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .time-preset:hover { border-color: #667eea; }
+        .time-preset.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .share-link-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            display: none;
+        }
+        .share-link-box.active { display: block; }
+        .share-link-input {
+            display: flex;
+            gap: 8px;
+        }
+        .share-link-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .share-link-input button {
+            padding: 10px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .generating-questions {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+            color: #667eea;
+        }
+        .generating-questions.active { display: flex; }
+
+        /* Question Review Styles */
+        .review-container {
+            max-height: 60vh;
+            overflow-y: auto;
+            margin: 16px 0;
+        }
+        .review-question {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .review-question.editing {
+            background: #fff;
+            border: 2px solid #667eea;
+        }
+        .review-q-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .review-q-num {
+            font-size: 11px;
+            color: #888;
+            background: #e0e0e0;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .review-q-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .review-q-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        .review-q-actions button:hover { opacity: 1; }
+        .review-q-text {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .review-q-options {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-left: 8px;
+        }
+        .review-q-option {
+            font-size: 13px;
+            color: #555;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        .review-q-option.correct {
+            color: #2e7d32;
+            font-weight: 500;
+        }
+        .review-q-answer {
+            font-size: 12px;
+            color: #2e7d32;
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: #e8f5e9;
+            border-radius: 6px;
+        }
+        .edit-q-form {
+            display: none;
+        }
+        .edit-q-form.active {
+            display: block;
+        }
+        .edit-q-form textarea,
+        .edit-q-form input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .edit-q-form textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+        .edit-options-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .edit-options-grid label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+        }
+        .edit-answer-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .edit-answer-row label {
+            font-size: 12px;
+            color: #666;
+        }
+        .edit-answer-row select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .edit-q-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .edit-q-buttons button {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .btn-save-q {
+            background: #667eea;
+            color: white;
+            border: none;
+        }
+        .btn-cancel-q {
+            background: #f0f0f0;
+            color: #333;
+            border: none;
+        }
+        .add-question-btn {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            background: none;
+            color: #888;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .add-question-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+        .review-summary {
+            background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .review-summary-text {
+            font-size: 14px;
+            color: #333;
+        }
+        .review-summary-count {
+            font-weight: 700;
+            color: #667eea;
+        }
+        .review-step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ddd;
+        }
+        .step-dot.active {
+            background: #667eea;
+        }
+        .step-dot.completed {
+            background: #4CAF50;
+        }
+
         /* FAB */
         .fab {
             position: fixed;
@@ -10269,31 +10628,58 @@ app.get('/teacher-dashboard', async (req, res) => {
             const cls = document.getElementById('classSelector').value;
             const subject = document.getElementById('subjectSelector').value;
 
-            document.getElementById('testList').innerHTML = '<div class="loading">Loading tests...</div>';
+            if (!cls || !subject) {
+                document.getElementById('testList').innerHTML =
+                    '<div class="empty-state"><div class="empty-icon">📝</div><p>Select class and subject to view assessments</p></div>';
+                return;
+            }
+
+            document.getElementById('testList').innerHTML = '<div class="loading">Loading assessments...</div>';
 
             try {
-                const res = await fetch('/api/teacher/tests?class=' + cls + '&subject=' + subject, {
+                const res = await fetch('/api/teacher/assessments?class=' + cls + '&subject=' + subject, {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 const data = await res.json();
 
-                if (data.success && data.tests.length > 0) {
-                    const html = data.tests.map(t =>
-                        '<div class="test-item">' +
-                            '<div class="test-header">' +
-                                '<span class="test-title">' + t.title + '</span>' +
-                                '<span class="test-status status-' + t.status + '">' + t.status + '</span>' +
+                if (data.success && data.assessments && data.assessments.length > 0) {
+                    const html = data.assessments.map(a => {
+                        const statusClass = a.status === 'active' ? 'badge-active' : (a.status === 'completed' ? 'badge-completed' : 'badge-draft');
+                        const timeLimitText = a.timeLimit > 0 ? a.timeLimit + ' min' : 'No limit';
+                        const createdDate = new Date(a.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                        return '<div class="assessment-card">' +
+                            '<div class="assessment-header">' +
+                                '<span class="assessment-title">' + escapeHtml(a.title) + '</span>' +
+                                '<span class="assessment-badge ' + statusClass + '">' + a.status + '</span>' +
                             '</div>' +
-                            '<div class="test-meta">' + t.questions + ' questions | ' + t.chapter + '</div>' +
-                        '</div>'
-                    ).join('');
+                            '<div class="assessment-info">' +
+                                '<span>📝 ' + a.questionCount + ' questions</span>' +
+                                '<span>⏱️ ' + timeLimitText + '</span>' +
+                                '<span>📊 ' + (a.submissions || 0) + ' submissions</span>' +
+                                '<span>📅 ' + createdDate + '</span>' +
+                            '</div>' +
+                            '<div class="assessment-topics">Topics: ' + escapeHtml(a.topics) + '</div>' +
+                            '<div class="assessment-actions">' +
+                                '<button class="btn-action btn-share" onclick="shareAssessment(\\'' + a.id + '\\')">' +
+                                    '<span>📤</span> Share' +
+                                '</button>' +
+                                '<button class="btn-action btn-view" onclick="viewAssessmentResults(\\'' + a.id + '\\')">' +
+                                    '<span>👁️</span> Results' +
+                                '</button>' +
+                                '<button class="btn-action btn-delete" onclick="deleteAssessment(\\'' + a.id + '\\')">' +
+                                    '<span>🗑️</span>' +
+                                '</button>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
                     document.getElementById('testList').innerHTML = html;
                 } else {
                     document.getElementById('testList').innerHTML =
-                        '<div class="empty-state"><div class="empty-icon">📝</div><p>No tests created yet</p></div>';
+                        '<div class="empty-state"><div class="empty-icon">📝</div><p>No assessments created yet.<br>Click + to create your first assessment.</p></div>';
                 }
             } catch (e) {
-                document.getElementById('testList').innerHTML = '<div class="empty-state">Error loading tests</div>';
+                console.error('Error loading assessments:', e);
+                document.getElementById('testList').innerHTML = '<div class="empty-state">Error loading assessments</div>';
             }
         }
 
@@ -10396,20 +10782,87 @@ app.get('/teacher-dashboard', async (req, res) => {
                     '</div>' +
                     '<button class="login-btn" onclick="saveNewCurriculumContent()">Add Chapter</button>';
             } else if (currentScreen === 'tests') {
-                document.getElementById('modalTitle').textContent = 'Create Test';
+                const cls = document.getElementById('classSelector').value;
+                const subject = document.getElementById('subjectSelector').value;
+                if (!cls || !subject) {
+                    showToast('Select class and subject first', 'error');
+                    return;
+                }
+                document.getElementById('modalTitle').textContent = 'Create Assessment';
                 document.getElementById('modalBody').innerHTML =
                     '<div class="form-group">' +
-                        '<label class="form-label">Test Title</label>' +
-                        '<input type="text" id="testTitle" class="form-input" placeholder="e.g., Chapter 1 Quiz">' +
+                        '<label class="form-label">Assessment Title *</label>' +
+                        '<input type="text" id="assessmentTitle" class="form-input" placeholder="e.g., Weekly Quiz, Chapter Test, Practice Set...">' +
                     '</div>' +
                     '<div class="form-group">' +
-                        '<label class="form-label">Chapter</label>' +
-                        '<select id="testChapter" class="form-input"><option value="">Select chapter...</option></select>' +
+                        '<label class="form-label">Topics (comma separated) *</label>' +
+                        '<input type="text" id="assessmentTopics" class="form-input" placeholder="e.g., Fractions, Decimals, Percentages">' +
+                        '<div style="font-size:11px;color:#888;margin-top:4px;">AI will generate questions covering these topics</div>' +
                     '</div>' +
-                    '<p style="color:#666;font-size:13px;margin-top:16px;">Question builder coming soon!</p>' +
-                    '<button class="login-btn" disabled>Create Test</button>';
-
-                loadChaptersForSelect('testChapter');
+                    '<div class="form-group">' +
+                        '<label class="form-label">Difficulty Level</label>' +
+                        '<div class="difficulty-selector">' +
+                            '<button type="button" class="difficulty-btn" data-level="easy" onclick="selectDifficulty(\\'easy\\')">' +
+                                '<span class="difficulty-label">Easy</span>' +
+                                '<span class="difficulty-desc">Basic recall</span>' +
+                            '</button>' +
+                            '<button type="button" class="difficulty-btn selected" data-level="medium" onclick="selectDifficulty(\\'medium\\')">' +
+                                '<span class="difficulty-label">Medium</span>' +
+                                '<span class="difficulty-desc">Application</span>' +
+                            '</button>' +
+                            '<button type="button" class="difficulty-btn" data-level="hard" onclick="selectDifficulty(\\'hard\\')">' +
+                                '<span class="difficulty-label">Hard</span>' +
+                                '<span class="difficulty-desc">Analysis</span>' +
+                            '</button>' +
+                        '</div>' +
+                        '<input type="hidden" id="selectedDifficulty" value="medium">' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label class="form-label">No. of Questions</label>' +
+                            '<select id="numQuestions" class="form-input">' +
+                                '<option value="5">5 questions</option>' +
+                                '<option value="10" selected>10 questions</option>' +
+                                '<option value="15">15 questions</option>' +
+                                '<option value="20">20 questions</option>' +
+                                '<option value="25">25 questions</option>' +
+                            '</select>' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label class="form-label">Question Type</label>' +
+                            '<select id="questionType" class="form-input">' +
+                                '<option value="mcq" selected>MCQ Only</option>' +
+                                '<option value="mixed">MCQ + Short Answer</option>' +
+                                '<option value="short">Short Answer Only</option>' +
+                            '</select>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label class="form-label">Time Limit</label>' +
+                        '<div class="time-presets">' +
+                            '<button type="button" class="time-preset" data-time="10" onclick="selectTimeLimit(10)">10 min</button>' +
+                            '<button type="button" class="time-preset" data-time="15" onclick="selectTimeLimit(15)">15 min</button>' +
+                            '<button type="button" class="time-preset selected" data-time="20" onclick="selectTimeLimit(20)">20 min</button>' +
+                            '<button type="button" class="time-preset" data-time="30" onclick="selectTimeLimit(30)">30 min</button>' +
+                            '<button type="button" class="time-preset" data-time="45" onclick="selectTimeLimit(45)">45 min</button>' +
+                            '<button type="button" class="time-preset" data-time="60" onclick="selectTimeLimit(60)">60 min</button>' +
+                            '<button type="button" class="time-preset" data-time="0" onclick="selectTimeLimit(0)">No limit</button>' +
+                        '</div>' +
+                        '<input type="hidden" id="selectedTimeLimit" value="20">' +
+                    '</div>' +
+                    '<div class="generating-questions" id="generatingQuestions">' +
+                        '<div class="spinner"></div>' +
+                        '<span>AI is generating questions...</span>' +
+                    '</div>' +
+                    '<div class="share-link-box" id="shareLinkBox">' +
+                        '<div style="font-weight:600;margin-bottom:8px;">Assessment Created!</div>' +
+                        '<div class="share-link-input">' +
+                            '<input type="text" id="shareLink" readonly>' +
+                            '<button onclick="copyShareLink()">Copy</button>' +
+                        '</div>' +
+                        '<div style="font-size:11px;color:#888;margin-top:8px;">Share this link with students to start the assessment</div>' +
+                    '</div>' +
+                    '<button class="login-btn" id="createAssessmentBtn" onclick="generateQuestions()">Generate Questions</button>';
             }
 
             document.getElementById('modalOverlay').classList.add('active');
@@ -10691,6 +11144,459 @@ app.get('/teacher-dashboard', async (req, res) => {
                     document.getElementById('schoolLogo').textContent = '📚';
                     document.getElementById('schoolNameDisplay').textContent = 'VidyaMitra';
                 });
+        }
+
+        // Assessment functions
+        let pendingAssessment = null; // Store assessment data before finalization
+        let reviewQuestions = []; // Questions being reviewed/edited
+
+        function selectDifficulty(level) {
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('selected'));
+            document.querySelector('.difficulty-btn[data-level="' + level + '"]').classList.add('selected');
+            document.getElementById('selectedDifficulty').value = level;
+        }
+
+        function selectTimeLimit(minutes) {
+            document.querySelectorAll('.time-preset').forEach(btn => btn.classList.remove('selected'));
+            document.querySelector('.time-preset[data-time="' + minutes + '"]').classList.add('selected');
+            document.getElementById('selectedTimeLimit').value = minutes;
+        }
+
+        async function generateQuestions() {
+            const title = document.getElementById('assessmentTitle').value.trim();
+            const topics = document.getElementById('assessmentTopics').value.trim();
+            const difficulty = document.getElementById('selectedDifficulty').value;
+            const numQuestions = document.getElementById('numQuestions').value;
+            const questionType = document.getElementById('questionType').value;
+            const timeLimit = document.getElementById('selectedTimeLimit').value;
+
+            if (!title) {
+                showToast('Please enter assessment title', 'error');
+                return;
+            }
+            if (!topics) {
+                showToast('Please enter at least one topic', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('createAssessmentBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            document.getElementById('generatingQuestions').classList.add('active');
+
+            try {
+                const token = localStorage.getItem(STORAGE_KEY + '_token');
+                const cls = document.getElementById('classSelector').value;
+                const subject = document.getElementById('subjectSelector').value;
+
+                const res = await fetch('/api/teacher/generate-questions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        topics: topics,
+                        difficulty: difficulty,
+                        numQuestions: parseInt(numQuestions),
+                        questionType: questionType,
+                        class: cls,
+                        subject: subject
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success && data.questions) {
+                    document.getElementById('generatingQuestions').classList.remove('active');
+
+                    // Store pending assessment data
+                    pendingAssessment = {
+                        title: title,
+                        topics: topics,
+                        difficulty: difficulty,
+                        questionType: questionType,
+                        timeLimit: parseInt(timeLimit),
+                        class: cls,
+                        subject: subject
+                    };
+                    reviewQuestions = data.questions;
+
+                    // Show review step
+                    showReviewStep();
+                } else {
+                    showToast(data.error || 'Failed to generate questions', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Generate Questions';
+                    document.getElementById('generatingQuestions').classList.remove('active');
+                }
+            } catch (e) {
+                showToast('Error generating questions', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Generate Questions';
+                document.getElementById('generatingQuestions').classList.remove('active');
+            }
+        }
+
+        function showReviewStep() {
+            document.getElementById('modalTitle').textContent = 'Review Questions';
+
+            let html = '<div class="review-step-indicator">' +
+                '<div class="step-dot completed"></div>' +
+                '<div class="step-dot active"></div>' +
+                '</div>' +
+                '<div class="review-summary">' +
+                    '<span class="review-summary-text">Review and edit your questions</span>' +
+                    '<span class="review-summary-count" id="questionCount">' + reviewQuestions.length + ' questions</span>' +
+                '</div>' +
+                '<div class="review-container" id="reviewContainer"></div>' +
+                '<button class="add-question-btn" onclick="addNewQuestion()">+ Add Your Own Question</button>' +
+                '<div style="display:flex;gap:10px;margin-top:16px;">' +
+                    '<button class="login-btn" style="flex:1;background:#f0f0f0;color:#333" onclick="backToSetup()">← Back</button>' +
+                    '<button class="login-btn" style="flex:2" id="finalizeBtn" onclick="finalizeAssessment()">Create Assessment</button>' +
+                '</div>';
+
+            document.getElementById('modalBody').innerHTML = html;
+            renderReviewQuestions();
+        }
+
+        function renderReviewQuestions() {
+            const container = document.getElementById('reviewContainer');
+            if (!container) return;
+
+            container.innerHTML = reviewQuestions.map((q, idx) => {
+                const isMcq = q.type === 'mcq' && q.options;
+                let optionsHtml = '';
+
+                if (isMcq) {
+                    optionsHtml = '<div class="review-q-options">' +
+                        Object.entries(q.options).map(([key, val]) =>
+                            '<div class="review-q-option ' + (key === q.answer ? 'correct' : '') + '">' +
+                                '<strong>' + key + '.</strong> ' + escapeHtml(val) +
+                                (key === q.answer ? ' ✓' : '') +
+                            '</div>'
+                        ).join('') +
+                    '</div>';
+                } else {
+                    optionsHtml = '<div class="review-q-answer">Answer: ' + escapeHtml(q.answer || '') + '</div>';
+                }
+
+                return '<div class="review-question" id="review-q-' + idx + '">' +
+                    '<div class="review-q-header">' +
+                        '<span class="review-q-num">Q' + (idx + 1) + ' • ' + (q.type === 'mcq' ? 'MCQ' : 'Short Answer') + '</span>' +
+                        '<div class="review-q-actions">' +
+                            '<button onclick="editQuestion(' + idx + ')" title="Edit">✏️</button>' +
+                            '<button onclick="deleteQuestion(' + idx + ')" title="Delete">🗑️</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="review-q-text">' + escapeHtml(q.question) + '</div>' +
+                    optionsHtml +
+                '</div>';
+            }).join('');
+
+            document.getElementById('questionCount').textContent = reviewQuestions.length + ' questions';
+        }
+
+        function editQuestion(idx) {
+            const q = reviewQuestions[idx];
+            const container = document.getElementById('review-q-' + idx);
+            container.classList.add('editing');
+
+            const isMcq = q.type === 'mcq';
+
+            let editHtml = '<div class="edit-q-form active">' +
+                '<textarea id="edit-q-text-' + idx + '" placeholder="Question text">' + escapeHtml(q.question) + '</textarea>';
+
+            if (isMcq) {
+                editHtml += '<div class="edit-options-grid">' +
+                    '<label>A:</label><input type="text" id="edit-opt-A-' + idx + '" value="' + escapeHtml(q.options?.A || '') + '">' +
+                    '<label>B:</label><input type="text" id="edit-opt-B-' + idx + '" value="' + escapeHtml(q.options?.B || '') + '">' +
+                    '<label>C:</label><input type="text" id="edit-opt-C-' + idx + '" value="' + escapeHtml(q.options?.C || '') + '">' +
+                    '<label>D:</label><input type="text" id="edit-opt-D-' + idx + '" value="' + escapeHtml(q.options?.D || '') + '">' +
+                '</div>' +
+                '<div class="edit-answer-row">' +
+                    '<label>Correct Answer:</label>' +
+                    '<select id="edit-answer-' + idx + '">' +
+                        '<option value="A"' + (q.answer === 'A' ? ' selected' : '') + '>A</option>' +
+                        '<option value="B"' + (q.answer === 'B' ? ' selected' : '') + '>B</option>' +
+                        '<option value="C"' + (q.answer === 'C' ? ' selected' : '') + '>C</option>' +
+                        '<option value="D"' + (q.answer === 'D' ? ' selected' : '') + '>D</option>' +
+                    '</select>' +
+                '</div>';
+            } else {
+                editHtml += '<input type="text" id="edit-answer-' + idx + '" placeholder="Answer" value="' + escapeHtml(q.answer || '') + '">';
+            }
+
+            editHtml += '<div class="edit-q-buttons">' +
+                '<button class="btn-cancel-q" onclick="cancelEdit(' + idx + ')">Cancel</button>' +
+                '<button class="btn-save-q" onclick="saveEdit(' + idx + ', ' + isMcq + ')">Save</button>' +
+            '</div></div>';
+
+            container.innerHTML = editHtml;
+        }
+
+        function saveEdit(idx, isMcq) {
+            const question = document.getElementById('edit-q-text-' + idx).value.trim();
+            if (!question) {
+                showToast('Question text is required', 'error');
+                return;
+            }
+
+            reviewQuestions[idx].question = question;
+
+            if (isMcq) {
+                reviewQuestions[idx].options = {
+                    A: document.getElementById('edit-opt-A-' + idx).value.trim(),
+                    B: document.getElementById('edit-opt-B-' + idx).value.trim(),
+                    C: document.getElementById('edit-opt-C-' + idx).value.trim(),
+                    D: document.getElementById('edit-opt-D-' + idx).value.trim()
+                };
+                reviewQuestions[idx].answer = document.getElementById('edit-answer-' + idx).value;
+            } else {
+                reviewQuestions[idx].answer = document.getElementById('edit-answer-' + idx).value.trim();
+            }
+
+            renderReviewQuestions();
+            showToast('Question updated', 'success');
+        }
+
+        function cancelEdit(idx) {
+            renderReviewQuestions();
+        }
+
+        function deleteQuestion(idx) {
+            if (reviewQuestions.length <= 1) {
+                showToast('Assessment must have at least 1 question', 'error');
+                return;
+            }
+            if (confirm('Delete this question?')) {
+                reviewQuestions.splice(idx, 1);
+                renderReviewQuestions();
+                showToast('Question deleted', 'success');
+            }
+        }
+
+        function addNewQuestion() {
+            // Show add question form
+            const container = document.getElementById('reviewContainer');
+            const newIdx = reviewQuestions.length;
+
+            const addHtml = '<div class="review-question editing" id="new-question-form">' +
+                '<div class="review-q-header">' +
+                    '<span class="review-q-num">New Question</span>' +
+                '</div>' +
+                '<div class="edit-q-form active">' +
+                    '<div style="margin-bottom:10px;">' +
+                        '<label style="font-size:12px;color:#666;">Question Type:</label>' +
+                        '<select id="new-q-type" class="form-input" style="margin-top:4px;" onchange="toggleNewQuestionType()">' +
+                            '<option value="mcq">Multiple Choice (MCQ)</option>' +
+                            '<option value="short">Short Answer</option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<textarea id="new-q-text" placeholder="Enter your question..."></textarea>' +
+                    '<div id="new-q-options">' +
+                        '<div class="edit-options-grid">' +
+                            '<label>A:</label><input type="text" id="new-opt-A" placeholder="Option A">' +
+                            '<label>B:</label><input type="text" id="new-opt-B" placeholder="Option B">' +
+                            '<label>C:</label><input type="text" id="new-opt-C" placeholder="Option C">' +
+                            '<label>D:</label><input type="text" id="new-opt-D" placeholder="Option D">' +
+                        '</div>' +
+                        '<div class="edit-answer-row">' +
+                            '<label>Correct Answer:</label>' +
+                            '<select id="new-q-answer-mcq">' +
+                                '<option value="A">A</option>' +
+                                '<option value="B">B</option>' +
+                                '<option value="C">C</option>' +
+                                '<option value="D">D</option>' +
+                            '</select>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div id="new-q-short-answer" style="display:none;">' +
+                        '<input type="text" id="new-q-answer-short" placeholder="Expected answer">' +
+                    '</div>' +
+                    '<div class="edit-q-buttons">' +
+                        '<button class="btn-cancel-q" onclick="cancelAddQuestion()">Cancel</button>' +
+                        '<button class="btn-save-q" onclick="saveNewQuestion()">Add Question</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+
+            container.insertAdjacentHTML('beforeend', addHtml);
+            document.getElementById('new-q-text').focus();
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function toggleNewQuestionType() {
+            const type = document.getElementById('new-q-type').value;
+            document.getElementById('new-q-options').style.display = type === 'mcq' ? 'block' : 'none';
+            document.getElementById('new-q-short-answer').style.display = type === 'short' ? 'block' : 'none';
+        }
+
+        function cancelAddQuestion() {
+            const form = document.getElementById('new-question-form');
+            if (form) form.remove();
+        }
+
+        function saveNewQuestion() {
+            const type = document.getElementById('new-q-type').value;
+            const question = document.getElementById('new-q-text').value.trim();
+
+            if (!question) {
+                showToast('Please enter question text', 'error');
+                return;
+            }
+
+            const newQ = {
+                type: type,
+                question: question,
+                topic: pendingAssessment?.topics?.split(',')[0]?.trim() || 'Custom'
+            };
+
+            if (type === 'mcq') {
+                const optA = document.getElementById('new-opt-A').value.trim();
+                const optB = document.getElementById('new-opt-B').value.trim();
+                if (!optA || !optB) {
+                    showToast('Please fill at least options A and B', 'error');
+                    return;
+                }
+                newQ.options = {
+                    A: optA,
+                    B: optB,
+                    C: document.getElementById('new-opt-C').value.trim() || '',
+                    D: document.getElementById('new-opt-D').value.trim() || ''
+                };
+                newQ.answer = document.getElementById('new-q-answer-mcq').value;
+            } else {
+                newQ.answer = document.getElementById('new-q-answer-short').value.trim();
+            }
+
+            reviewQuestions.push(newQ);
+            renderReviewQuestions();
+            showToast('Question added!', 'success');
+        }
+
+        function backToSetup() {
+            // Go back to initial setup form
+            openAddModal();
+        }
+
+        async function finalizeAssessment() {
+            if (reviewQuestions.length === 0) {
+                showToast('Add at least one question', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('finalizeBtn');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            try {
+                const token = localStorage.getItem(STORAGE_KEY + '_token');
+
+                const res = await fetch('/api/teacher/assessments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        ...pendingAssessment,
+                        questions: reviewQuestions,
+                        finalize: true
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    // Show success and share link
+                    document.getElementById('modalTitle').textContent = 'Assessment Created!';
+                    document.getElementById('modalBody').innerHTML =
+                        '<div style="text-align:center;padding:20px 0;">' +
+                            '<div style="font-size:48px;margin-bottom:16px;">✅</div>' +
+                            '<h3 style="margin-bottom:8px;">' + escapeHtml(pendingAssessment.title) + '</h3>' +
+                            '<p style="color:#666;margin-bottom:20px;">' + reviewQuestions.length + ' questions ready</p>' +
+                        '</div>' +
+                        '<div class="share-link-box active">' +
+                            '<div style="font-weight:600;margin-bottom:8px;">Share with students:</div>' +
+                            '<div class="share-link-input">' +
+                                '<input type="text" id="shareLink" value="' + data.shareLink + '" readonly>' +
+                                '<button onclick="copyShareLink()">Copy</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<button class="login-btn" style="margin-top:20px" onclick="closeModal();loadTests();">Done</button>';
+
+                    showToast('Assessment created!', 'success');
+                    pendingAssessment = null;
+                    reviewQuestions = [];
+                } else {
+                    showToast(data.error || 'Failed to create assessment', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Create Assessment';
+                }
+            } catch (e) {
+                showToast('Error creating assessment', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Create Assessment';
+            }
+        }
+
+        function copyShareLink() {
+            const linkInput = document.getElementById('shareLink');
+            linkInput.select();
+            document.execCommand('copy');
+            showToast('Link copied to clipboard!', 'success');
+        }
+
+        async function shareAssessment(assessmentId) {
+            const link = window.location.origin + '/assessment/' + assessmentId;
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'VidyaMitra Assessment',
+                        text: 'Take this assessment on VidyaMitra',
+                        url: link
+                    });
+                } catch (e) {
+                    copyToClipboard(link);
+                }
+            } else {
+                copyToClipboard(link);
+            }
+        }
+
+        function copyToClipboard(text) {
+            const temp = document.createElement('input');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast('Link copied to clipboard!', 'success');
+        }
+
+        async function deleteAssessment(assessmentId) {
+            if (!confirm('Are you sure you want to delete this assessment?')) return;
+
+            try {
+                const token = localStorage.getItem(STORAGE_KEY + '_token');
+                const res = await fetch('/api/teacher/assessments/' + assessmentId, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Assessment deleted', 'success');
+                    loadTests();
+                } else {
+                    showToast(data.error || 'Failed to delete', 'error');
+                }
+            } catch (e) {
+                showToast('Error deleting assessment', 'error');
+            }
+        }
+
+        function viewAssessmentResults(assessmentId) {
+            window.open('/assessment/' + assessmentId + '/results', '_blank');
         }
 
         // Initialize
@@ -11101,6 +12007,330 @@ This is for Class ${cls} ${subject}. Match the difficulty level appropriately.`
     }
 });
 
+// =====================================================
+// ASSESSMENT API ENDPOINTS
+// =====================================================
+
+// Generate unique assessment ID
+function generateAssessmentId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let id = '';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return id;
+}
+
+// POST /api/teacher/generate-questions - Generate questions for review (no save)
+app.post('/api/teacher/generate-questions', requireTeacher, async (req, res) => {
+    try {
+        const { topics, difficulty, numQuestions, questionType, class: cls, subject } = req.body;
+
+        if (!topics || !cls || !subject) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        console.log('[ASSESSMENT] Generating questions for review:', { topics, difficulty, numQuestions, cls, subject });
+
+        // Generate questions using AI
+        const topicsList = topics.split(',').map(t => t.trim()).filter(t => t);
+
+        let difficultyGuide = '';
+        if (difficulty === 'easy') {
+            difficultyGuide = 'Create basic recall questions focusing on definitions, simple facts, and direct applications. Suitable for beginners.';
+        } else if (difficulty === 'medium') {
+            difficultyGuide = 'Create questions that require understanding and application of concepts. Mix of straightforward and moderately challenging questions.';
+        } else if (difficulty === 'hard') {
+            difficultyGuide = 'Create challenging questions requiring analysis, problem-solving, and deep understanding. Include multi-step problems.';
+        }
+
+        let questionFormat = '';
+        if (questionType === 'mcq') {
+            questionFormat = 'All questions should be Multiple Choice Questions (MCQ) with exactly 4 options (A, B, C, D).';
+        } else if (questionType === 'short') {
+            questionFormat = 'All questions should be short answer questions requiring 1-2 sentence answers.';
+        } else {
+            questionFormat = 'Mix of MCQ (with 4 options A, B, C, D) and short answer questions.';
+        }
+
+        const systemPrompt = `You are an expert teacher creating assessment questions for Class ${cls} ${subject}.
+
+${difficultyGuide}
+${questionFormat}
+
+Topics to cover: ${topicsList.join(', ')}
+
+Generate exactly ${numQuestions} questions. For MCQ questions, always provide the correct answer key.
+
+IMPORTANT: Respond ONLY with a valid JSON array. No markdown, no explanation, just the JSON.
+
+Format:
+[
+  {
+    "type": "mcq",
+    "question": "Question text here?",
+    "options": {"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"},
+    "answer": "A",
+    "topic": "Topic name"
+  },
+  {
+    "type": "short",
+    "question": "Question text here?",
+    "answer": "Expected answer",
+    "topic": "Topic name"
+  }
+]`;
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Generate ${numQuestions} ${difficulty} difficulty questions for Class ${cls} ${subject} covering: ${topics}` }
+            ],
+            max_tokens: 4000,
+            temperature: 0.7
+        });
+
+        let questionsText = response.choices[0].message.content;
+
+        // Clean up the response - remove markdown code blocks if present
+        questionsText = questionsText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+        let questions;
+        try {
+            questions = JSON.parse(questionsText);
+        } catch (parseError) {
+            console.error('[ASSESSMENT] Failed to parse AI response:', parseError);
+            console.error('[ASSESSMENT] Raw response:', questionsText.substring(0, 500));
+            return res.status(500).json({ success: false, error: 'Failed to generate questions. Please try again.' });
+        }
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return res.status(500).json({ success: false, error: 'No questions generated. Please try again.' });
+        }
+
+        console.log('[ASSESSMENT] Generated', questions.length, 'questions for review');
+
+        res.json({
+            success: true,
+            questions: questions
+        });
+    } catch (e) {
+        console.error('[ASSESSMENT] Error generating questions:', e);
+        res.status(500).json({ success: false, error: 'Failed to generate questions' });
+    }
+});
+
+// POST /api/teacher/assessments - Create/finalize assessment
+app.post('/api/teacher/assessments', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId, name: teacherName } = req.teacher;
+        const { title, topics, difficulty, numQuestions, questionType, timeLimit, class: cls, subject, questions: providedQuestions, finalize } = req.body;
+
+        if (!title || !topics || !cls || !subject) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        let questions;
+
+        // If finalize is true and questions are provided, use them directly
+        if (finalize && providedQuestions && Array.isArray(providedQuestions) && providedQuestions.length > 0) {
+            console.log('[ASSESSMENT] Finalizing with', providedQuestions.length, 'teacher-reviewed questions');
+            questions = providedQuestions;
+        } else {
+            // Generate questions using AI (original flow)
+            console.log('[ASSESSMENT] Creating assessment with AI generation:', { title, topics, difficulty, numQuestions, cls, subject, schoolId });
+
+            const topicsList = topics.split(',').map(t => t.trim()).filter(t => t);
+
+            let difficultyGuide = '';
+            if (difficulty === 'easy') {
+                difficultyGuide = 'Create basic recall questions focusing on definitions, simple facts, and direct applications. Suitable for beginners.';
+            } else if (difficulty === 'medium') {
+                difficultyGuide = 'Create questions that require understanding and application of concepts. Mix of straightforward and moderately challenging questions.';
+            } else if (difficulty === 'hard') {
+                difficultyGuide = 'Create challenging questions requiring analysis, problem-solving, and deep understanding. Include multi-step problems.';
+            }
+
+            let questionFormat = '';
+            if (questionType === 'mcq') {
+                questionFormat = 'All questions should be Multiple Choice Questions (MCQ) with exactly 4 options (A, B, C, D).';
+            } else if (questionType === 'short') {
+                questionFormat = 'All questions should be short answer questions requiring 1-2 sentence answers.';
+            } else {
+                questionFormat = 'Mix of MCQ (with 4 options A, B, C, D) and short answer questions.';
+            }
+
+            const systemPrompt = `You are an expert teacher creating assessment questions for Class ${cls} ${subject}.
+
+${difficultyGuide}
+${questionFormat}
+
+Topics to cover: ${topicsList.join(', ')}
+
+Generate exactly ${numQuestions} questions. For MCQ questions, always provide the correct answer key.
+
+IMPORTANT: Respond ONLY with a valid JSON array. No markdown, no explanation, just the JSON.
+
+Format:
+[
+  {
+    "type": "mcq",
+    "question": "Question text here?",
+    "options": {"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"},
+    "answer": "A",
+    "topic": "Topic name"
+  },
+  {
+    "type": "short",
+    "question": "Question text here?",
+    "answer": "Expected answer",
+    "topic": "Topic name"
+  }
+]`;
+
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Generate ${numQuestions} ${difficulty} difficulty questions for Class ${cls} ${subject} covering: ${topics}` }
+                ],
+                max_tokens: 4000,
+                temperature: 0.7
+            });
+
+            let questionsText = response.choices[0].message.content;
+
+            // Clean up the response - remove markdown code blocks if present
+            questionsText = questionsText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+            try {
+                questions = JSON.parse(questionsText);
+            } catch (parseError) {
+                console.error('[ASSESSMENT] Failed to parse AI response:', parseError);
+                console.error('[ASSESSMENT] Raw response:', questionsText.substring(0, 500));
+                return res.status(500).json({ success: false, error: 'Failed to generate questions. Please try again.' });
+            }
+
+            if (!Array.isArray(questions) || questions.length === 0) {
+                return res.status(500).json({ success: false, error: 'No questions generated. Please try again.' });
+            }
+        }
+
+        // Generate unique assessment ID
+        const assessmentId = generateAssessmentId();
+
+        // Create assessment object
+        const assessment = {
+            id: assessmentId,
+            title: title,
+            topics: topics,
+            difficulty: difficulty,
+            questionType: questionType,
+            timeLimit: timeLimit,
+            class: cls,
+            subject: subject,
+            schoolId: schoolId,
+            teacherId: teacherId,
+            teacherName: teacherName,
+            questions: questions,
+            questionCount: questions.length,
+            status: 'active',
+            submissions: 0,
+            createdAt: new Date().toISOString()
+        };
+
+        // Store assessment in Redis
+        await db.kv.set(`assessment:${assessmentId}`, assessment);
+
+        // Add to teacher's assessment list
+        const listKey = `school:${schoolId}:teacher:${teacherId}:assessments`;
+        const existingList = await db.kv.get(listKey) || [];
+        existingList.unshift({
+            id: assessmentId,
+            title: title,
+            topics: topics,
+            class: cls,
+            subject: subject,
+            questionCount: questions.length,
+            timeLimit: timeLimit,
+            status: 'active',
+            submissions: 0,
+            createdAt: assessment.createdAt
+        });
+        await db.kv.set(listKey, existingList);
+
+        const baseUrl = process.env.BASE_URL || 'https://vidyamitra.ai';
+        const shareLink = `${baseUrl}/assessment/${assessmentId}`;
+
+        console.log('[ASSESSMENT] Created successfully:', assessmentId, 'with', questions.length, 'questions');
+
+        res.json({
+            success: true,
+            assessmentId: assessmentId,
+            questionCount: questions.length,
+            shareLink: shareLink
+        });
+    } catch (e) {
+        console.error('[ASSESSMENT] Error creating assessment:', e);
+        res.status(500).json({ success: false, error: 'Failed to create assessment' });
+    }
+});
+
+// GET /api/teacher/assessments - Get teacher's assessments
+app.get('/api/teacher/assessments', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.teacher;
+        const { class: cls, subject } = req.query;
+
+        const listKey = `school:${schoolId}:teacher:${teacherId}:assessments`;
+        let assessments = await db.kv.get(listKey) || [];
+
+        // Filter by class/subject if provided
+        if (cls && subject) {
+            assessments = assessments.filter(a => a.class === cls && a.subject === subject);
+        }
+
+        res.json({ success: true, assessments: assessments });
+    } catch (e) {
+        console.error('[ASSESSMENT] Error fetching assessments:', e);
+        res.status(500).json({ success: false, error: 'Failed to fetch assessments' });
+    }
+});
+
+// DELETE /api/teacher/assessments/:id - Delete an assessment
+app.delete('/api/teacher/assessments/:id', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.teacher;
+        const assessmentId = req.params.id;
+
+        // Get the assessment to verify ownership
+        const assessment = await db.kv.get(`assessment:${assessmentId}`);
+        if (!assessment) {
+            return res.status(404).json({ success: false, error: 'Assessment not found' });
+        }
+
+        if (assessment.schoolId !== schoolId || assessment.teacherId !== teacherId) {
+            return res.status(403).json({ success: false, error: 'Not authorized to delete this assessment' });
+        }
+
+        // Delete the assessment
+        await db.kv.del(`assessment:${assessmentId}`);
+
+        // Remove from teacher's list
+        const listKey = `school:${schoolId}:teacher:${teacherId}:assessments`;
+        let assessments = await db.kv.get(listKey) || [];
+        assessments = assessments.filter(a => a.id !== assessmentId);
+        await db.kv.set(listKey, assessments);
+
+        console.log('[ASSESSMENT] Deleted:', assessmentId);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[ASSESSMENT] Error deleting assessment:', e);
+        res.status(500).json({ success: false, error: 'Failed to delete assessment' });
+    }
+});
+
 // GET /api/school-info - Get school branding info
 app.get('/api/school-info', async (req, res) => {
     try {
@@ -11220,6 +12450,625 @@ app.post('/api/teacher/curriculum', requireTeacher, async (req, res) => {
     } catch (e) {
         console.error('[CURRICULUM] Save error:', e);
         res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
+// STUDENT ASSESSMENT PAGE
+// =====================================================
+
+// GET /assessment/:id - Student assessment taking page
+app.get('/assessment/:id', async (req, res) => {
+    const assessmentId = req.params.id;
+
+    try {
+        const assessment = await db.kv.get(`assessment:${assessmentId}`);
+
+        if (!assessment) {
+            return res.status(404).send(`
+<!DOCTYPE html>
+<html><head><title>Assessment Not Found</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.error{text-align:center;padding:40px;}.error h1{color:#e53935;}</style></head>
+<body><div class="error"><h1>Assessment Not Found</h1><p>This assessment link is invalid or has expired.</p></div></body></html>`);
+        }
+
+        // Get school info for branding
+        let school = await db.kv.get(`school:${assessment.schoolId}`) || demoSchools[assessment.schoolId] || demoSchools['vidyamitra'];
+
+        const timeLimitMinutes = assessment.timeLimit || 0;
+        const timeLimitText = timeLimitMinutes > 0 ? `${timeLimitMinutes} minutes` : 'No time limit';
+
+        // Build questions HTML (without showing answers)
+        const questionsForStudent = assessment.questions.map((q, idx) => ({
+            index: idx,
+            type: q.type,
+            question: q.question,
+            options: q.options || null,
+            topic: q.topic
+        }));
+
+        res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>${assessment.title} - VidyaMitra</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-content { max-width: 600px; margin: 0 auto; }
+        .assessment-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+        .assessment-meta { font-size: 13px; opacity: 0.9; display: flex; gap: 16px; flex-wrap: wrap; }
+        .timer {
+            position: fixed;
+            top: 70px;
+            right: 16px;
+            background: white;
+            padding: 8px 14px;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 99;
+        }
+        .timer.warning { background: #fff3cd; color: #856404; }
+        .timer.danger { background: #f8d7da; color: #721c24; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .container { max-width: 600px; margin: 0 auto; padding: 16px; padding-bottom: 100px; }
+        .start-screen, .end-screen {
+            background: white;
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            margin-top: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .start-screen h2 { margin-bottom: 20px; color: #333; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; text-align: left; }
+        .info-item { background: #f8f9fa; padding: 12px; border-radius: 8px; }
+        .info-label { font-size: 11px; color: #888; text-transform: uppercase; }
+        .info-value { font-size: 15px; font-weight: 600; color: #333; margin-top: 2px; }
+        .student-form { margin: 24px 0; text-align: left; }
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus { outline: none; border-color: #667eea; }
+        .btn-start {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 16px;
+        }
+        .btn-start:disabled { opacity: 0.6; cursor: not-allowed; }
+        .question-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .question-number {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .question-text {
+            font-size: 16px;
+            line-height: 1.5;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .option-btn {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            text-align: left;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        .option-btn:hover { border-color: #667eea; background: #f8f9ff; }
+        .option-btn.selected { border-color: #667eea; background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%); }
+        .option-letter {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        .option-btn.selected .option-letter { background: #667eea; color: white; }
+        .short-answer {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            resize: vertical;
+            min-height: 80px;
+        }
+        .short-answer:focus { outline: none; border-color: #667eea; }
+        .submit-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 16px 20px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .submit-bar-content { max-width: 600px; margin: 0 auto; display: flex; gap: 12px; align-items: center; }
+        .progress-text { font-size: 13px; color: #666; flex: 1; }
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-submit:disabled { opacity: 0.6; }
+        .questions-container { display: none; }
+        .questions-container.active { display: block; }
+        .result-score { font-size: 48px; font-weight: 700; color: #667eea; margin: 20px 0; }
+        .result-details { color: #666; margin-bottom: 24px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="assessment-title">${assessment.title}</div>
+            <div class="assessment-meta">
+                <span>Class ${assessment.class} ${assessment.subject}</span>
+                <span>${assessment.questionCount} Questions</span>
+                <span>${timeLimitText}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="timer hidden" id="timer">⏱️ <span id="timerDisplay">--:--</span></div>
+
+    <div class="container">
+        <!-- Start Screen -->
+        <div class="start-screen" id="startScreen">
+            <h2>Ready to Begin?</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Questions</div>
+                    <div class="info-value">${assessment.questionCount}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Time Limit</div>
+                    <div class="info-value">${timeLimitText}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Difficulty</div>
+                    <div class="info-value" style="text-transform:capitalize">${assessment.difficulty}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Topics</div>
+                    <div class="info-value" style="font-size:13px">${assessment.topics}</div>
+                </div>
+            </div>
+            <div class="student-form">
+                <input type="text" class="form-input" id="studentName" placeholder="Enter your name" required>
+                <input type="text" class="form-input" id="studentRoll" placeholder="Roll number (optional)">
+            </div>
+            <button class="btn-start" id="startBtn" onclick="startAssessment()">Start Assessment</button>
+        </div>
+
+        <!-- Questions -->
+        <div class="questions-container" id="questionsContainer"></div>
+
+        <!-- End Screen -->
+        <div class="end-screen hidden" id="endScreen">
+            <h2>Assessment Complete!</h2>
+            <div class="result-score" id="resultScore">--</div>
+            <div class="result-details" id="resultDetails">Calculating your score...</div>
+            <button class="btn-start" onclick="location.reload()">Take Again</button>
+        </div>
+    </div>
+
+    <div class="submit-bar hidden" id="submitBar">
+        <div class="submit-bar-content">
+            <div class="progress-text" id="progressText">0 of ${assessment.questionCount} answered</div>
+            <button class="btn-submit" id="submitBtn" onclick="submitAssessment()">Submit</button>
+        </div>
+    </div>
+
+    <script>
+        const assessmentId = '${assessmentId}';
+        const questions = ${JSON.stringify(questionsForStudent)};
+        const timeLimit = ${timeLimitMinutes};
+        let answers = {};
+        let timerInterval = null;
+        let remainingSeconds = timeLimit * 60;
+
+        function startAssessment() {
+            const name = document.getElementById('studentName').value.trim();
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('questionsContainer').classList.add('active');
+            document.getElementById('submitBar').classList.remove('hidden');
+
+            // Render questions
+            renderQuestions();
+
+            // Start timer if time limit exists
+            if (timeLimit > 0) {
+                document.getElementById('timer').classList.remove('hidden');
+                startTimer();
+            }
+
+            // Render LaTeX
+            if (typeof renderMathInElement !== 'undefined') {
+                setTimeout(() => {
+                    renderMathInElement(document.body, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false}
+                        ],
+                        throwOnError: false
+                    });
+                }, 100);
+            }
+        }
+
+        function renderQuestions() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = questions.map((q, idx) => {
+                if (q.type === 'mcq' && q.options) {
+                    const optionsHtml = Object.entries(q.options).map(([key, val]) =>
+                        '<button type="button" class="option-btn" data-question="' + idx + '" data-answer="' + key + '" onclick="selectOption(this)">' +
+                            '<span class="option-letter">' + key + '</span>' +
+                            '<span>' + escapeHtml(val) + '</span>' +
+                        '</button>'
+                    ).join('');
+                    return '<div class="question-card">' +
+                        '<div class="question-number">Question ' + (idx + 1) + ' of ' + questions.length + '</div>' +
+                        '<div class="question-text">' + escapeHtml(q.question) + '</div>' +
+                        '<div class="options">' + optionsHtml + '</div>' +
+                    '</div>';
+                } else {
+                    return '<div class="question-card">' +
+                        '<div class="question-number">Question ' + (idx + 1) + ' of ' + questions.length + '</div>' +
+                        '<div class="question-text">' + escapeHtml(q.question) + '</div>' +
+                        '<textarea class="short-answer" data-question="' + idx + '" placeholder="Type your answer here..." oninput="updateAnswer(this)"></textarea>' +
+                    '</div>';
+                }
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function selectOption(btn) {
+            const questionIdx = btn.dataset.question;
+            const answer = btn.dataset.answer;
+
+            // Remove selected from siblings
+            document.querySelectorAll('.option-btn[data-question="' + questionIdx + '"]').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+
+            answers[questionIdx] = answer;
+            updateProgress();
+        }
+
+        function updateAnswer(textarea) {
+            const questionIdx = textarea.dataset.question;
+            answers[questionIdx] = textarea.value.trim();
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const answered = Object.values(answers).filter(a => a && a.length > 0).length;
+            document.getElementById('progressText').textContent = answered + ' of ' + questions.length + ' answered';
+        }
+
+        function startTimer() {
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                remainingSeconds--;
+                updateTimerDisplay();
+
+                if (remainingSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    alert('Time is up! Your assessment will be submitted.');
+                    submitAssessment();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(remainingSeconds / 60);
+            const secs = remainingSeconds % 60;
+            document.getElementById('timerDisplay').textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+            const timer = document.getElementById('timer');
+            timer.classList.remove('warning', 'danger');
+            if (remainingSeconds <= 60) {
+                timer.classList.add('danger');
+            } else if (remainingSeconds <= 300) {
+                timer.classList.add('warning');
+            }
+        }
+
+        async function submitAssessment() {
+            if (timerInterval) clearInterval(timerInterval);
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            const studentName = document.getElementById('studentName').value.trim();
+            const studentRoll = document.getElementById('studentRoll').value.trim();
+
+            try {
+                const res = await fetch('/api/assessment/' + assessmentId + '/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        studentName: studentName,
+                        studentRoll: studentRoll,
+                        answers: answers,
+                        timeTaken: (timeLimit * 60) - remainingSeconds
+                    })
+                });
+                const data = await res.json();
+
+                document.getElementById('questionsContainer').classList.remove('active');
+                document.getElementById('submitBar').classList.add('hidden');
+                document.getElementById('timer').classList.add('hidden');
+                document.getElementById('endScreen').classList.remove('hidden');
+
+                if (data.success) {
+                    document.getElementById('resultScore').textContent = data.score + '%';
+                    document.getElementById('resultDetails').textContent =
+                        'You got ' + data.correct + ' out of ' + data.total + ' questions correct.';
+                } else {
+                    document.getElementById('resultScore').textContent = '--';
+                    document.getElementById('resultDetails').textContent = 'Error calculating score. Please contact your teacher.';
+                }
+            } catch (e) {
+                alert('Error submitting assessment. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+            }
+        }
+    </script>
+</body>
+</html>`);
+    } catch (e) {
+        console.error('[ASSESSMENT PAGE] Error:', e);
+        res.status(500).send('Error loading assessment');
+    }
+});
+
+// POST /api/assessment/:id/submit - Submit assessment answers
+app.post('/api/assessment/:id/submit', async (req, res) => {
+    try {
+        const assessmentId = req.params.id;
+        const { studentName, studentRoll, answers, timeTaken } = req.body;
+
+        const assessment = await db.kv.get(`assessment:${assessmentId}`);
+        if (!assessment) {
+            return res.status(404).json({ success: false, error: 'Assessment not found' });
+        }
+
+        // Calculate score
+        let correct = 0;
+        let total = assessment.questions.length;
+
+        assessment.questions.forEach((q, idx) => {
+            const studentAnswer = answers[idx];
+            if (q.type === 'mcq') {
+                if (studentAnswer && studentAnswer.toUpperCase() === q.answer.toUpperCase()) {
+                    correct++;
+                }
+            }
+            // For short answer, we'd need AI grading - for now skip auto-grading
+        });
+
+        const score = Math.round((correct / total) * 100);
+
+        // Store submission
+        const submission = {
+            assessmentId: assessmentId,
+            studentName: studentName,
+            studentRoll: studentRoll || '',
+            answers: answers,
+            correct: correct,
+            total: total,
+            score: score,
+            timeTaken: timeTaken,
+            submittedAt: new Date().toISOString()
+        };
+
+        // Add to submissions list
+        const submissionsKey = `assessment:${assessmentId}:submissions`;
+        const submissions = await db.kv.get(submissionsKey) || [];
+        submissions.push(submission);
+        await db.kv.set(submissionsKey, submissions);
+
+        // Update submission count in assessment
+        assessment.submissions = (assessment.submissions || 0) + 1;
+        await db.kv.set(`assessment:${assessmentId}`, assessment);
+
+        // Update in teacher's list too
+        const listKey = `school:${assessment.schoolId}:teacher:${assessment.teacherId}:assessments`;
+        let assessmentList = await db.kv.get(listKey) || [];
+        assessmentList = assessmentList.map(a => {
+            if (a.id === assessmentId) {
+                a.submissions = (a.submissions || 0) + 1;
+            }
+            return a;
+        });
+        await db.kv.set(listKey, assessmentList);
+
+        console.log('[ASSESSMENT] Submission received:', { assessmentId, studentName, score, correct, total });
+
+        res.json({
+            success: true,
+            score: score,
+            correct: correct,
+            total: total
+        });
+    } catch (e) {
+        console.error('[ASSESSMENT SUBMIT] Error:', e);
+        res.status(500).json({ success: false, error: 'Failed to submit assessment' });
+    }
+});
+
+// GET /assessment/:id/results - Teacher view of assessment results
+app.get('/assessment/:id/results', async (req, res) => {
+    try {
+        const assessmentId = req.params.id;
+        const assessment = await db.kv.get(`assessment:${assessmentId}`);
+
+        if (!assessment) {
+            return res.status(404).send('Assessment not found');
+        }
+
+        const submissionsKey = `assessment:${assessmentId}:submissions`;
+        const submissions = await db.kv.get(submissionsKey) || [];
+
+        // Calculate stats
+        const avgScore = submissions.length > 0
+            ? Math.round(submissions.reduce((acc, s) => acc + s.score, 0) / submissions.length)
+            : 0;
+
+        const submissionsHtml = submissions.length > 0
+            ? submissions.map((s, idx) => `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${s.studentName}</td>
+                    <td>${s.studentRoll || '-'}</td>
+                    <td><strong>${s.score}%</strong></td>
+                    <td>${s.correct}/${s.total}</td>
+                    <td>${Math.floor(s.timeTaken / 60)}m ${s.timeTaken % 60}s</td>
+                    <td>${new Date(s.submittedAt).toLocaleString('en-IN')}</td>
+                </tr>
+            `).join('')
+            : '<tr><td colspan="7" style="text-align:center;padding:40px;color:#888;">No submissions yet</td></tr>';
+
+        res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results - ${assessment.title}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; min-height: 100vh; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
+        .header h1 { font-size: 24px; margin-bottom: 8px; }
+        .header-meta { opacity: 0.9; font-size: 14px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .stat-value { font-size: 32px; font-weight: 700; color: #667eea; }
+        .stat-label { font-size: 13px; color: #888; margin-top: 4px; }
+        .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; font-size: 13px; color: #666; }
+        tr:hover { background: #f8f9ff; }
+        .back-link { display: inline-block; margin-bottom: 16px; color: #667eea; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="javascript:history.back()" class="back-link">← Back</a>
+        <div class="header">
+            <h1>${assessment.title}</h1>
+            <div class="header-meta">Class ${assessment.class} ${assessment.subject} | ${assessment.questionCount} questions | ${assessment.difficulty} difficulty</div>
+        </div>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value">${submissions.length}</div>
+                <div class="stat-label">Submissions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${avgScore}%</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${submissions.filter(s => s.score >= 60).length}</div>
+                <div class="stat-label">Passed (≥60%)</div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Student Name</th>
+                        <th>Roll No</th>
+                        <th>Score</th>
+                        <th>Correct</th>
+                        <th>Time</th>
+                        <th>Submitted</th>
+                    </tr>
+                </thead>
+                <tbody>${submissionsHtml}</tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>`);
+    } catch (e) {
+        console.error('[ASSESSMENT RESULTS] Error:', e);
+        res.status(500).send('Error loading results');
     }
 });
 
