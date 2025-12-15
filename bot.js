@@ -11092,31 +11092,28 @@ This is for Class ${cls} ${subject}. Match the difficulty level appropriately.`
 // GET /api/school-info - Get school branding info
 app.get('/api/school-info', async (req, res) => {
     try {
-        const schoolId = req.query.school || 'vidyamitra';
-        const school = await getSchoolByIdAsync(schoolId);
+        const schoolId = (req.query.school || 'vidyamitra').toLowerCase();
 
-        if (school) {
-            res.json({
-                success: true,
-                school: {
-                    id: school.id,
-                    name: school.name,
-                    shortName: school.shortName,
-                    tagline: school.tagline || 'Powered by VidyaMitra',
-                    logo: school.logo || '📚'
-                }
-            });
-        } else {
-            res.json({
-                success: true,
-                school: {
-                    id: 'vidyamitra',
-                    name: 'VidyaMitra',
-                    tagline: 'AI-Powered Learning',
-                    logo: '📚'
-                }
-            });
-        }
+        // First get hardcoded school data (trusted source)
+        const hardcodedSchool = demoSchools[schoolId] || demoSchools['vidyamitra'];
+
+        // Use hardcoded data as the primary source for branding
+        const safeName = hardcodedSchool.name || 'VidyaMitra';
+        const safeShortName = hardcodedSchool.shortName || '';
+        const safeTagline = hardcodedSchool.tagline || 'Powered by VidyaMitra';
+        // Use logoEmoji (not logo which is a URL)
+        const safeLogo = hardcodedSchool.logoEmoji || '📚';
+
+        res.json({
+            success: true,
+            school: {
+                id: hardcodedSchool.id || schoolId,
+                name: safeName,
+                shortName: safeShortName,
+                tagline: safeTagline,
+                logo: safeLogo
+            }
+        });
     } catch (e) {
         console.error('[SCHOOL-INFO] Error:', e);
         res.json({
