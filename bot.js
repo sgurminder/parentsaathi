@@ -9938,41 +9938,37 @@ app.get('/teacher-dashboard', async (req, res) => {
                 if (data.success) {
                     curriculumData = data.chapters;
                     const totalChapters = data.chapters.length;
-                    const withContent = data.chapters.filter(ch => ch.hasContent).length;
 
                     document.getElementById('totalChapters').textContent = totalChapters;
-                    document.getElementById('completedChapters').textContent = withContent;
+                    document.getElementById('completedChapters').textContent = totalChapters;
+
+                    let html = '';
 
                     if (totalChapters > 0) {
-                        const html = '<ul class="chapter-list">' + data.chapters.map((ch, idx) =>
+                        html = '<ul class="chapter-list">' + data.chapters.map((ch, idx) =>
                             '<li class="chapter-item" id="chapter-' + idx + '" onclick="toggleChapter(' + idx + ')">' +
                                 '<div style="display:flex;justify-content:space-between;align-items:center;width:100%">' +
                                     '<span class="chapter-name">' + (idx + 1) + '. ' + ch.name + '</span>' +
-                                    '<span class="chapter-status status-' + (ch.hasContent ? 'approved' : 'none') + '">' +
-                                        (ch.hasContent ? 'Has Content' : 'Add Content') +
-                                    '</span>' +
+                                    '<span class="chapter-status status-approved">Added</span>' +
                                 '</div>' +
                                 '<div class="chapter-details" id="chapter-details-' + idx + '" style="display:none">' +
-                                    (ch.hasContent ?
-                                        '<div class="chapter-content-preview" id="content-preview-' + idx + '">' +
-                                            '<strong>Your Teaching Method:</strong><br>' +
-                                            '<div class="latex-rendered">' + escapeHtml(ch.contentPreview || '') + '</div>' +
-                                        '</div>' : ''
-                                    ) +
+                                    '<div class="chapter-content-preview" id="content-preview-' + idx + '">' +
+                                        '<strong>Teaching Method:</strong><br>' +
+                                        '<div class="latex-rendered">' + escapeHtml(ch.contentPreview || ch.content || '') + '</div>' +
+                                    '</div>' +
                                     '<div class="chapter-actions">' +
-                                        '<button class="btn-small btn-primary" onclick="event.stopPropagation();openChapterEditor(' + idx + ')">' +
-                                            (ch.hasContent ? 'Edit Content' : 'Add Content') +
-                                        '</button>' +
+                                        '<button class="btn-small btn-primary" onclick="event.stopPropagation();openChapterEditor(' + idx + ')">Edit</button>' +
+                                        '<button class="btn-small btn-secondary" onclick="event.stopPropagation();deleteChapter(' + idx + ')">Delete</button>' +
                                     '</div>' +
                                 '</div>' +
                             '</li>'
                         ).join('') + '</ul>';
-                        document.getElementById('curriculumList').innerHTML = html;
-                        renderAllLatex();
                     } else {
-                        document.getElementById('curriculumList').innerHTML =
-                            '<div class="empty-state"><div class="empty-icon">📖</div><p>No chapters found for this class/subject</p></div>';
+                        html = '<div class="empty-state"><div class="empty-icon">📖</div><p>No chapters added yet.<br>Click + to add your first chapter or topic.</p></div>';
                     }
+
+                    document.getElementById('curriculumList').innerHTML = html;
+                    renderAllLatex();
                 }
             } catch (e) {
                 console.error('Curriculum load error:', e);
@@ -10195,24 +10191,21 @@ app.get('/teacher-dashboard', async (req, res) => {
                     showToast('Select class and subject first', 'error');
                     return;
                 }
-                document.getElementById('modalTitle').textContent = 'Add Teaching Content';
+                document.getElementById('modalTitle').textContent = 'Add Chapter / Topic';
                 document.getElementById('modalBody').innerHTML =
                     '<div class="form-group">' +
-                        '<label class="form-label">Chapter</label>' +
-                        '<select id="chapterSelect" class="form-input"><option value="">Select chapter...</option></select>' +
+                        '<label class="form-label">Chapter or Topic Name</label>' +
+                        '<input type="text" id="chapterName" class="form-input" placeholder="e.g., Rational Numbers, Fractions, Quadratic Equations...">' +
                     '</div>' +
                     '<div class="form-group">' +
                         '<label class="form-label">Teaching Method / Notes</label>' +
-                        '<textarea id="contentText" class="form-input" rows="6" placeholder="Enter your teaching method...\\n\\nUse LaTeX: $x^2$ or $$\\\\frac{a}{b}$$" oninput="updateLatexPreview()"></textarea>' +
+                        '<textarea id="contentText" class="form-input" rows="6" placeholder="How do you teach this topic? Include examples, tips, shortcuts...\\n\\nMath will be auto-formatted (e.g., 1/2 + 3/4, x^2, sqrt(x))" oninput="updateLatexPreview()"></textarea>' +
                     '</div>' +
                     '<div class="latex-preview-container">' +
-                        '<div class="latex-preview-label">Preview <span>LaTeX</span></div>' +
+                        '<div class="latex-preview-label">Preview</div>' +
                         '<div class="latex-preview" id="latexPreview">Start typing to see preview...</div>' +
                     '</div>' +
-                    '<button class="login-btn" onclick="saveNewCurriculumContent()">Save Content</button>';
-
-                // Populate chapters
-                loadChaptersForSelect();
+                    '<button class="login-btn" onclick="saveNewCurriculumContent()">Add Chapter</button>';
             } else if (currentScreen === 'tests') {
                 document.getElementById('modalTitle').textContent = 'Create Test';
                 document.getElementById('modalBody').innerHTML =
@@ -10255,9 +10248,9 @@ app.get('/teacher-dashboard', async (req, res) => {
         }
 
         async function saveNewCurriculumContent() {
-            const chapter = document.getElementById('chapterSelect').value;
+            const chapter = document.getElementById('chapterName').value.trim();
             if (!chapter) {
-                showToast('Select a chapter', 'error');
+                showToast('Enter a chapter or topic name', 'error');
                 return;
             }
 
@@ -10267,7 +10260,7 @@ app.get('/teacher-dashboard', async (req, res) => {
             const content = document.getElementById('contentText').value.trim();
 
             if (!content) {
-                showToast('Please enter content', 'error');
+                showToast('Please enter teaching content', 'error');
                 return;
             }
 
@@ -10288,11 +10281,45 @@ app.get('/teacher-dashboard', async (req, res) => {
                 const data = await res.json();
 
                 if (data.success) {
-                    showToast('Content saved!', 'success');
+                    showToast('Chapter added!', 'success');
                     closeModal();
                     loadCurriculum();
                 } else {
                     showToast(data.error || 'Failed to save', 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function deleteChapter(idx) {
+            if (!confirm('Are you sure you want to delete this chapter?')) return;
+
+            const chapter = curriculumData[idx];
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            try {
+                const res = await fetch('/api/teacher/curriculum', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        class: cls,
+                        subject: subject,
+                        chapter: chapter.name
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Chapter deleted', 'success');
+                    loadCurriculum();
+                } else {
+                    showToast(data.error || 'Failed to delete', 'error');
                 }
             } catch (e) {
                 showToast('Network error', 'error');
@@ -10524,7 +10551,7 @@ app.get('/api/teacher/results', requireTeacher, async (req, res) => {
 // CURRICULUM API ENDPOINTS
 // =====================================================
 
-// GET /api/teacher/curriculum - Get curriculum with chapters and content status
+// GET /api/teacher/curriculum - Get teacher's custom chapters (no prefill)
 app.get('/api/teacher/curriculum', requireTeacher, async (req, res) => {
     try {
         const { schoolId, teacherId } = req.teacher;
@@ -10535,33 +10562,58 @@ app.get('/api/teacher/curriculum', requireTeacher, async (req, res) => {
             return res.json({ success: true, chapters: [] });
         }
 
-        // Get NCERT chapters for this class/subject
-        const chapterNames = getNCERTChapters(selectedClass, selectedSubject);
-
-        // Get existing content for this teacher
+        // Get teacher's custom chapters for this class/subject
         const methodsKey = 'school:' + schoolId + ':teacher:' + teacherId + ':methods';
         const methods = await db.kv.get(methodsKey) || [];
 
-        // Map chapters with their content and status
-        const chapters = chapterNames.map(chapterName => {
-            const existingContent = methods.find(m =>
+        // Filter chapters for this class/subject
+        const chapters = methods
+            .filter(m =>
                 m.class === selectedClass &&
-                m.subject.toLowerCase() === selectedSubject.toLowerCase() &&
-                m.chapter === chapterName
-            );
-            return {
-                name: chapterName,
-                hasContent: !!existingContent,
-                content: existingContent ? existingContent.content : '',
-                contentPreview: existingContent ? existingContent.content.substring(0, 200) + (existingContent.content.length > 200 ? '...' : '') : '',
-                createdAt: existingContent ? existingContent.createdAt : null,
-                approved: existingContent ? existingContent.approved : false
-            };
-        });
+                m.subject.toLowerCase() === selectedSubject.toLowerCase()
+            )
+            .map(m => ({
+                name: m.chapter,
+                content: m.content,
+                contentPreview: m.content.substring(0, 200) + (m.content.length > 200 ? '...' : ''),
+                createdAt: m.createdAt,
+                updatedAt: m.updatedAt
+            }));
 
         res.json({ success: true, chapters });
     } catch (e) {
         console.error('[TEACHER] Curriculum error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// DELETE /api/teacher/curriculum - Delete a chapter
+app.delete('/api/teacher/curriculum', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.teacher;
+        const { class: cls, subject, chapter } = req.body;
+
+        if (!cls || !subject || !chapter) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        // Get existing methods
+        const methodsKey = 'school:' + schoolId + ':teacher:' + teacherId + ':methods';
+        const methods = await db.kv.get(methodsKey) || [];
+
+        // Filter out the chapter to delete
+        const updatedMethods = methods.filter(m =>
+            !(m.class === cls &&
+              m.subject.toLowerCase() === subject.toLowerCase() &&
+              m.chapter === chapter)
+        );
+
+        await db.kv.set(methodsKey, updatedMethods);
+
+        console.log('[CURRICULUM] Chapter deleted:', { schoolId, teacherId, chapter });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[CURRICULUM] Delete error:', e);
         res.status(500).json({ success: false, error: 'Server error' });
     }
 });
