@@ -9565,9 +9565,165 @@ app.get('/teacher-dashboard', async (req, res) => {
         .chapter-expanded {
             background: #f0f4ff;
         }
+
+        /* School Branding Header */
+        .school-brand {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .school-logo {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .school-info {
+            flex: 1;
+        }
+        .school-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .school-tagline {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+
+        /* Photo Upload */
+        .upload-section {
+            margin-top: 16px;
+            padding: 16px;
+            background: #f0f7ff;
+            border-radius: 12px;
+            border: 2px dashed #667eea;
+        }
+        .upload-label {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .upload-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .upload-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-btn-camera {
+            background: #667eea;
+            color: white;
+        }
+        .upload-btn-gallery {
+            background: white;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+        .upload-btn-ai {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        .upload-preview {
+            margin-top: 12px;
+            position: relative;
+            display: none;
+        }
+        .upload-preview.active {
+            display: block;
+        }
+        .upload-preview img {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .upload-preview-remove {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .ai-extracting {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: #fff3e0;
+            border-radius: 8px;
+            margin-top: 12px;
+            color: #e65100;
+            font-size: 13px;
+        }
+        .ai-extracting .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e65100;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* AI Prefill Button */
+        .ai-prefill-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .ai-prefill-btn:hover {
+            opacity: 0.9;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
     </style>
 </head>
 <body>
+    <!-- School Branding (shown on all screens) -->
+    <div class="school-brand" id="schoolBrand">
+        <div class="school-logo" id="schoolLogo"></div>
+        <div class="school-info">
+            <div class="school-name" id="schoolNameDisplay"></div>
+            <div class="school-tagline" id="schoolTagline">Powered by VidyaMitra</div>
+        </div>
+    </div>
+
     <!-- Login Screen -->
     <div class="login-screen" id="loginScreen">
         <div class="login-card">
@@ -10183,7 +10339,10 @@ app.get('/teacher-dashboard', async (req, res) => {
             document.getElementById('modalOverlay').classList.add('active');
         }
 
+        let uploadedImageData = null;
+
         function openAddModal() {
+            uploadedImageData = null;
             if (currentScreen === 'curriculum') {
                 const cls = document.getElementById('classSelector').value;
                 const subject = document.getElementById('subjectSelector').value;
@@ -10196,10 +10355,34 @@ app.get('/teacher-dashboard', async (req, res) => {
                     '<div class="form-group">' +
                         '<label class="form-label">Chapter or Topic Name</label>' +
                         '<input type="text" id="chapterName" class="form-input" placeholder="e.g., Rational Numbers, Fractions, Quadratic Equations...">' +
+                        '<button class="ai-prefill-btn" onclick="aiGenerateChapterContent()" style="margin-top:8px">' +
+                            '<span>✨</span> AI Generate Content' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="upload-section">' +
+                        '<div class="upload-label"><span>📸</span> Upload Board/Notes Photo</div>' +
+                        '<div class="upload-buttons">' +
+                            '<button class="upload-btn upload-btn-camera" onclick="capturePhoto()">' +
+                                '<span>📷</span> Take Photo' +
+                            '</button>' +
+                            '<button class="upload-btn upload-btn-gallery" onclick="selectFromGallery()">' +
+                                '<span>🖼️</span> Gallery' +
+                            '</button>' +
+                        '</div>' +
+                        '<input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">' +
+                        '<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoUpload(event)">' +
+                        '<div class="upload-preview" id="uploadPreview">' +
+                            '<img id="previewImage" src="" alt="Preview">' +
+                            '<button class="upload-preview-remove" onclick="removeUploadedPhoto()">×</button>' +
+                        '</div>' +
+                        '<div class="ai-extracting" id="aiExtracting" style="display:none">' +
+                            '<div class="spinner"></div>' +
+                            '<span>AI is reading your notes...</span>' +
+                        '</div>' +
                     '</div>' +
                     '<div class="form-group">' +
                         '<label class="form-label">Teaching Method / Notes</label>' +
-                        '<textarea id="contentText" class="form-input" rows="6" placeholder="How do you teach this topic? Include examples, tips, shortcuts...\\n\\nMath will be auto-formatted (e.g., 1/2 + 3/4, x^2, sqrt(x))" oninput="updateLatexPreview()"></textarea>' +
+                        '<textarea id="contentText" class="form-input" rows="6" placeholder="How do you teach this topic? Include examples, tips, shortcuts...\\n\\nOR upload a photo of your board/notes and AI will extract it!" oninput="updateLatexPreview()"></textarea>' +
                     '</div>' +
                     '<div class="latex-preview-container">' +
                         '<div class="latex-preview-label">Preview</div>' +
@@ -10347,7 +10530,159 @@ app.get('/teacher-dashboard', async (req, res) => {
             setTimeout(() => toast.classList.remove('active'), 3000);
         }
 
+        // Photo upload functions
+        function capturePhoto() {
+            document.getElementById('cameraInput').click();
+        }
+
+        function selectFromGallery() {
+            document.getElementById('photoInput').click();
+        }
+
+        function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImage').src = e.target.result;
+                document.getElementById('uploadPreview').classList.add('active');
+                uploadedImageData = e.target.result;
+
+                // Auto-extract with AI
+                extractFromPhoto(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeUploadedPhoto() {
+            document.getElementById('uploadPreview').classList.remove('active');
+            document.getElementById('previewImage').src = '';
+            uploadedImageData = null;
+            document.getElementById('photoInput').value = '';
+            document.getElementById('cameraInput').value = '';
+        }
+
+        async function extractFromPhoto(imageData) {
+            const extractingEl = document.getElementById('aiExtracting');
+            extractingEl.style.display = 'flex';
+
+            try {
+                const token = localStorage.getItem(STORAGE_KEY + '_token');
+                const cls = document.getElementById('classSelector').value;
+                const subject = document.getElementById('subjectSelector').value;
+                const chapterName = document.getElementById('chapterName').value.trim();
+
+                const res = await fetch('/api/teacher/extract-from-image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        image: imageData,
+                        class: cls,
+                        subject: subject,
+                        chapter: chapterName
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    // If chapter name is empty, fill it from AI
+                    if (!chapterName && data.chapter) {
+                        document.getElementById('chapterName').value = data.chapter;
+                    }
+                    // Append extracted content to textarea
+                    const contentEl = document.getElementById('contentText');
+                    const existing = contentEl.value.trim();
+                    contentEl.value = existing ? existing + '\\n\\n' + data.content : data.content;
+                    updateLatexPreview();
+                    showToast('Content extracted from image!', 'success');
+                } else {
+                    showToast(data.error || 'Failed to extract content', 'error');
+                }
+            } catch (e) {
+                showToast('Error extracting from photo', 'error');
+            }
+
+            extractingEl.style.display = 'none';
+        }
+
+        async function aiGenerateChapterContent() {
+            const chapterName = document.getElementById('chapterName').value.trim();
+            if (!chapterName) {
+                showToast('Enter a chapter name first', 'error');
+                return;
+            }
+
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></span> Generating...';
+            btn.disabled = true;
+
+            try {
+                const token = localStorage.getItem(STORAGE_KEY + '_token');
+                const cls = document.getElementById('classSelector').value;
+                const subject = document.getElementById('subjectSelector').value;
+
+                const res = await fetch('/api/teacher/ai-generate-content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        class: cls,
+                        subject: subject,
+                        chapter: chapterName
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('contentText').value = data.content;
+                    updateLatexPreview();
+                    showToast('Content generated!', 'success');
+                } else {
+                    showToast(data.error || 'Failed to generate', 'error');
+                }
+            } catch (e) {
+                showToast('Error generating content', 'error');
+            }
+
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+
+        // School branding - load on page init
+        function loadSchoolBranding() {
+            // Get school info from URL or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const schoolIdParam = urlParams.get('school') || 'vidyamitra';
+
+            // Fetch school data
+            fetch('/api/school-info?school=' + schoolIdParam)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.school) {
+                        document.getElementById('schoolLogo').textContent = data.school.logo || '📚';
+                        document.getElementById('schoolNameDisplay').textContent = data.school.name || 'VidyaMitra';
+                        document.getElementById('schoolTagline').textContent = data.school.tagline || 'Powered by VidyaMitra';
+                    } else {
+                        document.getElementById('schoolLogo').textContent = '📚';
+                        document.getElementById('schoolNameDisplay').textContent = 'VidyaMitra';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('schoolLogo').textContent = '📚';
+                    document.getElementById('schoolNameDisplay').textContent = 'VidyaMitra';
+                });
+        }
+
         // Initialize
+        loadSchoolBranding();
         init();
     </script>
 </body>
@@ -10615,6 +10950,184 @@ app.delete('/api/teacher/curriculum', requireTeacher, async (req, res) => {
     } catch (e) {
         console.error('[CURRICULUM] Delete error:', e);
         res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/teacher/extract-from-image - Extract teaching content from board/notes photo
+app.post('/api/teacher/extract-from-image', requireTeacher, async (req, res) => {
+    try {
+        const { image, class: cls, subject, chapter } = req.body;
+
+        if (!image) {
+            return res.status(400).json({ success: false, error: 'No image provided' });
+        }
+
+        // Use OpenAI Vision API to extract content
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are an expert at extracting and formatting educational content from images of blackboards, whiteboards, and handwritten notes.
+
+Your task:
+1. Extract ALL text, formulas, diagrams descriptions, and examples from the image
+2. Format mathematical expressions properly (use standard notation like x^2, sqrt(x), fractions as a/b)
+3. Organize the content in a clear, structured way
+4. If there are diagrams, describe them clearly
+5. Identify the topic/chapter if not provided
+
+Output format:
+- Start with a brief title/topic if identifiable
+- Use bullet points for key concepts
+- Use numbered steps for procedures/methods
+- Format math expressions clearly
+- Add section headers for different parts
+
+Keep the teacher's original teaching style and examples. Do not add content that's not in the image.`
+                },
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "text",
+                            text: `Extract the teaching content from this ${subject} board/notes image for Class ${cls}. ${chapter ? 'The topic is: ' + chapter : 'Also identify the topic if possible.'}`
+                        },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: image,
+                                detail: "high"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 2000
+        });
+
+        const extractedContent = response.choices[0].message.content;
+
+        // Try to extract chapter name if not provided
+        let detectedChapter = chapter;
+        if (!chapter) {
+            const lines = extractedContent.split('\n');
+            // Look for a title-like line at the start
+            for (const line of lines.slice(0, 3)) {
+                const cleaned = line.replace(/^[#*\-\s]+/, '').trim();
+                if (cleaned.length > 3 && cleaned.length < 100 && !cleaned.includes(':')) {
+                    detectedChapter = cleaned;
+                    break;
+                }
+            }
+        }
+
+        console.log('[AI-EXTRACT] Content extracted from image for', cls, subject);
+        res.json({
+            success: true,
+            content: extractedContent,
+            chapter: detectedChapter
+        });
+    } catch (e) {
+        console.error('[AI-EXTRACT] Error:', e);
+        res.status(500).json({ success: false, error: 'Failed to extract content from image' });
+    }
+});
+
+// POST /api/teacher/ai-generate-content - AI generates teaching content for a chapter
+app.post('/api/teacher/ai-generate-content', requireTeacher, async (req, res) => {
+    try {
+        const { class: cls, subject, chapter } = req.body;
+
+        if (!cls || !subject || !chapter) {
+            return res.status(400).json({ success: false, error: 'Class, subject and chapter are required' });
+        }
+
+        // Generate teaching content using AI
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are an experienced Indian school teacher creating teaching notes for other teachers.
+
+Create comprehensive teaching content for the given topic that includes:
+1. Key Concepts - Main ideas students must understand
+2. Teaching Method - How to explain this topic step by step
+3. Common Mistakes - What students typically get wrong
+4. Examples - 2-3 worked examples with solutions
+5. Quick Tips - Memory tricks, shortcuts, visual aids
+6. Practice Problems - 2-3 problems for students to try
+
+Format guidelines:
+- Use clear bullet points and numbered lists
+- Write math as: x^2, sqrt(x), a/b for fractions
+- Keep language simple and clear
+- Include diagrams descriptions where helpful
+- Focus on NCERT/CBSE curriculum style
+
+This is for Class ${cls} ${subject}. Match the difficulty level appropriately.`
+                },
+                {
+                    role: "user",
+                    content: `Create detailed teaching notes for: "${chapter}" - Class ${cls} ${subject}`
+                }
+            ],
+            max_tokens: 2000
+        });
+
+        const content = response.choices[0].message.content;
+
+        console.log('[AI-GENERATE] Content generated for', chapter, cls, subject);
+        res.json({
+            success: true,
+            content: content
+        });
+    } catch (e) {
+        console.error('[AI-GENERATE] Error:', e);
+        res.status(500).json({ success: false, error: 'Failed to generate content' });
+    }
+});
+
+// GET /api/school-info - Get school branding info
+app.get('/api/school-info', async (req, res) => {
+    try {
+        const schoolId = req.query.school || 'vidyamitra';
+        const school = await getSchoolByIdAsync(schoolId);
+
+        if (school) {
+            res.json({
+                success: true,
+                school: {
+                    id: school.id,
+                    name: school.name,
+                    shortName: school.shortName,
+                    tagline: school.tagline || 'Powered by VidyaMitra',
+                    logo: school.logo || '📚'
+                }
+            });
+        } else {
+            res.json({
+                success: true,
+                school: {
+                    id: 'vidyamitra',
+                    name: 'VidyaMitra',
+                    tagline: 'AI-Powered Learning',
+                    logo: '📚'
+                }
+            });
+        }
+    } catch (e) {
+        console.error('[SCHOOL-INFO] Error:', e);
+        res.json({
+            success: true,
+            school: {
+                id: 'vidyamitra',
+                name: 'VidyaMitra',
+                tagline: 'AI-Powered Learning',
+                logo: '📚'
+            }
+        });
     }
 });
 
