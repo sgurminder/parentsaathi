@@ -11094,20 +11094,39 @@ app.get('/api/school-info', async (req, res) => {
     try {
         const schoolId = (req.query.school || 'vidyamitra').toLowerCase();
 
-        // First get hardcoded school data (trusted source)
-        const hardcodedSchool = demoSchools[schoolId] || demoSchools['vidyamitra'];
+        // Try to get school from Redis first (uploaded config)
+        let school = null;
+        try {
+            school = await db.kv.get(`school:${schoolId}`);
+        } catch (e) {
+            console.log('[SCHOOL-INFO] Redis lookup failed');
+        }
 
-        // Use hardcoded data as the primary source for branding
-        const safeName = hardcodedSchool.name || 'VidyaMitra';
-        const safeShortName = hardcodedSchool.shortName || '';
-        const safeTagline = hardcodedSchool.tagline || 'Powered by VidyaMitra';
-        // Use logoEmoji (not logo which is a URL)
-        const safeLogo = hardcodedSchool.logoEmoji || '📚';
+        // Fall back to hardcoded if not in Redis
+        if (!school) {
+            school = demoSchools[schoolId] || demoSchools['vidyamitra'];
+        }
+
+        // Extract only the branding fields we need (sanitize)
+        const safeName = typeof school.name === 'string' && school.name.length < 150
+            ? school.name
+            : 'VidyaMitra';
+        const safeShortName = typeof school.shortName === 'string' && school.shortName.length < 50
+            ? school.shortName
+            : '';
+        const safeTagline = typeof school.tagline === 'string' && school.tagline.length < 150
+            ? school.tagline
+            : 'Powered by VidyaMitra';
+        // Logo should be an emoji (1-4 chars) or short text
+        let safeLogo = school.logoEmoji || school.logo || '📚';
+        if (typeof safeLogo !== 'string' || safeLogo.length > 10) {
+            safeLogo = '📚';
+        }
 
         res.json({
             success: true,
             school: {
-                id: hardcodedSchool.id || schoolId,
+                id: school.id || schoolId,
                 name: safeName,
                 shortName: safeShortName,
                 tagline: safeTagline,
