@@ -9584,6 +9584,12 @@ app.get('/teacher-dashboard', async (req, res) => {
             align-items: center;
             justify-content: center;
             font-size: 24px;
+            overflow: hidden;
+        }
+        .school-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
         .school-info {
             flex: 1;
@@ -10667,7 +10673,13 @@ app.get('/teacher-dashboard', async (req, res) => {
                 .then(res => res.json())
                 .then(data => {
                     if (data.success && data.school) {
-                        document.getElementById('schoolLogo').textContent = data.school.logo || '📚';
+                        // Handle logo - prefer image URL, fallback to emoji
+                        const logoEl = document.getElementById('schoolLogo');
+                        if (data.school.logoUrl) {
+                            logoEl.innerHTML = '<img src="' + data.school.logoUrl + '" alt="Logo">';
+                        } else {
+                            logoEl.textContent = data.school.logoEmoji || '📚';
+                        }
                         document.getElementById('schoolNameDisplay').textContent = data.school.name || 'VidyaMitra';
                         document.getElementById('schoolTagline').textContent = data.school.tagline || 'Powered by VidyaMitra';
                     } else {
@@ -11117,10 +11129,19 @@ app.get('/api/school-info', async (req, res) => {
         const safeTagline = typeof school.tagline === 'string' && school.tagline.length < 150
             ? school.tagline
             : 'Powered by VidyaMitra';
-        // Logo should be an emoji (1-4 chars) or short text
-        let safeLogo = school.logoEmoji || school.logo || '📚';
-        if (typeof safeLogo !== 'string' || safeLogo.length > 10) {
-            safeLogo = '📚';
+
+        // Logo can be an image URL or emoji
+        // Check if logo is a URL (starts with http or data:)
+        let logoUrl = null;
+        let logoEmoji = '📚';
+
+        if (school.logo && typeof school.logo === 'string') {
+            if (school.logo.startsWith('http') || school.logo.startsWith('data:')) {
+                logoUrl = school.logo;
+            }
+        }
+        if (school.logoEmoji && typeof school.logoEmoji === 'string' && school.logoEmoji.length <= 10) {
+            logoEmoji = school.logoEmoji;
         }
 
         res.json({
@@ -11130,7 +11151,8 @@ app.get('/api/school-info', async (req, res) => {
                 name: safeName,
                 shortName: safeShortName,
                 tagline: safeTagline,
-                logo: safeLogo
+                logoUrl: logoUrl,
+                logoEmoji: logoEmoji
             }
         });
     } catch (e) {
@@ -11141,7 +11163,8 @@ app.get('/api/school-info', async (req, res) => {
                 id: 'vidyamitra',
                 name: 'VidyaMitra',
                 tagline: 'AI-Powered Learning',
-                logo: '📚'
+                logoUrl: null,
+                logoEmoji: '📚'
             }
         });
     }
