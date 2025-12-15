@@ -9411,6 +9411,25 @@ app.get('/teacher-dashboard', async (req, res) => {
             color: white;
             border-color: #667eea;
         }
+        .retake-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .retake-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .retake-option:hover { background: #f0f0f0; }
+        .retake-option input { width: 16px; height: 16px; }
+        .retake-label { font-size: 13px; }
         .share-link-box {
             background: #f8f9fa;
             border-radius: 8px;
@@ -10850,6 +10869,19 @@ app.get('/teacher-dashboard', async (req, res) => {
                         '</div>' +
                         '<input type="hidden" id="selectedTimeLimit" value="20">' +
                     '</div>' +
+                    '<div class="form-group">' +
+                        '<label class="form-label">Retake Policy</label>' +
+                        '<div class="retake-options">' +
+                            '<label class="retake-option">' +
+                                '<input type="radio" name="retakePolicy" value="single" checked>' +
+                                '<span class="retake-label">One attempt only</span>' +
+                            '</label>' +
+                            '<label class="retake-option">' +
+                                '<input type="radio" name="retakePolicy" value="unlimited">' +
+                                '<span class="retake-label">Unlimited retakes (best score kept)</span>' +
+                            '</label>' +
+                        '</div>' +
+                    '</div>' +
                     '<div class="generating-questions" id="generatingQuestions">' +
                         '<div class="spinner"></div>' +
                         '<span>AI is generating questions...</span>' +
@@ -11209,6 +11241,9 @@ app.get('/teacher-dashboard', async (req, res) => {
                 if (data.success && data.questions) {
                     document.getElementById('generatingQuestions').classList.remove('active');
 
+                    // Get retake policy
+                    const retakePolicy = document.querySelector('input[name="retakePolicy"]:checked')?.value || 'single';
+
                     // Store pending assessment data
                     pendingAssessment = {
                         title: title,
@@ -11216,6 +11251,7 @@ app.get('/teacher-dashboard', async (req, res) => {
                         difficulty: difficulty,
                         questionType: questionType,
                         timeLimit: parseInt(timeLimit),
+                        retakePolicy: retakePolicy,
                         class: cls,
                         subject: subject
                     };
@@ -12125,7 +12161,7 @@ Format:
 app.post('/api/teacher/assessments', requireTeacher, async (req, res) => {
     try {
         const { schoolId, teacherId, name: teacherName } = req.teacher;
-        const { title, topics, difficulty, numQuestions, questionType, timeLimit, class: cls, subject, questions: providedQuestions, finalize } = req.body;
+        const { title, topics, difficulty, numQuestions, questionType, timeLimit, retakePolicy, class: cls, subject, questions: providedQuestions, finalize } = req.body;
 
         if (!title || !topics || !cls || !subject) {
             return res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -12228,6 +12264,7 @@ Format:
             difficulty: difficulty,
             questionType: questionType,
             timeLimit: timeLimit,
+            retakePolicy: retakePolicy || 'single',
             class: cls,
             subject: subject,
             schoolId: schoolId,
@@ -12671,9 +12708,21 @@ app.get('/assessment/:id', async (req, res) => {
     <div class="timer hidden" id="timer">⏱️ <span id="timerDisplay">--:--</span></div>
 
     <div class="container">
+        <!-- Login Screen -->
+        <div class="start-screen" id="loginScreen">
+            <h2>Student Verification</h2>
+            <p style="color:#666;margin-bottom:20px;font-size:14px;">Only students of ${assessment.schoolId || 'this school'} can take this assessment</p>
+            <div class="student-form">
+                <input type="tel" class="form-input" id="loginPhone" placeholder="Enter your registered phone number">
+            </div>
+            <button class="btn-start" onclick="verifyStudent()">Verify & Continue</button>
+            <div id="loginError" style="color:#e53935;font-size:13px;margin-top:10px;text-align:center;display:none;"></div>
+        </div>
+
         <!-- Start Screen -->
-        <div class="start-screen" id="startScreen">
+        <div class="start-screen hidden" id="startScreen">
             <h2>Ready to Begin?</h2>
+            <div id="studentWelcome" style="color:#667eea;font-weight:500;margin-bottom:16px;"></div>
             <div class="info-grid">
                 <div class="info-item">
                     <div class="info-label">Questions</div>
@@ -12691,10 +12740,6 @@ app.get('/assessment/:id', async (req, res) => {
                     <div class="info-label">Topics</div>
                     <div class="info-value" style="font-size:13px">${assessment.topics}</div>
                 </div>
-            </div>
-            <div class="student-form">
-                <input type="text" class="form-input" id="studentName" placeholder="Enter your name" required>
-                <input type="text" class="form-input" id="studentRoll" placeholder="Roll number (optional)">
             </div>
             <button class="btn-start" id="startBtn" onclick="startAssessment()">Start Assessment</button>
         </div>
@@ -12720,16 +12765,78 @@ app.get('/assessment/:id', async (req, res) => {
 
     <script>
         const assessmentId = '${assessmentId}';
+        const schoolId = '${assessment.schoolId}';
+        const retakePolicy = '${assessment.retakePolicy || 'single'}';
         const questions = ${JSON.stringify(questionsForStudent)};
         const timeLimit = ${timeLimitMinutes};
         let answers = {};
         let timerInterval = null;
         let remainingSeconds = timeLimit * 60;
+        let currentStudent = null;
+
+        async function verifyStudent() {
+            const phone = document.getElementById('loginPhone').value.trim();
+            const errorEl = document.getElementById('loginError');
+
+            if (!phone) {
+                errorEl.textContent = 'Please enter your phone number';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            errorEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/student/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone, schoolId: schoolId })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    currentStudent = data.student;
+                    currentStudent.token = data.token;
+
+                    // Check if already attempted (for single-attempt)
+                    if (retakePolicy === 'single') {
+                        const checkRes = await fetch('/api/student/results/' + assessmentId, {
+                            headers: { 'Authorization': 'Bearer ' + data.token }
+                        });
+                        const checkData = await checkRes.json();
+
+                        if (checkData.success) {
+                            errorEl.innerHTML = 'You have already completed this assessment.<br>Your score: <strong>' + checkData.result.score + '%</strong>';
+                            errorEl.style.display = 'block';
+                            btn.disabled = false;
+                            btn.textContent = 'Verify & Continue';
+                            return;
+                        }
+                    }
+
+                    // Show start screen
+                    document.getElementById('loginScreen').classList.add('hidden');
+                    document.getElementById('startScreen').classList.remove('hidden');
+                    document.getElementById('studentWelcome').textContent = 'Welcome, ' + currentStudent.name + ' (Class ' + currentStudent.class + ')';
+                } else {
+                    errorEl.textContent = data.error || 'Verification failed. Please check your phone number.';
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.style.display = 'block';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Verify & Continue';
+        }
 
         function startAssessment() {
-            const name = document.getElementById('studentName').value.trim();
-            if (!name) {
-                alert('Please enter your name');
+            if (!currentStudent) {
+                alert('Please verify your phone number first');
                 return;
             }
 
@@ -12849,16 +12956,14 @@ app.get('/assessment/:id', async (req, res) => {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
 
-            const studentName = document.getElementById('studentName').value.trim();
-            const studentRoll = document.getElementById('studentRoll').value.trim();
-
             try {
                 const res = await fetch('/api/assessment/' + assessmentId + '/submit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        studentName: studentName,
-                        studentRoll: studentRoll,
+                        studentId: currentStudent ? currentStudent.id : null,
+                        studentName: currentStudent ? currentStudent.name : 'Unknown',
+                        studentRoll: currentStudent ? (currentStudent.section || '') : '',
                         answers: answers,
                         timeTaken: (timeLimit * 60) - remainingSeconds
                     })
@@ -12897,11 +13002,25 @@ app.get('/assessment/:id', async (req, res) => {
 app.post('/api/assessment/:id/submit', async (req, res) => {
     try {
         const assessmentId = req.params.id;
-        const { studentName, studentRoll, answers, timeTaken } = req.body;
+        const { studentName, studentRoll, studentId, answers, timeTaken } = req.body;
 
         const assessment = await db.kv.get(`assessment:${assessmentId}`);
         if (!assessment) {
             return res.status(404).json({ success: false, error: 'Assessment not found' });
+        }
+
+        // Check if student already attempted (for single-attempt assessments)
+        const retakePolicy = assessment.retakePolicy || 'single';
+
+        if (studentId && retakePolicy === 'single') {
+            const studentSubmissions = await db.kv.get(`student:${studentId}:submissions`) || {};
+            if (studentSubmissions[assessmentId]) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'You have already completed this assessment',
+                    previousScore: studentSubmissions[assessmentId].bestScore || studentSubmissions[assessmentId].score
+                });
+            }
         }
 
         // Calculate score
@@ -12919,10 +13038,12 @@ app.post('/api/assessment/:id/submit', async (req, res) => {
         });
 
         const score = Math.round((correct / total) * 100);
+        const now = new Date().toISOString();
 
-        // Store submission
+        // Store submission in teacher's view list
         const submission = {
             assessmentId: assessmentId,
+            studentId: studentId || null,
             studentName: studentName,
             studentRoll: studentRoll || '',
             answers: answers,
@@ -12930,31 +13051,86 @@ app.post('/api/assessment/:id/submit', async (req, res) => {
             total: total,
             score: score,
             timeTaken: timeTaken,
-            submittedAt: new Date().toISOString()
+            submittedAt: now
         };
 
-        // Add to submissions list
+        // Add to submissions list for teacher view
         const submissionsKey = `assessment:${assessmentId}:submissions`;
         const submissions = await db.kv.get(submissionsKey) || [];
-        submissions.push(submission);
+
+        // For retakes, replace previous submission from same student
+        if (studentId && retakePolicy === 'unlimited') {
+            const existingIdx = submissions.findIndex(s => s.studentId === studentId);
+            if (existingIdx >= 0) {
+                // Keep the better score for display
+                const prevScore = submissions[existingIdx].score;
+                submission.bestScore = Math.max(score, prevScore);
+                submission.attempts = (submissions[existingIdx].attempts || 1) + 1;
+                submissions[existingIdx] = submission;
+            } else {
+                submission.attempts = 1;
+                submissions.push(submission);
+            }
+        } else {
+            submissions.push(submission);
+        }
         await db.kv.set(submissionsKey, submissions);
 
-        // Update submission count in assessment
-        assessment.submissions = (assessment.submissions || 0) + 1;
-        await db.kv.set(`assessment:${assessmentId}`, assessment);
+        // Store/update in student's personal submissions (for student dashboard)
+        if (studentId) {
+            const studentSubmissionsKey = `student:${studentId}:submissions`;
+            const studentSubmissions = await db.kv.get(studentSubmissionsKey) || {};
 
-        // Update in teacher's list too
-        const listKey = `school:${assessment.schoolId}:teacher:${assessment.teacherId}:assessments`;
-        let assessmentList = await db.kv.get(listKey) || [];
-        assessmentList = assessmentList.map(a => {
-            if (a.id === assessmentId) {
-                a.submissions = (a.submissions || 0) + 1;
+            const existing = studentSubmissions[assessmentId];
+            if (existing && retakePolicy === 'unlimited') {
+                // Update with best score
+                studentSubmissions[assessmentId] = {
+                    score: score,
+                    correct: correct,
+                    total: total,
+                    bestScore: Math.max(score, existing.bestScore || existing.score),
+                    bestCorrect: score > (existing.bestScore || existing.score) ? correct : (existing.bestCorrect || existing.correct),
+                    attempts: (existing.attempts || 1) + 1,
+                    answers: answers,
+                    timeTaken: timeTaken,
+                    lastAttempt: now,
+                    submittedAt: existing.submittedAt
+                };
+            } else {
+                studentSubmissions[assessmentId] = {
+                    score: score,
+                    bestScore: score,
+                    correct: correct,
+                    bestCorrect: correct,
+                    total: total,
+                    attempts: 1,
+                    answers: answers,
+                    timeTaken: timeTaken,
+                    submittedAt: now,
+                    lastAttempt: now
+                };
             }
-            return a;
-        });
-        await db.kv.set(listKey, assessmentList);
+            await db.kv.set(studentSubmissionsKey, studentSubmissions);
+        }
 
-        console.log('[ASSESSMENT] Submission received:', { assessmentId, studentName, score, correct, total });
+        // Update submission count in assessment (count unique students for retake assessments)
+        if (!studentId || retakePolicy === 'single' || !submissions.find(s => s.studentId === studentId && s.attempts > 1)) {
+            assessment.submissions = (assessment.submissions || 0) + 1;
+            await db.kv.set(`assessment:${assessmentId}`, assessment);
+
+            // Update in teacher's list too
+            const listKey = `school:${assessment.schoolId}:teacher:${assessment.teacherId}:assessments`;
+            let assessmentList = await db.kv.get(listKey) || [];
+            assessmentList = assessmentList.map(a => {
+                if (a.id === assessmentId) {
+                    a.submissions = (a.submissions || 0) + 1;
+                }
+                return a;
+            });
+            await db.kv.set(listKey, assessmentList);
+        }
+
+        console.log('[ASSESSMENT] Submission received:', { assessmentId, studentId, studentName, score, correct, total });
 
         res.json({
             success: true,
@@ -13070,6 +13246,841 @@ app.get('/assessment/:id/results', async (req, res) => {
         console.error('[ASSESSMENT RESULTS] Error:', e);
         res.status(500).send('Error loading results');
     }
+});
+
+// =====================================================
+// STUDENT DASHBOARD & AUTHENTICATION
+// =====================================================
+
+// POST /api/student/verify - Verify student phone number
+app.post('/api/student/verify', async (req, res) => {
+    try {
+        const { phone, schoolId } = req.body;
+
+        if (!phone || !schoolId) {
+            return res.status(400).json({ success: false, error: 'Phone and school ID required' });
+        }
+
+        // Normalize phone
+        let normalizedPhone = phone.replace(/\D/g, '');
+        if (normalizedPhone.startsWith('91') && normalizedPhone.length > 10) {
+            normalizedPhone = normalizedPhone.slice(-10);
+        }
+
+        // Look up student by phone
+        const studentId = await db.kv.get(`school:${schoolId}:student:phone:${normalizedPhone}`);
+
+        if (!studentId) {
+            return res.json({ success: false, error: 'Phone number not registered. Please contact your school.' });
+        }
+
+        const student = await db.kv.get(`school:${schoolId}:student:${studentId}`);
+
+        if (!student) {
+            return res.json({ success: false, error: 'Student record not found' });
+        }
+
+        // Generate student token
+        const token = Math.random().toString(36).substr(2) + Date.now().toString(36);
+        const sessionKey = `student:session:${token}`;
+
+        await db.kv.set(sessionKey, {
+            studentId: student.id,
+            schoolId: schoolId,
+            name: student.name,
+            class: student.class,
+            section: student.section,
+            phone: normalizedPhone,
+            createdAt: Date.now()
+        });
+
+        console.log('[STUDENT] Verified:', student.name, '@', schoolId);
+
+        res.json({
+            success: true,
+            token: token,
+            student: {
+                id: student.id,
+                name: student.name,
+                class: student.class,
+                section: student.section
+            }
+        });
+    } catch (e) {
+        console.error('[STUDENT VERIFY] Error:', e);
+        res.status(500).json({ success: false, error: 'Verification failed' });
+    }
+});
+
+// Middleware for student authentication
+async function requireStudent(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, error: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const session = await db.kv.get(`student:session:${token}`);
+
+    if (!session) {
+        return res.status(401).json({ success: false, error: 'Invalid or expired session' });
+    }
+
+    req.student = session;
+    next();
+}
+
+// GET /api/student/assessments - Get available assessments for student
+app.get('/api/student/assessments', requireStudent, async (req, res) => {
+    try {
+        const { schoolId, class: studentClass } = req.student;
+
+        // Get all assessments for this school/class
+        // We need to scan through teachers' assessments
+        const assessments = [];
+
+        // Get all assessment keys for this school (simplified approach - in production use indexes)
+        const allKeys = await db.kv.keys(`school:${schoolId}:teacher:*:assessments`);
+
+        for (const key of allKeys || []) {
+            const teacherAssessments = await db.kv.get(key) || [];
+            for (const a of teacherAssessments) {
+                if (a.class === studentClass && a.status === 'active') {
+                    // Get full assessment to get retake policy
+                    const fullAssessment = await db.kv.get(`assessment:${a.id}`);
+                    if (fullAssessment) {
+                        assessments.push({
+                            ...a,
+                            retakePolicy: fullAssessment.retakePolicy || 'single'
+                        });
+                    }
+                }
+            }
+        }
+
+        // Get student's submissions to add status
+        const studentId = req.student.studentId;
+        const studentSubmissions = await db.kv.get(`student:${studentId}:submissions`) || {};
+
+        const assessmentsWithStatus = assessments.map(a => {
+            const submission = studentSubmissions[a.id];
+            return {
+                ...a,
+                attempted: !!submission,
+                lastScore: submission ? submission.bestScore || submission.score : null,
+                attempts: submission ? submission.attempts || 1 : 0,
+                canRetake: !submission || a.retakePolicy === 'unlimited'
+            };
+        });
+
+        // Sort by created date, newest first
+        assessmentsWithStatus.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        res.json({ success: true, assessments: assessmentsWithStatus });
+    } catch (e) {
+        console.error('[STUDENT ASSESSMENTS] Error:', e);
+        res.status(500).json({ success: false, error: 'Failed to load assessments' });
+    }
+});
+
+// GET /api/student/results - Get student's all results
+app.get('/api/student/results', requireStudent, async (req, res) => {
+    try {
+        const studentId = req.student.studentId;
+        const submissions = await db.kv.get(`student:${studentId}:submissions`) || {};
+
+        const results = [];
+        for (const [assessmentId, submission] of Object.entries(submissions)) {
+            const assessment = await db.kv.get(`assessment:${assessmentId}`);
+            if (assessment) {
+                results.push({
+                    assessmentId,
+                    title: assessment.title,
+                    subject: assessment.subject,
+                    class: assessment.class,
+                    topics: assessment.topics,
+                    score: submission.bestScore || submission.score,
+                    correct: submission.bestCorrect || submission.correct,
+                    total: submission.total,
+                    attempts: submission.attempts || 1,
+                    lastAttempt: submission.lastAttempt || submission.submittedAt
+                });
+            }
+        }
+
+        // Sort by last attempt, newest first
+        results.sort((a, b) => new Date(b.lastAttempt) - new Date(a.lastAttempt));
+
+        // Calculate stats
+        const totalAttempts = results.length;
+        const avgScore = totalAttempts > 0
+            ? Math.round(results.reduce((acc, r) => acc + r.score, 0) / totalAttempts)
+            : 0;
+
+        res.json({
+            success: true,
+            results,
+            stats: {
+                totalAttempts,
+                avgScore,
+                totalAssessments: results.length
+            }
+        });
+    } catch (e) {
+        console.error('[STUDENT RESULTS] Error:', e);
+        res.status(500).json({ success: false, error: 'Failed to load results' });
+    }
+});
+
+// GET /api/student/results/:assessmentId - Get detailed result for an assessment
+app.get('/api/student/results/:assessmentId', requireStudent, async (req, res) => {
+    try {
+        const studentId = req.student.studentId;
+        const assessmentId = req.params.assessmentId;
+
+        const submissions = await db.kv.get(`student:${studentId}:submissions`) || {};
+        const submission = submissions[assessmentId];
+
+        if (!submission) {
+            return res.status(404).json({ success: false, error: 'No submission found' });
+        }
+
+        const assessment = await db.kv.get(`assessment:${assessmentId}`);
+        if (!assessment) {
+            return res.status(404).json({ success: false, error: 'Assessment not found' });
+        }
+
+        // Build detailed review with questions, answers, and correct answers
+        const review = assessment.questions.map((q, idx) => {
+            const studentAnswer = submission.answers[idx];
+            const isCorrect = q.type === 'mcq'
+                ? studentAnswer && studentAnswer.toUpperCase() === q.answer.toUpperCase()
+                : null; // Short answers need manual grading
+
+            return {
+                index: idx,
+                type: q.type,
+                question: q.question,
+                options: q.options || null,
+                studentAnswer: studentAnswer || null,
+                correctAnswer: q.answer,
+                isCorrect,
+                topic: q.topic
+            };
+        });
+
+        res.json({
+            success: true,
+            assessment: {
+                id: assessmentId,
+                title: assessment.title,
+                subject: assessment.subject,
+                class: assessment.class,
+                topics: assessment.topics
+            },
+            result: {
+                score: submission.bestScore || submission.score,
+                correct: submission.bestCorrect || submission.correct,
+                total: submission.total,
+                attempts: submission.attempts || 1,
+                timeTaken: submission.timeTaken
+            },
+            review
+        });
+    } catch (e) {
+        console.error('[STUDENT RESULT DETAIL] Error:', e);
+        res.status(500).json({ success: false, error: 'Failed to load result details' });
+    }
+});
+
+// GET /student - Student Dashboard
+app.get('/student', async (req, res) => {
+    res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Student Dashboard - VidyaMitra</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-content {
+            max-width: 600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-title { font-size: 18px; font-weight: 600; }
+        .header-subtitle { font-size: 12px; opacity: 0.9; }
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .container { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+        /* Login Screen */
+        .login-screen {
+            background: white;
+            border-radius: 16px;
+            padding: 32px 24px;
+            margin-top: 60px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .login-screen h2 { text-align: center; margin-bottom: 8px; color: #333; }
+        .login-screen p { text-align: center; color: #666; margin-bottom: 24px; font-size: 14px; }
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        .form-input:focus { outline: none; border-color: #667eea; }
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .error-msg { color: #e53935; font-size: 13px; margin-top: 8px; text-align: center; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .stat-value { font-size: 24px; font-weight: 700; color: #667eea; }
+        .stat-label { font-size: 11px; color: #888; margin-top: 4px; }
+
+        /* Assessment Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .card-title { font-size: 15px; font-weight: 600; color: #333; }
+        .card-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .badge-new { background: #e3f2fd; color: #1976d2; }
+        .badge-completed { background: #e8f5e9; color: #388e3c; }
+        .badge-retake { background: #fff3e0; color: #f57c00; }
+        .card-meta { font-size: 12px; color: #888; margin-bottom: 12px; }
+        .card-meta span { margin-right: 12px; }
+        .card-score {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .score-bar {
+            flex: 1;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+        }
+        .score-text { font-size: 14px; font-weight: 600; color: #333; width: 45px; }
+        .card-actions { display: flex; gap: 8px; }
+        .btn-primary, .btn-secondary {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+        }
+        .empty-state h3 { color: #333; margin-bottom: 8px; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: flex-end;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            width: 100%;
+            max-height: 90vh;
+            background: white;
+            border-radius: 16px 16px 0 0;
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #888;
+        }
+        .modal-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        /* Review Question */
+        .review-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+        }
+        .review-item.correct { border-left: 4px solid #4caf50; }
+        .review-item.incorrect { border-left: 4px solid #f44336; }
+        .review-q-num { font-size: 11px; color: #888; margin-bottom: 6px; }
+        .review-q-text { font-size: 14px; margin-bottom: 10px; line-height: 1.4; }
+        .review-answer {
+            font-size: 13px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+        .answer-student { background: #fff3e0; }
+        .answer-student.correct-answer { background: #e8f5e9; }
+        .answer-correct { background: #e8f5e9; color: #2e7d32; }
+
+        .hidden { display: none !important; }
+        .loading { text-align: center; padding: 40px; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div>
+                <div class="header-title">VidyaMitra</div>
+                <div class="header-subtitle" id="studentInfo">Student Portal</div>
+            </div>
+            <button class="logout-btn hidden" id="logoutBtn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Login Screen -->
+        <div class="login-screen" id="loginScreen">
+            <h2>Student Login</h2>
+            <p>Enter your registered phone number to access your assessments</p>
+            <input type="text" class="form-input" id="schoolCode" placeholder="School Code (e.g., SNPS)">
+            <input type="tel" class="form-input" id="phoneNumber" placeholder="Phone Number">
+            <button class="login-btn" id="loginBtn" onclick="verifyStudent()">Continue</button>
+            <div class="error-msg hidden" id="loginError"></div>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="hidden" id="dashboard">
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('assessments')">Assessments</button>
+                <button class="tab" onclick="switchTab('results')">My Results</button>
+            </div>
+
+            <div id="assessmentsList"></div>
+            <div id="resultsList" class="hidden"></div>
+        </div>
+    </div>
+
+    <!-- Result Detail Modal -->
+    <div class="modal-overlay" id="resultModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Review Answers</div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'vidyamitra_student';
+        let currentTab = 'assessments';
+
+        // Check if already logged in
+        window.onload = function() {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const studentData = localStorage.getItem(STORAGE_KEY + '_data');
+
+            if (token && studentData) {
+                const student = JSON.parse(studentData);
+                showDashboard(student);
+            }
+        };
+
+        async function verifyStudent() {
+            const schoolCode = document.getElementById('schoolCode').value.trim().toUpperCase();
+            const phone = document.getElementById('phoneNumber').value.trim();
+            const errorEl = document.getElementById('loginError');
+
+            if (!schoolCode || !phone) {
+                errorEl.textContent = 'Please enter school code and phone number';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            errorEl.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/student/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, schoolId: schoolCode })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem(STORAGE_KEY + '_token', data.token);
+                    localStorage.setItem(STORAGE_KEY + '_data', JSON.stringify(data.student));
+                    localStorage.setItem(STORAGE_KEY + '_school', schoolCode);
+                    showDashboard(data.student);
+                } else {
+                    errorEl.textContent = data.error || 'Verification failed';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.classList.remove('hidden');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Continue';
+        }
+
+        function showDashboard(student) {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+            document.getElementById('studentInfo').textContent = student.name + ' - Class ' + student.class;
+
+            loadDashboardData();
+        }
+
+        async function loadDashboardData() {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+
+            // Load assessments
+            const assessmentsRes = await fetch('/api/student/assessments', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const assessmentsData = await assessmentsRes.json();
+
+            // Load results
+            const resultsRes = await fetch('/api/student/results', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const resultsData = await resultsRes.json();
+
+            // Update stats
+            const stats = resultsData.stats || { totalAssessments: 0, avgScore: 0, totalAttempts: 0 };
+            document.getElementById('statsGrid').innerHTML =
+                '<div class="stat-card">' +
+                    '<div class="stat-value">' + (assessmentsData.assessments?.length || 0) + '</div>' +
+                    '<div class="stat-label">Available</div>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                    '<div class="stat-value">' + stats.totalAttempts + '</div>' +
+                    '<div class="stat-label">Completed</div>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                    '<div class="stat-value">' + stats.avgScore + '%</div>' +
+                    '<div class="stat-label">Avg Score</div>' +
+                '</div>';
+
+            // Render assessments
+            renderAssessments(assessmentsData.assessments || []);
+            renderResults(resultsData.results || []);
+        }
+
+        function renderAssessments(assessments) {
+            const container = document.getElementById('assessmentsList');
+
+            if (assessments.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3>No Assessments</h3><p>No assessments available for your class yet.</p></div>';
+                return;
+            }
+
+            container.innerHTML = assessments.map(a => {
+                let badge = '';
+                let actions = '';
+
+                if (!a.attempted) {
+                    badge = '<span class="card-badge badge-new">New</span>';
+                    actions = '<button class="btn-primary" onclick="startAssessment(\\'' + a.id + '\\')">Start Assessment</button>';
+                } else if (a.canRetake) {
+                    badge = '<span class="card-badge badge-retake">Can Retake</span>';
+                    actions =
+                        '<button class="btn-secondary" onclick="viewResult(\\'' + a.id + '\\')">View Result</button>' +
+                        '<button class="btn-primary" onclick="startAssessment(\\'' + a.id + '\\')">Retake</button>';
+                } else {
+                    badge = '<span class="card-badge badge-completed">Completed</span>';
+                    actions = '<button class="btn-primary" onclick="viewResult(\\'' + a.id + '\\')">View Result</button>';
+                }
+
+                const scoreHtml = a.attempted ?
+                    '<div class="card-score">' +
+                        '<div class="score-bar"><div class="score-fill" style="width:' + a.lastScore + '%"></div></div>' +
+                        '<div class="score-text">' + a.lastScore + '%</div>' +
+                    '</div>' : '';
+
+                return '<div class="card">' +
+                    '<div class="card-header">' +
+                        '<div class="card-title">' + escapeHtml(a.title) + '</div>' +
+                        badge +
+                    '</div>' +
+                    '<div class="card-meta">' +
+                        '<span>' + a.subject + '</span>' +
+                        '<span>' + a.questionCount + ' Qs</span>' +
+                        '<span>' + (a.timeLimit ? a.timeLimit + ' min' : 'No limit') + '</span>' +
+                    '</div>' +
+                    scoreHtml +
+                    '<div class="card-actions">' + actions + '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function renderResults(results) {
+            const container = document.getElementById('resultsList');
+
+            if (results.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3>No Results Yet</h3><p>Complete an assessment to see your results here.</p></div>';
+                return;
+            }
+
+            container.innerHTML = results.map(r =>
+                '<div class="card">' +
+                    '<div class="card-header">' +
+                        '<div class="card-title">' + escapeHtml(r.title) + '</div>' +
+                        '<span class="card-badge badge-completed">' + r.attempts + ' attempt' + (r.attempts > 1 ? 's' : '') + '</span>' +
+                    '</div>' +
+                    '<div class="card-meta">' +
+                        '<span>' + r.subject + '</span>' +
+                        '<span>' + r.correct + '/' + r.total + ' correct</span>' +
+                    '</div>' +
+                    '<div class="card-score">' +
+                        '<div class="score-bar"><div class="score-fill" style="width:' + r.score + '%"></div></div>' +
+                        '<div class="score-text">' + r.score + '%</div>' +
+                    '</div>' +
+                    '<div class="card-actions">' +
+                        '<button class="btn-primary" onclick="viewResult(\\'' + r.assessmentId + '\\')">Review Answers</button>' +
+                    '</div>' +
+                '</div>'
+            ).join('');
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.tab:nth-child(' + (tab === 'assessments' ? 1 : 2) + ')').classList.add('active');
+
+            document.getElementById('assessmentsList').classList.toggle('hidden', tab !== 'assessments');
+            document.getElementById('resultsList').classList.toggle('hidden', tab !== 'results');
+        }
+
+        function startAssessment(id) {
+            window.location.href = '/assessment/' + id;
+        }
+
+        async function viewResult(assessmentId) {
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+
+            document.getElementById('modalBody').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('resultModal').classList.add('active');
+
+            try {
+                const res = await fetch('/api/student/results/' + assessmentId, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('modalTitle').textContent = data.assessment.title;
+
+                    const reviewHtml = data.review.map((q, idx) => {
+                        const statusClass = q.isCorrect === true ? 'correct' : (q.isCorrect === false ? 'incorrect' : '');
+                        const studentAnswerClass = q.isCorrect === true ? 'correct-answer' : '';
+
+                        let answerDisplay = '';
+                        if (q.type === 'mcq') {
+                            const studentOpt = q.studentAnswer ? q.options[q.studentAnswer] : 'Not answered';
+                            const correctOpt = q.options[q.correctAnswer];
+                            answerDisplay =
+                                '<div class="review-answer answer-student ' + studentAnswerClass + '">Your answer: ' + q.studentAnswer + '. ' + escapeHtml(studentOpt || 'Not answered') + '</div>' +
+                                (q.isCorrect === false ? '<div class="review-answer answer-correct">Correct: ' + q.correctAnswer + '. ' + escapeHtml(correctOpt) + '</div>' : '');
+                        } else {
+                            answerDisplay =
+                                '<div class="review-answer answer-student">Your answer: ' + escapeHtml(q.studentAnswer || 'Not answered') + '</div>' +
+                                '<div class="review-answer answer-correct">Expected: ' + escapeHtml(q.correctAnswer) + '</div>';
+                        }
+
+                        return '<div class="review-item ' + statusClass + '">' +
+                            '<div class="review-q-num">Question ' + (idx + 1) + ' - ' + (q.topic || '') + '</div>' +
+                            '<div class="review-q-text">' + escapeHtml(q.question) + '</div>' +
+                            answerDisplay +
+                        '</div>';
+                    }).join('');
+
+                    const summaryHtml =
+                        '<div class="card" style="margin-bottom:16px;text-align:center;">' +
+                            '<div style="font-size:32px;font-weight:700;color:#667eea;">' + data.result.score + '%</div>' +
+                            '<div style="font-size:13px;color:#888;">' + data.result.correct + ' of ' + data.result.total + ' correct</div>' +
+                        '</div>';
+
+                    document.getElementById('modalBody').innerHTML = summaryHtml + reviewHtml;
+
+                    // Render LaTeX
+                    if (typeof renderMathInElement !== 'undefined') {
+                        setTimeout(() => {
+                            renderMathInElement(document.getElementById('modalBody'), {
+                                delimiters: [
+                                    {left: '$$', right: '$$', display: true},
+                                    {left: '$', right: '$', display: false}
+                                ],
+                                throwOnError: false
+                            });
+                        }, 100);
+                    }
+                } else {
+                    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><p>' + (data.error || 'Failed to load') + '</p></div>';
+                }
+            } catch (e) {
+                document.getElementById('modalBody').innerHTML = '<div class="empty-state"><p>Error loading result</p></div>';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('resultModal').classList.remove('active');
+        }
+
+        function logout() {
+            localStorage.removeItem(STORAGE_KEY + '_token');
+            localStorage.removeItem(STORAGE_KEY + '_data');
+            localStorage.removeItem(STORAGE_KEY + '_school');
+            location.reload();
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>`);
 });
 
 // =====================================================
