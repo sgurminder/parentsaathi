@@ -9008,6 +9008,9 @@ app.get('/teacher-dashboard', async (req, res) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Teacher Dashboard - VidyaMitra</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -9432,6 +9435,136 @@ app.get('/teacher-dashboard', async (req, res) => {
         }
         .toast.success { background: #28a745; }
         .toast.error { background: #dc3545; }
+
+        /* LaTeX Preview */
+        .latex-preview-container {
+            margin-top: 12px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+        .latex-preview-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .latex-preview-label span {
+            background: #667eea;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .latex-preview {
+            min-height: 40px;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .latex-help {
+            margin-top: 12px;
+            padding: 12px;
+            background: #e8f4fd;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #1565c0;
+        }
+        .latex-help code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        .latex-examples {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .latex-example {
+            background: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            border: 1px solid #1565c0;
+            color: #1565c0;
+        }
+        .latex-example:hover {
+            background: #1565c0;
+            color: white;
+        }
+
+        /* Curriculum Screen Styles */
+        .curriculum-overview {
+            margin-bottom: 16px;
+        }
+        .curriculum-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .curriculum-stat {
+            background: white;
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .curriculum-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .curriculum-stat-label {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+        }
+        .chapter-details {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .chapter-content-preview {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .chapter-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .btn-small {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .chapter-expanded {
+            background: #f0f4ff;
+        }
     </style>
 </head>
 <body>
@@ -9513,16 +9646,28 @@ app.get('/teacher-dashboard', async (req, res) => {
                 </div>
             </div>
 
-            <!-- Content Screen -->
-            <div class="screen" id="contentScreen">
+            <!-- Curriculum Screen -->
+            <div class="screen" id="curriculumScreen">
+                <div class="curriculum-overview">
+                    <div class="curriculum-stats">
+                        <div class="curriculum-stat">
+                            <div class="curriculum-stat-value" id="totalChapters">-</div>
+                            <div class="curriculum-stat-label">Total Chapters</div>
+                        </div>
+                        <div class="curriculum-stat">
+                            <div class="curriculum-stat-value" id="completedChapters">-</div>
+                            <div class="curriculum-stat-label">With Content</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="section">
                     <div class="section-title">
-                        <span>Chapters</span>
+                        <span>Curriculum Chapters</span>
                     </div>
-                    <div id="chapterList">
+                    <div id="curriculumList">
                         <div class="empty-state">
-                            <div class="empty-icon">📚</div>
-                            <p>Select a class and subject to view chapters</p>
+                            <div class="empty-icon">📖</div>
+                            <p>Select a class and subject to view curriculum</p>
                         </div>
                     </div>
                 </div>
@@ -9568,9 +9713,9 @@ app.get('/teacher-dashboard', async (req, res) => {
                 <span class="nav-icon">🏠</span>
                 <span>Home</span>
             </button>
-            <button class="nav-item" data-screen="content" onclick="switchScreen('content')">
-                <span class="nav-icon">📚</span>
-                <span>Content</span>
+            <button class="nav-item" data-screen="curriculum" onclick="switchScreen('curriculum')">
+                <span class="nav-icon">📖</span>
+                <span>Curriculum</span>
             </button>
             <button class="nav-item" data-screen="tests" onclick="switchScreen('tests')">
                 <span class="nav-icon">📝</span>
@@ -9716,11 +9861,11 @@ app.get('/teacher-dashboard', async (req, res) => {
             document.getElementById(screen + 'Screen').classList.add('active');
             document.querySelector('[data-screen="' + screen + '"]').classList.add('active');
 
-            // Show FAB for content and tests screens
+            // Show FAB for curriculum and tests screens
             const fab = document.getElementById('fab');
-            fab.classList.toggle('active', screen === 'content' || screen === 'tests');
+            fab.classList.toggle('active', screen === 'curriculum' || screen === 'tests');
 
-            if (screen === 'content') loadContent();
+            if (screen === 'curriculum') loadCurriculum();
             else if (screen === 'tests') loadTests();
             else if (screen === 'results') loadResults();
         }
@@ -9732,7 +9877,7 @@ app.get('/teacher-dashboard', async (req, res) => {
             localStorage.setItem(STORAGE_KEY + '_class', cls);
             localStorage.setItem(STORAGE_KEY + '_subject', subject);
 
-            if (currentScreen === 'content') loadContent();
+            if (currentScreen === 'curriculum') loadCurriculum();
             else if (currentScreen === 'tests') loadTests();
             else if (currentScreen === 'results') loadResults();
         }
@@ -9767,42 +9912,197 @@ app.get('/teacher-dashboard', async (req, res) => {
             }
         }
 
-        async function loadContent() {
+        let curriculumData = [];
+
+        async function loadCurriculum() {
             const token = localStorage.getItem(STORAGE_KEY + '_token');
             const cls = document.getElementById('classSelector').value;
             const subject = document.getElementById('subjectSelector').value;
 
             if (!cls || !subject) {
-                document.getElementById('chapterList').innerHTML =
-                    '<div class="empty-state"><div class="empty-icon">📚</div><p>Select a class and subject to view chapters</p></div>';
+                document.getElementById('totalChapters').textContent = '-';
+                document.getElementById('completedChapters').textContent = '-';
+                document.getElementById('curriculumList').innerHTML =
+                    '<div class="empty-state"><div class="empty-icon">📖</div><p>Select a class and subject to view curriculum</p></div>';
                 return;
             }
 
-            document.getElementById('chapterList').innerHTML = '<div class="loading">Loading chapters...</div>';
+            document.getElementById('curriculumList').innerHTML = '<div class="loading">Loading curriculum...</div>';
 
             try {
-                const res = await fetch('/api/teacher/content?class=' + cls + '&subject=' + subject, {
+                const res = await fetch('/api/teacher/curriculum?class=' + cls + '&subject=' + subject, {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
                 const data = await res.json();
 
-                if (data.success && data.chapters.length > 0) {
-                    const html = '<ul class="chapter-list">' + data.chapters.map(ch =>
-                        '<li class="chapter-item" onclick="openChapter(\\'' + ch.name.replace(/'/g, "\\\\'") + '\\')">' +
-                            '<span class="chapter-name">' + ch.name + '</span>' +
-                            '<span class="chapter-status status-' + (ch.status || 'none') + '">' +
-                                (ch.status === 'approved' ? 'Live' : ch.status === 'pending' ? 'Pending' : 'No content') +
-                            '</span>' +
-                        '</li>'
-                    ).join('') + '</ul>';
-                    document.getElementById('chapterList').innerHTML = html;
-                } else {
-                    document.getElementById('chapterList').innerHTML =
-                        '<div class="empty-state"><div class="empty-icon">📚</div><p>No chapters found for this selection</p></div>';
+                if (data.success) {
+                    curriculumData = data.chapters;
+                    const totalChapters = data.chapters.length;
+                    const withContent = data.chapters.filter(ch => ch.hasContent).length;
+
+                    document.getElementById('totalChapters').textContent = totalChapters;
+                    document.getElementById('completedChapters').textContent = withContent;
+
+                    if (totalChapters > 0) {
+                        const html = '<ul class="chapter-list">' + data.chapters.map((ch, idx) =>
+                            '<li class="chapter-item" id="chapter-' + idx + '" onclick="toggleChapter(' + idx + ')">' +
+                                '<div style="display:flex;justify-content:space-between;align-items:center;width:100%">' +
+                                    '<span class="chapter-name">' + (idx + 1) + '. ' + ch.name + '</span>' +
+                                    '<span class="chapter-status status-' + (ch.hasContent ? 'approved' : 'none') + '">' +
+                                        (ch.hasContent ? 'Has Content' : 'Add Content') +
+                                    '</span>' +
+                                '</div>' +
+                                '<div class="chapter-details" id="chapter-details-' + idx + '" style="display:none">' +
+                                    (ch.hasContent ?
+                                        '<div class="chapter-content-preview" id="content-preview-' + idx + '">' +
+                                            '<strong>Your Teaching Method:</strong><br>' +
+                                            '<div class="latex-rendered">' + escapeHtml(ch.contentPreview || '') + '</div>' +
+                                        '</div>' : ''
+                                    ) +
+                                    '<div class="chapter-actions">' +
+                                        '<button class="btn-small btn-primary" onclick="event.stopPropagation();openChapterEditor(' + idx + ')">' +
+                                            (ch.hasContent ? 'Edit Content' : 'Add Content') +
+                                        '</button>' +
+                                    '</div>' +
+                                '</div>' +
+                            '</li>'
+                        ).join('') + '</ul>';
+                        document.getElementById('curriculumList').innerHTML = html;
+                        renderAllLatex();
+                    } else {
+                        document.getElementById('curriculumList').innerHTML =
+                            '<div class="empty-state"><div class="empty-icon">📖</div><p>No chapters found for this class/subject</p></div>';
+                    }
                 }
             } catch (e) {
-                console.error('Content load error:', e);
-                document.getElementById('chapterList').innerHTML = '<div class="empty-state">Error loading chapters</div>';
+                console.error('Curriculum load error:', e);
+                document.getElementById('curriculumList').innerHTML = '<div class="empty-state">Error loading curriculum</div>';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function toggleChapter(idx) {
+            const details = document.getElementById('chapter-details-' + idx);
+            const item = document.getElementById('chapter-' + idx);
+            if (details.style.display === 'none') {
+                // Close all other details
+                document.querySelectorAll('.chapter-details').forEach(d => d.style.display = 'none');
+                document.querySelectorAll('.chapter-item').forEach(i => i.classList.remove('chapter-expanded'));
+                details.style.display = 'block';
+                item.classList.add('chapter-expanded');
+                renderAllLatex();
+            } else {
+                details.style.display = 'none';
+                item.classList.remove('chapter-expanded');
+            }
+        }
+
+        function openChapterEditor(idx) {
+            const chapter = curriculumData[idx];
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+
+            document.getElementById('modalTitle').textContent = chapter.name;
+            document.getElementById('modalBody').innerHTML =
+                '<div class="form-group">' +
+                    '<label class="form-label">Teaching Method / Notes</label>' +
+                    '<textarea id="contentText" class="form-input" rows="6" placeholder="Enter your teaching method, examples, or notes for this chapter...\\n\\nUse LaTeX: $x^2$ or $$\\\\frac{a}{b}$$" oninput="updateLatexPreview()">' + (chapter.content || '') + '</textarea>' +
+                '</div>' +
+                '<div class="latex-preview-container">' +
+                    '<div class="latex-preview-label">Preview <span>LaTeX</span></div>' +
+                    '<div class="latex-preview" id="latexPreview">Start typing to see preview...</div>' +
+                '</div>' +
+                '<div class="latex-help">' +
+                    '<strong>LaTeX Tips:</strong> Use <code>$...$</code> for inline math, <code>$$...$$</code> for display math' +
+                    '<div class="latex-examples">' +
+                        '<button class="latex-example" onclick="insertLatex(\\'$\\\\\\\\frac{a}{b}$\\')">Fraction</button>' +
+                        '<button class="latex-example" onclick="insertLatex(\\'$x^2$\\')">Exponent</button>' +
+                        '<button class="latex-example" onclick="insertLatex(\\'$\\\\\\\\sqrt{x}$\\')">Square Root</button>' +
+                        '<button class="latex-example" onclick="insertLatex(\\'$\\\\\\\\sum_{i=1}^{n}$\\')">Sum</button>' +
+                    '</div>' +
+                '</div>' +
+                '<button class="login-btn" style="margin-top:16px" onclick="saveCurriculumContent(' + idx + ')">Save Content</button>';
+
+            document.getElementById('modalOverlay').classList.add('active');
+            setTimeout(updateLatexPreview, 100);
+        }
+
+        function insertLatex(latex) {
+            const textarea = document.getElementById('contentText');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            textarea.value = text.substring(0, start) + latex + text.substring(end);
+            textarea.focus();
+            textarea.selectionStart = textarea.selectionEnd = start + latex.length;
+            updateLatexPreview();
+        }
+
+        function updateLatexPreview() {
+            const content = document.getElementById('contentText').value;
+            const preview = document.getElementById('latexPreview');
+            if (!content.trim()) {
+                preview.innerHTML = 'Start typing to see preview...';
+                return;
+            }
+            preview.innerHTML = escapeHtml(content);
+            renderAllLatex();
+        }
+
+        function renderAllLatex() {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        async function saveCurriculumContent(idx) {
+            const chapter = curriculumData[idx];
+            const token = localStorage.getItem(STORAGE_KEY + '_token');
+            const cls = document.getElementById('classSelector').value;
+            const subject = document.getElementById('subjectSelector').value;
+            const content = document.getElementById('contentText').value.trim();
+
+            if (!content) {
+                showToast('Please enter content', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/teacher/curriculum', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        class: cls,
+                        subject: subject,
+                        chapter: chapter.name,
+                        content: content
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Content saved!', 'success');
+                    closeModal();
+                    loadCurriculum();
+                } else {
+                    showToast(data.error || 'Failed to save', 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
             }
         }
 
@@ -9888,7 +10188,7 @@ app.get('/teacher-dashboard', async (req, res) => {
         }
 
         function openAddModal() {
-            if (currentScreen === 'content') {
+            if (currentScreen === 'curriculum') {
                 const cls = document.getElementById('classSelector').value;
                 const subject = document.getElementById('subjectSelector').value;
                 if (!cls || !subject) {
@@ -9903,9 +10203,13 @@ app.get('/teacher-dashboard', async (req, res) => {
                     '</div>' +
                     '<div class="form-group">' +
                         '<label class="form-label">Teaching Method / Notes</label>' +
-                        '<textarea id="contentText" class="form-input" rows="6" placeholder="Enter your teaching method..."></textarea>' +
+                        '<textarea id="contentText" class="form-input" rows="6" placeholder="Enter your teaching method...\\n\\nUse LaTeX: $x^2$ or $$\\\\frac{a}{b}$$" oninput="updateLatexPreview()"></textarea>' +
                     '</div>' +
-                    '<button class="login-btn" onclick="saveNewContent()">Save Content</button>';
+                    '<div class="latex-preview-container">' +
+                        '<div class="latex-preview-label">Preview <span>LaTeX</span></div>' +
+                        '<div class="latex-preview" id="latexPreview">Start typing to see preview...</div>' +
+                    '</div>' +
+                    '<button class="login-btn" onclick="saveNewCurriculumContent()">Save Content</button>';
 
                 // Populate chapters
                 loadChaptersForSelect();
@@ -9934,7 +10238,7 @@ app.get('/teacher-dashboard', async (req, res) => {
             const cls = document.getElementById('classSelector').value;
             const subject = document.getElementById('subjectSelector').value;
 
-            const res = await fetch('/api/teacher/content?class=' + cls + '&subject=' + subject, {
+            const res = await fetch('/api/teacher/curriculum?class=' + cls + '&subject=' + subject, {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
             const data = await res.json();
@@ -9950,7 +10254,13 @@ app.get('/teacher-dashboard', async (req, res) => {
             }
         }
 
-        async function saveContent(chapterName) {
+        async function saveNewCurriculumContent() {
+            const chapter = document.getElementById('chapterSelect').value;
+            if (!chapter) {
+                showToast('Select a chapter', 'error');
+                return;
+            }
+
             const token = localStorage.getItem(STORAGE_KEY + '_token');
             const cls = document.getElementById('classSelector').value;
             const subject = document.getElementById('subjectSelector').value;
@@ -9962,7 +10272,7 @@ app.get('/teacher-dashboard', async (req, res) => {
             }
 
             try {
-                const res = await fetch('/api/teacher/content', {
+                const res = await fetch('/api/teacher/curriculum', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -9971,7 +10281,7 @@ app.get('/teacher-dashboard', async (req, res) => {
                     body: JSON.stringify({
                         class: cls,
                         subject: subject,
-                        chapter: chapterName,
+                        chapter: chapter,
                         content: content
                     })
                 });
@@ -9980,7 +10290,7 @@ app.get('/teacher-dashboard', async (req, res) => {
                 if (data.success) {
                     showToast('Content saved!', 'success');
                     closeModal();
-                    loadContent();
+                    loadCurriculum();
                 } else {
                     showToast(data.error || 'Failed to save', 'error');
                 }
@@ -10206,6 +10516,105 @@ app.get('/api/teacher/results', requireTeacher, async (req, res) => {
         res.json({ success: true, results });
     } catch (e) {
         console.error('[TEACHER] Results error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// =====================================================
+// CURRICULUM API ENDPOINTS
+// =====================================================
+
+// GET /api/teacher/curriculum - Get curriculum with chapters and content status
+app.get('/api/teacher/curriculum', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.teacher;
+        const selectedClass = req.query.class;
+        const selectedSubject = req.query.subject;
+
+        if (!selectedClass || !selectedSubject) {
+            return res.json({ success: true, chapters: [] });
+        }
+
+        // Get NCERT chapters for this class/subject
+        const chapterNames = getNCERTChapters(selectedClass, selectedSubject);
+
+        // Get existing content for this teacher
+        const methodsKey = 'school:' + schoolId + ':teacher:' + teacherId + ':methods';
+        const methods = await db.kv.get(methodsKey) || [];
+
+        // Map chapters with their content and status
+        const chapters = chapterNames.map(chapterName => {
+            const existingContent = methods.find(m =>
+                m.class === selectedClass &&
+                m.subject.toLowerCase() === selectedSubject.toLowerCase() &&
+                m.chapter === chapterName
+            );
+            return {
+                name: chapterName,
+                hasContent: !!existingContent,
+                content: existingContent ? existingContent.content : '',
+                contentPreview: existingContent ? existingContent.content.substring(0, 200) + (existingContent.content.length > 200 ? '...' : '') : '',
+                createdAt: existingContent ? existingContent.createdAt : null,
+                approved: existingContent ? existingContent.approved : false
+            };
+        });
+
+        res.json({ success: true, chapters });
+    } catch (e) {
+        console.error('[TEACHER] Curriculum error:', e);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
+// POST /api/teacher/curriculum - Save curriculum content for a chapter
+app.post('/api/teacher/curriculum', requireTeacher, async (req, res) => {
+    try {
+        const { schoolId, teacherId, name } = req.teacher;
+        const { class: cls, subject, chapter, content } = req.body;
+
+        if (!cls || !subject || !chapter || !content) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        // Get existing methods
+        const methodsKey = 'school:' + schoolId + ':teacher:' + teacherId + ':methods';
+        const methods = await db.kv.get(methodsKey) || [];
+
+        // Check if method already exists for this chapter
+        const existingIndex = methods.findIndex(m =>
+            m.class === cls &&
+            m.subject.toLowerCase() === subject.toLowerCase() &&
+            m.chapter === chapter
+        );
+
+        const newMethod = {
+            class: cls,
+            subject: subject,
+            chapter: chapter,
+            content: content,
+            teacherName: name,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            approved: false
+        };
+
+        if (existingIndex >= 0) {
+            // Update existing - preserve createdAt
+            methods[existingIndex] = {
+                ...methods[existingIndex],
+                content: content,
+                updatedAt: new Date().toISOString()
+            };
+        } else {
+            methods.push(newMethod);
+        }
+
+        await db.kv.set(methodsKey, methods);
+
+        console.log('[CURRICULUM] Content saved:', { schoolId, teacherId, chapter, contentLength: content.length });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[CURRICULUM] Save error:', e);
         res.status(500).json({ success: false, error: 'Server error' });
     }
 });
