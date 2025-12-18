@@ -1215,6 +1215,23 @@ function adminAuth(req, res, next) {
     next();
 }
 
+// Debug: List all admin keys
+app.get('/api/admin/debug-keys', adminAuth, async (req, res) => {
+    try {
+        const adminKeys = await db.kv.keys('school:admin:*');
+        const schoolKeys = await db.kv.keys('school:*');
+        // Only show simple school keys, not nested ones
+        const simpleSchoolKeys = schoolKeys.filter(k => !k.replace('school:', '').includes(':'));
+        res.json({
+            adminKeys,
+            schoolKeys: simpleSchoolKeys,
+            message: 'Compare adminKeys with schoolKeys - they should match'
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // List all schools (hardcoded + dynamic)
 app.get('/api/admin/schools', adminAuth, async (req, res) => {
     try {
