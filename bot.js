@@ -1576,7 +1576,8 @@ app.get('/admin', async (req, res, next) => {
         .school-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .school-card { background: white; border-radius: 12px; padding: 15px; border: 2px solid #e5e7eb; cursor: pointer; transition: all 0.2s; }
         .school-card:hover { border-color: #7c3aed; transform: translateY(-2px); }
-        .school-card .logo { width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin-bottom: 10px; }
+        .school-card .logo { width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin-bottom: 10px; overflow: hidden; }
+        .school-card .logo img { width: 100%; height: 100%; object-fit: contain; }
         .school-card h4 { font-size: 16px; margin-bottom: 5px; }
         .school-card p { color: #6b7280; font-size: 13px; }
         .school-card .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-top: 8px; }
