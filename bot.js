@@ -1576,18 +1576,36 @@ app.get('/admin', async (req, res, next) => {
                 <!-- Academic Tab -->
                 <div class="tab-content" id="academicTab" style="display:none">
                     <div class="form-group">
-                        <label>Board</label>
-                        <select id="board">
-                            <option value="CBSE">CBSE</option>
-                            <option value="ICSE">ICSE</option>
-                            <option value="State Board">State Board</option>
-                            <option value="IB">IB</option>
-                            <option value="Cambridge">Cambridge</option>
+                        <label>Institution Type</label>
+                        <select id="institutionType" onchange="updateAcademicFields()">
+                            <option value="school">School (K-12)</option>
+                            <option value="college">College / Professional Institute</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Classes (comma-separated)</label>
+                        <label>Board / Affiliation</label>
+                        <select id="board">
+                            <optgroup label="School Boards">
+                                <option value="CBSE">CBSE</option>
+                                <option value="ICSE">ICSE</option>
+                                <option value="State Board">State Board</option>
+                                <option value="IB">IB</option>
+                                <option value="Cambridge">Cambridge</option>
+                            </optgroup>
+                            <optgroup label="Professional / University">
+                                <option value="PCI">PCI (Pharmacy Council)</option>
+                                <option value="AICTE">AICTE (Engineering)</option>
+                                <option value="MCI">MCI (Medical)</option>
+                                <option value="BCI">BCI (Law)</option>
+                                <option value="UGC">UGC (University)</option>
+                                <option value="University">University Affiliated</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="classesLabel">Classes (comma-separated)</label>
                         <input type="text" id="classes" placeholder="1,2,3,4,5,6,7,8,9,10,11,12" value="1,2,3,4,5,6,7,8,9,10,11,12">
+                        <small id="classesHint" style="color:#6b7280;font-size:12px">For schools: 1,2,3... For colleges: B.Pharm 1st Year, B.Pharm 2nd Year...</small>
                     </div>
                     <div class="form-group">
                         <label>Sections (comma-separated)</label>
@@ -1709,6 +1727,7 @@ app.get('/admin', async (req, res, next) => {
                 document.getElementById('gradientFromPicker').value = school.gradientFrom || school.primaryColor || '#7c3aed';
                 document.getElementById('gradientTo').value = school.gradientTo || '#a855f7';
                 document.getElementById('gradientToPicker').value = school.gradientTo || '#a855f7';
+                document.getElementById('institutionType').value = school.institutionType || 'school';
                 document.getElementById('board').value = school.board || 'CBSE';
                 document.getElementById('classes').value = (school.classes || [1,2,3,4,5,6,7,8,9,10,11,12]).join(',');
                 document.getElementById('sections').value = (school.sections || ['A','B','C','D']).join(',');
@@ -1717,6 +1736,9 @@ app.get('/admin', async (req, res, next) => {
                     logoBase64 = school.logo;
                     document.getElementById('logoPreview').innerHTML = '<img src="' + school.logo + '" alt="Logo">';
                 }
+
+                // Update form labels based on institution type
+                updateAcademicFields();
             }
 
             document.getElementById('schoolModal').classList.add('active');
@@ -1748,6 +1770,42 @@ app.get('/admin', async (req, res, next) => {
             document.getElementById(tab + 'Tab').style.display = 'block';
         }
 
+        function updateAcademicFields() {
+            const type = document.getElementById('institutionType').value;
+            const classesInput = document.getElementById('classes');
+            const classesLabel = document.getElementById('classesLabel');
+            const classesHint = document.getElementById('classesHint');
+            const boardSelect = document.getElementById('board');
+
+            if (type === 'college') {
+                classesLabel.textContent = 'Years/Programs (comma-separated)';
+                classesInput.placeholder = 'B.Pharm 1st Year, B.Pharm 2nd Year, M.Pharm 1st Year';
+                classesHint.textContent = 'Examples: B.Pharm 1st Year, B.Tech 2nd Year, MBA 1st Sem';
+                // Set default college values if empty or has school defaults
+                if (classesInput.value === '1,2,3,4,5,6,7,8,9,10,11,12' || classesInput.value === '') {
+                    classesInput.value = 'B.Pharm 1st Year, B.Pharm 2nd Year, B.Pharm 3rd Year, B.Pharm 4th Year';
+                }
+                // Select first college board option if currently on school board
+                const schoolBoards = ['CBSE', 'ICSE', 'State Board', 'IB', 'Cambridge'];
+                if (schoolBoards.includes(boardSelect.value)) {
+                    boardSelect.value = 'PCI';
+                }
+            } else {
+                classesLabel.textContent = 'Classes (comma-separated)';
+                classesInput.placeholder = '1,2,3,4,5,6,7,8,9,10,11,12';
+                classesHint.textContent = 'For schools: 1,2,3... or LKG, UKG, 1, 2...';
+                // Set default school values if has college defaults
+                if (classesInput.value.includes('Year') || classesInput.value.includes('Sem') || classesInput.value === '') {
+                    classesInput.value = '1,2,3,4,5,6,7,8,9,10,11,12';
+                }
+                // Select CBSE if currently on college board
+                const collegeBoards = ['PCI', 'AICTE', 'MCI', 'BCI', 'UGC', 'University'];
+                if (collegeBoards.includes(boardSelect.value)) {
+                    boardSelect.value = 'CBSE';
+                }
+            }
+        }
+
         function syncColor(field) {
             const picker = document.getElementById(field + 'Picker') || document.getElementById(field + 'ColorPicker');
             const input = document.getElementById(field) || document.getElementById(field + 'Color');
@@ -1764,12 +1822,45 @@ app.get('/admin', async (req, res, next) => {
 
         function previewLogo(input) {
             if (input.files && input.files[0]) {
+                const file = input.files[0];
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    logoBase64 = e.target.result;
-                    document.getElementById('logoPreview').innerHTML = '<img src="' + logoBase64 + '" alt="Logo">';
+                    // Create an image to resize
+                    const img = new Image();
+                    img.onload = function() {
+                        // Target max dimension
+                        const maxSize = 200;
+                        let width = img.width;
+                        let height = img.height;
+
+                        // Calculate new dimensions maintaining aspect ratio
+                        if (width > height) {
+                            if (width > maxSize) {
+                                height = Math.round(height * maxSize / width);
+                                width = maxSize;
+                            }
+                        } else {
+                            if (height > maxSize) {
+                                width = Math.round(width * maxSize / height);
+                                height = maxSize;
+                            }
+                        }
+
+                        // Create canvas and resize
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Convert to PNG (better quality and smaller for small images)
+                        // PNG is universally supported unlike webp in some contexts
+                        logoBase64 = canvas.toDataURL('image/png', 0.9);
+                        document.getElementById('logoPreview').innerHTML = '<img src="' + logoBase64 + '" alt="Logo">';
+                    };
+                    img.src = e.target.result;
                 };
-                reader.readAsDataURL(input.files[0]);
+                reader.readAsDataURL(file);
             }
         }
 
@@ -1780,6 +1871,20 @@ app.get('/admin', async (req, res, next) => {
 
         async function saveSchool(e) {
             e.preventDefault();
+
+            const institutionType = document.getElementById('institutionType').value;
+            const classesRaw = document.getElementById('classes').value.split(',').map(c => c.trim()).filter(c => c);
+
+            // For schools, try to parse as numbers; for colleges, keep as strings
+            let classes;
+            if (institutionType === 'school') {
+                // Try to parse as numbers for schools
+                const parsed = classesRaw.map(c => parseInt(c)).filter(c => !isNaN(c));
+                classes = parsed.length > 0 ? parsed : classesRaw; // Fallback to strings if not numeric
+            } else {
+                // For colleges, keep as strings (e.g., "B.Pharm 1st Year")
+                classes = classesRaw;
+            }
 
             const schoolData = {
                 id: document.getElementById('schoolId').value,
@@ -1793,8 +1898,9 @@ app.get('/admin', async (req, res, next) => {
                 secondaryColor: document.getElementById('secondaryColor').value,
                 gradientFrom: document.getElementById('gradientFrom').value,
                 gradientTo: document.getElementById('gradientTo').value,
+                institutionType: institutionType,
                 board: document.getElementById('board').value,
-                classes: document.getElementById('classes').value.split(',').map(c => parseInt(c.trim())).filter(c => !isNaN(c)),
+                classes: classes,
                 sections: document.getElementById('sections').value.split(',').map(s => s.trim()).filter(s => s)
             };
 
