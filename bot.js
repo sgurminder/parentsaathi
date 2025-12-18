@@ -123,6 +123,25 @@ const demoSchools = {
         gradientFrom: '#10b981',
         gradientTo: '#059669',
         appName: 'Demo AI'
+    },
+    // ===== PROFESSIONAL COLLEGES =====
+    'pharmacy': {
+        id: 'pharmacy',
+        name: 'Demo College of Pharmacy',
+        shortName: 'Pharmacy College',
+        tagline: 'AI-Powered Pharmacy Education',
+        logo: null,
+        logoEmoji: '💊',
+        primaryColor: '#0d9488',
+        secondaryColor: '#f59e0b',
+        gradientFrom: '#0d9488',
+        gradientTo: '#14b8a6',
+        appName: 'PharmaMitra',
+        institutionType: 'college',
+        board: 'PCI',  // Pharmacy Council of India
+        classes: ['B.Pharm 1st Year', 'B.Pharm 2nd Year', 'B.Pharm 3rd Year', 'B.Pharm 4th Year', 'M.Pharm 1st Year', 'M.Pharm 2nd Year', 'D.Pharm 1st Year', 'D.Pharm 2nd Year'],
+        sections: ['A', 'B'],
+        subjects: ['Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry', 'Pharmacognosy', 'Pharmaceutical Analysis', 'Hospital Pharmacy', 'Clinical Pharmacy', 'Pharmaceutical Jurisprudence']
     }
 };
 
@@ -4985,12 +5004,328 @@ app.get('/dashboard', (req, res) => {
 });
 
 // =====================================================
+// COLLEGE LANDING PAGE - For Pharmacy, Engineering, etc.
+// =====================================================
+function getCollegeLandingPage(college) {
+    const collegeName = college.name || 'Demo College';
+    const appName = college.appName || 'EduMitra';
+    const primaryColor = college.primaryColor || '#0d9488';
+    const gradientFrom = college.gradientFrom || '#0d9488';
+    const gradientTo = college.gradientTo || '#14b8a6';
+    const emoji = college.logoEmoji || '🎓';
+    const board = college.board || 'University';
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${appName} - AI Platform for Professional Education</title>
+    <meta name="description" content="24/7 AI study assistance for students. Smart tools for faculty. Built for professional colleges.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${emoji}</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.6; }
+
+        nav { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; }
+        .logo { font-size: 1.5rem; font-weight: 700; color: ${primaryColor}; }
+        .nav-links { display: flex; gap: 32px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #475569; font-weight: 500; }
+        .nav-links a:hover { color: ${primaryColor}; }
+        .nav-cta { background: ${primaryColor}; color: white !important; padding: 10px 20px; border-radius: 8px; }
+        .nav-cta:hover { opacity: 0.9 !important; }
+
+        .mobile-menu { display: none; flex-direction: column; gap: 4px; cursor: pointer; }
+        .mobile-menu span { width: 24px; height: 3px; background: ${primaryColor}; border-radius: 2px; }
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .mobile-menu { display: flex; }
+        }
+
+        .hero { padding: 140px 24px 80px; background: linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%); color: white; text-align: center; }
+        .hero h1 { font-size: 2.8rem; max-width: 900px; margin: 0 auto 20px; line-height: 1.2; }
+        .hero p { font-size: 1.25rem; max-width: 700px; margin: 0 auto 32px; opacity: 0.95; }
+        .hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+        .btn-primary { background: white; color: ${primaryColor}; padding: 14px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 1rem; }
+        .btn-secondary { background: transparent; color: white; padding: 14px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 1rem; border: 2px solid white; }
+        .trust-badge { margin-top: 32px; opacity: 0.9; font-size: 0.95rem; }
+
+        .section { padding: 80px 24px; }
+        .section-alt { background: #f8fafc; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section-header { text-align: center; margin-bottom: 48px; }
+        .section-header h2 { font-size: 2rem; margin-bottom: 12px; color: #1e293b; }
+        .section-header p { color: #64748b; font-size: 1.1rem; }
+
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+        .card { background: white; padding: 32px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .card-icon { font-size: 2.5rem; margin-bottom: 16px; }
+        .card h3 { font-size: 1.25rem; margin-bottom: 12px; color: #1e293b; }
+        .card p { color: #64748b; }
+        .card ul { margin-top: 16px; padding-left: 20px; color: #64748b; }
+        .card li { margin-bottom: 8px; }
+
+        .stakeholder-tabs { display: flex; justify-content: center; gap: 16px; margin-bottom: 40px; flex-wrap: wrap; }
+        .tab-btn { padding: 12px 24px; border: 2px solid ${primaryColor}; background: white; color: ${primaryColor}; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .tab-btn.active, .tab-btn:hover { background: ${primaryColor}; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .outcomes { background: linear-gradient(135deg, ${gradientFrom}10, ${gradientTo}10); border-left: 4px solid ${primaryColor}; padding: 24px; border-radius: 8px; margin-top: 32px; }
+        .outcomes h4 { color: ${primaryColor}; margin-bottom: 12px; }
+        .outcomes ul { padding-left: 20px; }
+        .outcomes li { margin-bottom: 8px; color: #475569; }
+
+        .card-cta { display: inline-block; background: ${primaryColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px; }
+        .card-cta:hover { opacity: 0.9; }
+
+        .demo-section { background: linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%); color: white; padding: 60px 24px; text-align: center; }
+        .demo-section h2 { font-size: 2rem; margin-bottom: 16px; }
+        .demo-section p { opacity: 0.9; margin-bottom: 24px; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+        .footer { background: #1e293b; color: #94a3b8; padding: 48px 24px 24px; }
+        .footer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 32px; max-width: 1200px; margin: 0 auto; }
+        .footer h4 { color: white; margin-bottom: 16px; }
+        .footer ul { list-style: none; }
+        .footer li { margin-bottom: 8px; }
+        .footer a { color: #94a3b8; text-decoration: none; }
+        .footer a:hover { color: white; }
+        .footer-bottom { border-top: 1px solid #334155; margin-top: 32px; padding-top: 24px; text-align: center; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo">${emoji} ${appName}</div>
+        <div class="nav-links">
+            <a href="#students">For Students</a>
+            <a href="#faculty">For Faculty</a>
+            <a href="#management">For Management</a>
+            <a href="#industry">Industry Connect</a>
+            <a href="/contact?school=${college.id}" class="nav-cta">Get Started</a>
+        </div>
+        <div class="mobile-menu">
+            <span></span><span></span><span></span>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1>AI-Powered Learning Platform for Professional Colleges</h1>
+        <p>24/7 study assistance for students. Smart tools for faculty. Industry-ready skill development. Built for ${board} curriculum.</p>
+        <div class="hero-buttons">
+            <a href="/contact?school=${college.id}" class="btn-primary">Start Free Pilot</a>
+            <a href="/contact?school=${college.id}" class="btn-secondary">Book a Demo</a>
+        </div>
+        <p class="trust-badge">✓ Trusted by 1000+ students across multiple institutions</p>
+    </section>
+
+    <section id="students" class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <h2>For Students</h2>
+                <p>Your 24/7 AI study companion</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon">💬</div>
+                    <h3>Instant Doubt Resolution</h3>
+                    <p>Ask complex questions on WhatsApp anytime. Get detailed explanations with diagrams and examples.</p>
+                    <ul>
+                        <li>Photo your question, get step-by-step solution</li>
+                        <li>Explains in your faculty's teaching style</li>
+                        <li>Practice questions to test understanding</li>
+                        <li>Available 24/7 - even during exam prep</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📚</div>
+                    <h3>Subject Mastery</h3>
+                    <p>Deep dive into complex topics with AI-powered explanations.</p>
+                    <ul>
+                        <li>Pharmaceutics, Pharmacology, Chemistry</li>
+                        <li>Clinical case studies</li>
+                        <li>Drug interactions & mechanisms</li>
+                        <li>PCI exam preparation</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🎯</div>
+                    <h3>Career Readiness</h3>
+                    <p>Prepare for competitive exams and industry placements.</p>
+                    <ul>
+                        <li>GPAT preparation</li>
+                        <li>Industry interview prep</li>
+                        <li>Pharma company insights</li>
+                        <li>Research paper assistance</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="faculty" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2>For Faculty</h2>
+                <p>Save 10+ hours every week on administrative tasks</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon">📝</div>
+                    <h3>AI Lecture Planner</h3>
+                    <p>Generate comprehensive lecture plans aligned with PCI syllabus in minutes.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📄</div>
+                    <h3>Question Paper Generator</h3>
+                    <p>Create balanced question papers with proper Bloom's taxonomy distribution.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">✅</div>
+                    <h3>Auto-Graded Assessments</h3>
+                    <p>Create MCQ tests that grade automatically and give instant analytics.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📊</div>
+                    <h3>Student Analytics</h3>
+                    <p>Track understanding in real-time. Identify struggling students early.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🤖</div>
+                    <h3>Custom AI Teaching Assistant</h3>
+                    <p>Train AI on YOUR methods. Students get help exactly like you teach.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📚</div>
+                    <h3>Resource Library</h3>
+                    <p>Access pre-built templates for experiments, practicals, and assignments.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="management" class="section section-alt">
+        <div class="container">
+            <div class="section-header">
+                <h2>For Management</h2>
+                <p>Institutional excellence through AI</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon">📈</div>
+                    <h3>Academic Analytics Dashboard</h3>
+                    <p>Real-time insights into student performance, faculty workload, and learning outcomes.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🎯</div>
+                    <h3>Goal Tracking</h3>
+                    <p>Set institutional goals (pass rates, placements) and track progress automatically.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📋</div>
+                    <h3>Accreditation Ready</h3>
+                    <p>Generate reports for NBA, NAAC accreditation with comprehensive data.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">💰</div>
+                    <h3>Cost Efficiency</h3>
+                    <p>Reduce administrative overhead. Faculty focuses on teaching, not paperwork.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="industry" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2>Industry Connect</h2>
+                <p>Bridge the gap between academia and industry</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon">🏢</div>
+                    <h3>Industry-Aligned Curriculum</h3>
+                    <p>AI helps align course content with current industry requirements and trends.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">👔</div>
+                    <h3>Placement Preparation</h3>
+                    <p>Mock interviews, aptitude tests, and company-specific preparation.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔬</div>
+                    <h3>Research Collaboration</h3>
+                    <p>Connect students with industry research projects and internships.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📜</div>
+                    <h3>Skill Certification</h3>
+                    <p>AI-verified skill assessments that industry can trust.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="demo-section">
+        <h2>See ${appName} in Action</h2>
+        <p>Book a personalized demo to see how AI can transform your institution.</p>
+        <div class="hero-buttons">
+            <a href="/contact?school=${college.id}" class="btn-primary">Schedule Demo</a>
+            <a href="/teacher?school=${college.id}" class="btn-secondary">Faculty Login</a>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-grid">
+            <div>
+                <h4>${emoji} ${appName}</h4>
+                <p>AI-Powered Professional Education Platform</p>
+            </div>
+            <div>
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="#students">For Students</a></li>
+                    <li><a href="#faculty">For Faculty</a></li>
+                    <li><a href="#management">For Management</a></li>
+                    <li><a href="#industry">Industry Connect</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4>Portals</h4>
+                <ul>
+                    <li><a href="/student?school=${college.id}">Student Dashboard</a></li>
+                    <li><a href="/teacher?school=${college.id}">Faculty Dashboard</a></li>
+                    <li><a href="/admin?school=${college.id}">Admin Dashboard</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4>Contact</h4>
+                <ul>
+                    <li>📧 hello@vidyamitra.ai</li>
+                    <li>📱 WhatsApp Support</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2024 ${appName}. Powered by <a href="/">VidyaMitra</a> / Eulean AI</p>
+        </div>
+    </footer>
+</body>
+</html>`;
+}
+
+// =====================================================
 // HOMEPAGE - VidyaMitra.ai Website
 // =====================================================
 
 app.get('/', (req, res) => {
     // Redirect euleanai.com to main VidyaMitra page (merged brands)
     const host = req.get('host') || '';
+    const school = getSchoolConfig(req);
+
+    // Check if this is a college (pharmacy, engineering, etc.)
+    if (school.institutionType === 'college') {
+        return res.send(getCollegeLandingPage(school));
+    }
 
     res.send(`<!DOCTYPE html>
 <html lang="en">
