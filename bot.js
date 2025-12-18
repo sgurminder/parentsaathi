@@ -7315,6 +7315,7 @@ async function requireAdmin(req, res, next) {
 app.post('/api/admin/login', async (req, res) => {
     try {
         const { username, password, schoolId } = req.body;
+        console.log(`[ADMIN LOGIN] Attempt: username=${username}, schoolId=${schoolId}`);
 
         if (!username || !password) {
             return res.status(400).json({ success: false, error: 'Username and password required' });
@@ -7323,20 +7324,29 @@ app.post('/api/admin/login', async (req, res) => {
         // Get admin record
         const normalizedSchoolId = (schoolId || 'vidyamitra').toLowerCase();
         const adminKey = `school:admin:${normalizedSchoolId}`;
+        console.log(`[ADMIN LOGIN] Looking up key: ${adminKey}`);
         const adminRecord = await db.kv.get(adminKey);
+        console.log(`[ADMIN LOGIN] Found record:`, adminRecord ? `username=${adminRecord.username}, hasPasswordHash=${!!adminRecord.passwordHash}, hasPassword=${!!adminRecord.password}` : 'null');
 
         if (!adminRecord) {
-            console.log(`[ADMIN] No admin found for school: ${normalizedSchoolId}`);
+            console.log(`[ADMIN LOGIN] No admin found for school: ${normalizedSchoolId}`);
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
 
         // Check username
         if (adminRecord.username !== username) {
+            console.log(`[ADMIN LOGIN] Username mismatch: expected=${adminRecord.username}, got=${username}`);
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
 
-        // Verify password
-        const validPassword = await bcrypt.compare(password, adminRecord.passwordHash);
+        // Verify password - support both passwordHash and legacy password field
+        const hashToCheck = adminRecord.passwordHash || adminRecord.password;
+        if (!hashToCheck) {
+            console.log(`[ADMIN LOGIN] No password hash found in record`);
+            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+        const validPassword = await bcrypt.compare(password, hashToCheck);
+        console.log(`[ADMIN LOGIN] Password valid: ${validPassword}`);
         if (!validPassword) {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
