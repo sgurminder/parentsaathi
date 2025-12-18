@@ -83,7 +83,8 @@ const demoSchools = {
         secondaryColor: '#fbbf24',
         gradientFrom: '#667eea',
         gradientTo: '#764ba2',
-        appName: 'Springfields AI'
+        appName: 'Springfields AI',
+        isDemo: true
     },
     'dps': {
         id: 'dps',
@@ -96,7 +97,8 @@ const demoSchools = {
         secondaryColor: '#fbbf24',
         gradientFrom: '#1a56db',
         gradientTo: '#1e40af',
-        appName: 'DPS AI'
+        appName: 'DPS AI',
+        isDemo: true
     },
     'greenvalley': {
         id: 'greenvalley',
@@ -109,7 +111,8 @@ const demoSchools = {
         secondaryColor: '#fbbf24',
         gradientFrom: '#059669',
         gradientTo: '#047857',
-        appName: 'GVI AI'
+        appName: 'GVI AI',
+        isDemo: true
     },
     'demo': {
         id: 'demo',
@@ -122,7 +125,8 @@ const demoSchools = {
         secondaryColor: '#fbbf24',
         gradientFrom: '#10b981',
         gradientTo: '#059669',
-        appName: 'Demo AI'
+        appName: 'Demo AI',
+        isDemo: true
     },
     // ===== PROFESSIONAL COLLEGES =====
     'pharmacy': {
@@ -141,7 +145,8 @@ const demoSchools = {
         board: 'PCI',  // Pharmacy Council of India
         classes: ['B.Pharm 1st Year', 'B.Pharm 2nd Year', 'B.Pharm 3rd Year', 'B.Pharm 4th Year', 'M.Pharm 1st Year', 'M.Pharm 2nd Year', 'D.Pharm 1st Year', 'D.Pharm 2nd Year'],
         sections: ['A', 'B'],
-        subjects: ['Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry', 'Pharmacognosy', 'Pharmaceutical Analysis', 'Hospital Pharmacy', 'Clinical Pharmacy', 'Pharmaceutical Jurisprudence']
+        subjects: ['Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry', 'Pharmacognosy', 'Pharmaceutical Analysis', 'Hospital Pharmacy', 'Clinical Pharmacy', 'Pharmaceutical Jurisprudence'],
+        isDemo: true
     }
 };
 
@@ -3475,8 +3480,34 @@ app.get('/admin', (req, res) => {
 // =====================================================
 
 // Teacher routes - if school param provided, go to dashboard, otherwise form
-app.get('/teacher', (req, res) => {
+app.get('/teacher', async (req, res) => {
     if (req.query.school) {
+        // Check if this is a demo school - block teacher login for demo schools
+        const school = await getSchoolByIdAsync(req.query.school);
+        if (school && school.isDemo) {
+            return res.status(403).send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Access Restricted</title>
+                    <style>
+                        body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f3f4f6; }
+                        .container { text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 400px; }
+                        h1 { color: #dc2626; margin-bottom: 16px; }
+                        p { color: #6b7280; margin-bottom: 24px; }
+                        a { color: #3b82f6; text-decoration: none; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>Teacher Login Disabled</h1>
+                        <p>Teacher login is not available for demo schools. Please contact the administrator if you need access.</p>
+                        <a href="/?school=${req.query.school}">Back to Home</a>
+                    </div>
+                </body>
+                </html>
+            `);
+        }
         // Has school param - this will be handled by the teacher dashboard route below
         // Use next() to pass to the next matching route
         return res.redirect('/teacher-dashboard?school=' + req.query.school);
@@ -5333,6 +5364,7 @@ function getCollegeLandingPage(college) {
     const gradientTo = college.gradientTo || '#14b8a6';
     const emoji = college.logoEmoji || '🎓';
     const board = college.board || 'University';
+    const isDemo = college.isDemo || false;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -5589,7 +5621,7 @@ function getCollegeLandingPage(college) {
         <p>Book a personalized demo to see how AI can transform your institution.</p>
         <div class="hero-buttons">
             <a href="/contact?school=${college.id}" class="btn-primary">Schedule Demo</a>
-            <a href="/teacher?school=${college.id}" class="btn-secondary">Faculty Login</a>
+            ${!isDemo ? `<a href="/teacher?school=${college.id}" class="btn-secondary">Faculty Login</a>` : ''}
         </div>
     </section>
 
@@ -5612,7 +5644,7 @@ function getCollegeLandingPage(college) {
                 <h4>Portals</h4>
                 <ul>
                     <li><a href="/student?school=${college.id}">Student Dashboard</a></li>
-                    <li><a href="/teacher?school=${college.id}">Faculty Dashboard</a></li>
+                    ${!isDemo ? `<li><a href="/teacher?school=${college.id}">Faculty Dashboard</a></li>` : ''}
                     <li><a href="/admin?school=${college.id}">Admin Dashboard</a></li>
                 </ul>
             </div>
@@ -9663,6 +9695,33 @@ app.get('/teacher-dashboard', async (req, res) => {
 
     if (!schoolId) {
         return res.status(400).send('School ID required');
+    }
+
+    // Block demo schools from accessing teacher dashboard
+    const school = await getSchoolByIdAsync(req.query.school);
+    if (school && school.isDemo) {
+        return res.status(403).send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Access Restricted</title>
+                <style>
+                    body { font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f3f4f6; }
+                    .container { text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 400px; }
+                    h1 { color: #dc2626; margin-bottom: 16px; }
+                    p { color: #6b7280; margin-bottom: 24px; }
+                    a { color: #3b82f6; text-decoration: none; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Teacher Login Disabled</h1>
+                    <p>Teacher login is not available for demo schools. Please contact the administrator if you need access.</p>
+                    <a href="/?school=${req.query.school}">Back to Home</a>
+                </div>
+            </body>
+            </html>
+        `);
     }
 
     res.send(`<!DOCTYPE html>
