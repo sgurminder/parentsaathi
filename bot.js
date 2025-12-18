@@ -1332,6 +1332,76 @@ app.delete('/api/admin/schools/:id', adminAuth, async (req, res) => {
     }
 });
 
+// Set school admin credentials
+app.post('/api/admin/schools/:id/admin', adminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, password } = req.body;
+
+        if (!username) {
+            return res.status(400).json({ success: false, error: 'Username is required' });
+        }
+
+        const adminKey = `school:admin:${id.toLowerCase()}`;
+        const existingAdmin = await db.kv.get(adminKey);
+
+        // If no existing admin, password is required
+        if (!existingAdmin && !password) {
+            return res.status(400).json({ success: false, error: 'Password is required for new admin' });
+        }
+
+        if (password && password.length < 6) {
+            return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+        }
+
+        // Hash the password if provided
+        const bcrypt = require('bcryptjs');
+        let hashedPassword = existingAdmin ? existingAdmin.password : null;
+        if (password) {
+            hashedPassword = await bcrypt.hash(password, 10);
+        }
+
+        // Store admin credentials
+        await db.kv.set(adminKey, {
+            username: username,
+            password: hashedPassword,
+            schoolId: id.toLowerCase(),
+            createdAt: existingAdmin ? existingAdmin.createdAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        });
+
+        console.log(`[ADMIN] School admin credentials set for: ${id}`);
+        res.json({ success: true, message: 'Admin credentials saved' });
+    } catch (e) {
+        console.error('[ADMIN] Error setting school admin:', e);
+        res.status(500).json({ success: false, error: 'Failed to set admin credentials' });
+    }
+});
+
+// Get school admin info (without password)
+app.get('/api/admin/schools/:id/admin', adminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const adminKey = `school:admin:${id.toLowerCase()}`;
+        const adminRecord = await db.kv.get(adminKey);
+
+        if (!adminRecord) {
+            return res.json({ success: true, admin: null });
+        }
+
+        // Return without password
+        res.json({
+            success: true,
+            admin: {
+                username: adminRecord.username,
+                createdAt: adminRecord.createdAt
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: 'Failed to get admin info' });
+    }
+});
+
 // Upload logo (base64)
 app.post('/api/admin/schools/:id/logo', adminAuth, upload.single('logo'), async (req, res) => {
     try {
@@ -1496,6 +1566,7 @@ app.get('/admin', async (req, res, next) => {
                 <button class="tab active" onclick="switchTab('basic')">Basic Info</button>
                 <button class="tab" onclick="switchTab('branding')">Branding</button>
                 <button class="tab" onclick="switchTab('academic')">Academic</button>
+                <button class="tab" onclick="switchTab('adminAccess')" id="adminAccessTab">Admin Access</button>
             </div>
 
             <form id="schoolForm" onsubmit="saveSchool(event)">
@@ -1612,6 +1683,29 @@ app.get('/admin', async (req, res, next) => {
                         <label>Sections (comma-separated)</label>
                         <input type="text" id="sections" placeholder="A,B,C,D" value="A,B,C,D">
                     </div>
+                </div>
+
+                <!-- Admin Access Tab -->
+                <div class="tab-content" id="adminAccessTab" style="display:none">
+                    <div style="background:#f0f9ff;padding:15px;border-radius:8px;margin-bottom:20px;border-left:4px solid #0ea5e9">
+                        <strong>School Admin Credentials</strong>
+                        <p style="margin:8px 0 0;color:#666;font-size:14px">Set login credentials for the school administrator. They will use these to access the school-specific admin dashboard.</p>
+                    </div>
+                    <div id="existingAdminInfo" style="display:none;background:#f0fdf4;padding:15px;border-radius:8px;margin-bottom:20px;border-left:4px solid #22c55e">
+                        <strong>Current Admin</strong>
+                        <p style="margin:8px 0 0;color:#666;font-size:14px">Username: <span id="currentAdminUsername">-</span></p>
+                        <p style="margin:4px 0 0;color:#666;font-size:14px">Created: <span id="currentAdminCreated">-</span></p>
+                    </div>
+                    <div class="form-group">
+                        <label>Admin Username</label>
+                        <input type="text" id="adminUsername" placeholder="e.g., schooladmin">
+                    </div>
+                    <div class="form-group">
+                        <label>Admin Password</label>
+                        <input type="password" id="adminPassword" placeholder="Minimum 6 characters">
+                        <small style="color:#6b7280">Leave empty to keep existing password</small>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="saveAdminCredentials()" style="margin-top:10px">Save Admin Credentials</button>
                 </div>
 
                 <div style="display:flex;gap:10px;margin-top:20px">
@@ -1753,6 +1847,8 @@ app.get('/admin', async (req, res, next) => {
                 });
                 const data = await res.json();
                 openModal(data.school);
+                // Load admin credentials info
+                loadAdminInfo(id);
             } catch (e) {
                 showToast('Failed to load school', 'error');
             }
@@ -1953,6 +2049,89 @@ app.get('/admin', async (req, res, next) => {
                 }
             } catch (e) {
                 showToast('Failed to delete school', 'error');
+            }
+        }
+
+        async function loadAdminInfo(schoolId) {
+            if (!schoolId) {
+                document.getElementById('existingAdminInfo').style.display = 'none';
+                document.getElementById('adminUsername').value = '';
+                document.getElementById('adminPassword').value = '';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/schools/' + schoolId + '/admin', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+
+                if (data.success && data.admin) {
+                    document.getElementById('existingAdminInfo').style.display = 'block';
+                    document.getElementById('currentAdminUsername').textContent = data.admin.username;
+                    document.getElementById('currentAdminCreated').textContent = new Date(data.admin.createdAt).toLocaleDateString();
+                    document.getElementById('adminUsername').value = data.admin.username;
+                    document.getElementById('adminPassword').value = '';
+                } else {
+                    document.getElementById('existingAdminInfo').style.display = 'none';
+                    document.getElementById('adminUsername').value = '';
+                    document.getElementById('adminPassword').value = '';
+                }
+            } catch (e) {
+                console.error('Failed to load admin info:', e);
+            }
+        }
+
+        async function saveAdminCredentials() {
+            const schoolId = document.getElementById('schoolId').value;
+            const username = document.getElementById('adminUsername').value.trim();
+            const password = document.getElementById('adminPassword').value;
+
+            if (!schoolId) {
+                showToast('Please save the school first', 'error');
+                return;
+            }
+
+            if (!username) {
+                showToast('Username is required', 'error');
+                return;
+            }
+
+            // Check if this is updating existing admin (password can be empty to keep existing)
+            const existingAdmin = document.getElementById('existingAdminInfo').style.display !== 'none';
+            if (!existingAdmin && (!password || password.length < 6)) {
+                showToast('Password must be at least 6 characters', 'error');
+                return;
+            }
+
+            if (password && password.length < 6) {
+                showToast('Password must be at least 6 characters', 'error');
+                return;
+            }
+
+            try {
+                const body = { username };
+                if (password) body.password = password;
+
+                const res = await fetch('/api/admin/schools/' + schoolId + '/admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('Admin credentials saved!', 'success');
+                    loadAdminInfo(schoolId);
+                } else {
+                    showToast(data.error || 'Failed to save credentials', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to save admin credentials', 'error');
             }
         }
 
