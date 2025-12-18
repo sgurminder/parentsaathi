@@ -1362,6 +1362,41 @@ app.patch('/api/admin/schools/:id/config', adminAuth, async (req, res) => {
     }
 });
 
+// Internal endpoint to update school config (protected by secret key)
+app.post('/api/internal/update-school-config', async (req, res) => {
+    try {
+        const { secret, schoolId, classes, subjects } = req.body;
+
+        // Validate secret (use OPENAI_API_KEY as internal secret for now)
+        if (secret !== process.env.OPENAI_API_KEY?.slice(0, 20)) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+
+        if (!schoolId) {
+            return res.status(400).json({ success: false, error: 'schoolId is required' });
+        }
+
+        // Get existing school config
+        let school = await db.kv.get(`school:${schoolId}`);
+        if (!school) {
+            return res.status(404).json({ success: false, error: 'School not found' });
+        }
+
+        // Update only the provided fields
+        if (classes) school.classes = classes;
+        if (subjects) school.subjects = subjects;
+        school.updatedAt = new Date().toISOString();
+
+        await db.kv.set(`school:${schoolId}`, school);
+
+        console.log(`[INTERNAL] School config updated for ${schoolId}`);
+        res.json({ success: true, school: { id: schoolId, classes: school.classes, subjects: school.subjects } });
+    } catch (e) {
+        console.error('[INTERNAL] Error updating school config:', e);
+        res.status(500).json({ success: false, error: 'Failed to update school config' });
+    }
+});
+
 // Delete school
 app.delete('/api/admin/schools/:id', adminAuth, async (req, res) => {
     try {
