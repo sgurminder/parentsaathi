@@ -1337,12 +1337,14 @@ app.post('/api/admin/schools/:id/admin', adminAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { username, password } = req.body;
+        console.log(`[ADMIN SAVE] Setting admin for school: ${id}, username: ${username}, hasPassword: ${!!password}`);
 
         if (!username) {
             return res.status(400).json({ success: false, error: 'Username is required' });
         }
 
         const adminKey = `school:admin:${id.toLowerCase()}`;
+        console.log(`[ADMIN SAVE] Using key: ${adminKey}`);
         const existingAdmin = await db.kv.get(adminKey);
 
         // If no existing admin, password is required
