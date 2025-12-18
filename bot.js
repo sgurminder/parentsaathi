@@ -1224,8 +1224,12 @@ app.get('/api/admin/schools', adminAuth, async (req, res) => {
 
         for (const key of keys) {
             const schoolId = key.replace('school:', '');
+            // Skip non-school keys (like school:snps:teacher:xxx, school:snps:student:xxx)
+            if (schoolId.includes(':')) continue;
+
             const school = await db.kv.get(key);
-            if (school) {
+            // Only add if it's a valid school object with a name
+            if (school && school.name) {
                 dynamicSchools.push({ ...school, id: schoolId, source: 'dynamic' });
             }
         }
@@ -1365,7 +1369,13 @@ app.post('/api/admin/schools/:id/logo', adminAuth, upload.single('logo'), async 
 });
 
 // Admin Dashboard UI
-app.get('/admin', (req, res) => {
+app.get('/admin', async (req, res, next) => {
+    // If a school parameter is provided, use the school-specific admin
+    if (req.query.school) {
+        return next();
+    }
+
+    // Otherwise show super admin
     res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5603,8 +5613,8 @@ app.get('/', (req, res) => {
                 </div>
                 <div class="card">
                     <div class="card-icon">🇮🇳</div>
-                    <h3>Indian Curriculum</h3>
-                    <p>CBSE, ICSE, State boards, PCI, University courses.</p>
+                    <h3>All Curricula Supported</h3>
+                    <p>Schools (CBSE, ICSE, State) & Colleges (PCI, University, Professional).</p>
                 </div>
                 <div class="card">
                     <div class="card-icon">📱</div>
