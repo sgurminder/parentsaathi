@@ -2229,7 +2229,8 @@ app.post('/api/auth/verify-otp', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Please enter a valid 6-digit OTP' });
     }
 
-    const school = getSchoolById(schoolId || 'vidyamitra');
+    // Use async version to support dynamic schools from Redis
+    const school = await getSchoolByIdAsync(schoolId || 'vidyamitra');
 
     // Get or create user
     let user;
