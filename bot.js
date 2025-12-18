@@ -10869,16 +10869,9 @@ app.get('/teacher-dashboard', async (req, res) => {
             <div class="selector-row">
                 <select class="selector" id="classSelector" onchange="onSelectionChange()">
                     <option value="">Select Class</option>
-                    <option value="6">Class 6</option>
-                    <option value="7">Class 7</option>
-                    <option value="8">Class 8</option>
-                    <option value="9">Class 9</option>
-                    <option value="10">Class 10</option>
                 </select>
                 <select class="selector" id="subjectSelector" onchange="onSelectionChange()">
                     <option value="">Select Subject</option>
-                    <option value="Math">Mathematics</option>
-                    <option value="Science">Science</option>
                 </select>
             </div>
         </div>
@@ -11011,11 +11004,47 @@ app.get('/teacher-dashboard', async (req, res) => {
     <script>
         const schoolId = '${schoolId}';
         const STORAGE_KEY = 'teacher_' + schoolId;
+        // School configuration for classes and subjects
+        const schoolConfig = ${JSON.stringify({
+            classes: school.classes || [6, 7, 8, 9, 10],
+            subjects: school.subjects || ['Math', 'Science'],
+            institutionType: school.institutionType || 'school'
+        })};
         let currentScreen = 'home';
         let teacherData = null;
 
+        // Populate class and subject dropdowns from school config
+        function populateSelectors() {
+            const classSelector = document.getElementById('classSelector');
+            const subjectSelector = document.getElementById('subjectSelector');
+
+            // Clear existing options except first
+            classSelector.innerHTML = '<option value="">Select Class</option>';
+            subjectSelector.innerHTML = '<option value="">Select Subject</option>';
+
+            // Add classes
+            const isCollege = schoolConfig.institutionType === 'college';
+            schoolConfig.classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls;
+                option.textContent = isCollege ? cls : 'Class ' + cls;
+                classSelector.appendChild(option);
+            });
+
+            // Add subjects
+            schoolConfig.subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject;
+                option.textContent = subject;
+                subjectSelector.appendChild(option);
+            });
+        }
+
         // Check existing session
         function init() {
+            // Populate dropdowns with school-specific classes/subjects
+            populateSelectors();
+
             const token = localStorage.getItem(STORAGE_KEY + '_token');
             const user = localStorage.getItem(STORAGE_KEY + '_user');
 
