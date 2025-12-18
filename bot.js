@@ -1356,15 +1356,15 @@ app.post('/api/admin/schools/:id/admin', adminAuth, async (req, res) => {
 
         // Hash the password if provided
         const bcrypt = require('bcryptjs');
-        let hashedPassword = existingAdmin ? existingAdmin.password : null;
+        let hashedPassword = existingAdmin ? existingAdmin.passwordHash : null;
         if (password) {
             hashedPassword = await bcrypt.hash(password, 10);
         }
 
-        // Store admin credentials
+        // Store admin credentials (use passwordHash to match login endpoint)
         await db.kv.set(adminKey, {
             username: username,
-            password: hashedPassword,
+            passwordHash: hashedPassword,
             schoolId: id.toLowerCase(),
             createdAt: existingAdmin ? existingAdmin.createdAt : new Date().toISOString(),
             updatedAt: new Date().toISOString()
