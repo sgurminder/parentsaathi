@@ -1269,7 +1269,7 @@ app.get('/api/admin/schools/:id', adminAuth, async (req, res) => {
 app.post('/api/admin/schools', adminAuth, async (req, res) => {
     try {
         const { id, name, shortName, tagline, logo, logoEmoji, primaryColor, secondaryColor,
-                gradientFrom, gradientTo, appName, board, classes, sections, backgroundImage } = req.body;
+                gradientFrom, gradientTo, appName, institutionType, board, classes, sections, backgroundImage } = req.body;
 
         if (!id || !name) {
             return res.status(400).json({ success: false, error: 'ID and name are required' });
@@ -1291,6 +1291,7 @@ app.post('/api/admin/schools', adminAuth, async (req, res) => {
             gradientFrom: gradientFrom || primaryColor || '#7c3aed',
             gradientTo: gradientTo || '#a855f7',
             appName: appName || shortName || name,
+            institutionType: institutionType || 'school',
             board: board || 'CBSE',
             classes: classes || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             sections: sections || ['A', 'B', 'C', 'D'],
@@ -1370,9 +1371,9 @@ app.post('/api/admin/schools/:id/logo', adminAuth, upload.single('logo'), async 
 
 // Admin Dashboard UI
 app.get('/admin', async (req, res, next) => {
-    // If a school parameter is provided, use the school-specific admin
+    // If a school parameter is provided, redirect to school-specific admin
     if (req.query.school) {
-        return next();
+        return res.redirect(`/school-admin?school=${req.query.school}`);
     }
 
     // Otherwise show super admin
@@ -1781,8 +1782,10 @@ app.get('/admin', async (req, res, next) => {
                 classesLabel.textContent = 'Years/Programs (comma-separated)';
                 classesInput.placeholder = 'B.Pharm 1st Year, B.Pharm 2nd Year, M.Pharm 1st Year';
                 classesHint.textContent = 'Examples: B.Pharm 1st Year, B.Tech 2nd Year, MBA 1st Sem';
-                // Set default college values if empty or has school defaults
-                if (classesInput.value === '1,2,3,4,5,6,7,8,9,10,11,12' || classesInput.value === '') {
+                // Set default college values if looks like school classes (all numeric or default)
+                const currentValue = classesInput.value.trim();
+                const looksLikeSchoolClasses = /^[0-9,\\s]+$/.test(currentValue) || currentValue === '';
+                if (looksLikeSchoolClasses) {
                     classesInput.value = 'B.Pharm 1st Year, B.Pharm 2nd Year, B.Pharm 3rd Year, B.Pharm 4th Year';
                 }
                 // Select first college board option if currently on school board
@@ -1794,8 +1797,10 @@ app.get('/admin', async (req, res, next) => {
                 classesLabel.textContent = 'Classes (comma-separated)';
                 classesInput.placeholder = '1,2,3,4,5,6,7,8,9,10,11,12';
                 classesHint.textContent = 'For schools: 1,2,3... or LKG, UKG, 1, 2...';
-                // Set default school values if has college defaults
-                if (classesInput.value.includes('Year') || classesInput.value.includes('Sem') || classesInput.value === '') {
+                // Set default school values if looks like college values
+                const currentValue = classesInput.value.trim();
+                const looksLikeCollegeClasses = currentValue.includes('Year') || currentValue.includes('Sem') || currentValue.includes('Pharm') || currentValue.includes('Tech') || currentValue === '';
+                if (looksLikeCollegeClasses) {
                     classesInput.value = '1,2,3,4,5,6,7,8,9,10,11,12';
                 }
                 // Select CBSE if currently on college board
