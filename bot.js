@@ -1291,7 +1291,7 @@ app.get('/api/admin/schools/:id', adminAuth, async (req, res) => {
 app.post('/api/admin/schools', adminAuth, async (req, res) => {
     try {
         const { id, name, shortName, tagline, logo, logoEmoji, primaryColor, secondaryColor,
-                gradientFrom, gradientTo, appName, institutionType, board, classes, sections, backgroundImage } = req.body;
+                gradientFrom, gradientTo, appName, institutionType, board, classes, sections, subjects, backgroundImage } = req.body;
 
         if (!id || !name) {
             return res.status(400).json({ success: false, error: 'ID and name are required' });
@@ -1317,6 +1317,7 @@ app.post('/api/admin/schools', adminAuth, async (req, res) => {
             board: board || 'CBSE',
             classes: classes || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             sections: sections || ['A', 'B', 'C', 'D'],
+            subjects: subjects || ['Math', 'Science'],
             backgroundImage: backgroundImage || null,
             updatedAt: new Date().toISOString()
         };
@@ -1331,6 +1332,33 @@ app.post('/api/admin/schools', adminAuth, async (req, res) => {
     } catch (e) {
         console.error('[ADMIN] Error saving school:', e);
         res.status(500).json({ success: false, error: 'Failed to save school' });
+    }
+});
+
+// Update school subjects/classes only (for quick updates)
+app.patch('/api/admin/schools/:id/config', adminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { classes, subjects } = req.body;
+
+        // Get existing school config
+        let school = await db.kv.get(`school:${id}`);
+        if (!school) {
+            return res.status(404).json({ success: false, error: 'School not found' });
+        }
+
+        // Update only the provided fields
+        if (classes) school.classes = classes;
+        if (subjects) school.subjects = subjects;
+        school.updatedAt = new Date().toISOString();
+
+        await db.kv.set(`school:${id}`, school);
+
+        console.log(`[ADMIN] School config updated for ${id}: classes=${classes ? classes.length : 'unchanged'}, subjects=${subjects ? subjects.length : 'unchanged'}`);
+        res.json({ success: true, school: { id, ...school } });
+    } catch (e) {
+        console.error('[ADMIN] Error updating school config:', e);
+        res.status(500).json({ success: false, error: 'Failed to update school config' });
     }
 });
 
