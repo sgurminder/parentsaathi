@@ -1566,7 +1566,7 @@ app.get('/admin', async (req, res, next) => {
                 <button class="tab active" onclick="switchTab('basic')">Basic Info</button>
                 <button class="tab" onclick="switchTab('branding')">Branding</button>
                 <button class="tab" onclick="switchTab('academic')">Academic</button>
-                <button class="tab" onclick="switchTab('adminAccess')" id="adminAccessTab">Admin Access</button>
+                <button class="tab" onclick="switchTab('adminAccess')">Admin Access</button>
             </div>
 
             <form id="schoolForm" onsubmit="saveSchool(event)">
