@@ -1302,23 +1302,27 @@ app.post('/api/admin/schools', adminAuth, async (req, res) => {
             return res.status(400).json({ success: false, error: 'ID must be lowercase alphanumeric with hyphens only' });
         }
 
+        // Get existing school config to preserve subjects/classes if not provided
+        const existingSchool = await db.kv.get(`school:${id}`) || {};
+
         const schoolConfig = {
             name,
             shortName: shortName || name,
             tagline: tagline || 'AI-Powered Learning',
-            logo: logo || null, // Base64 or URL
+            logo: logo || existingSchool.logo || null, // Preserve existing logo if not provided
             logoEmoji: logoEmoji || '📚',
             primaryColor: primaryColor || '#7c3aed',
             secondaryColor: secondaryColor || '#fbbf24',
             gradientFrom: gradientFrom || primaryColor || '#7c3aed',
             gradientTo: gradientTo || '#a855f7',
             appName: appName || shortName || name,
-            institutionType: institutionType || 'school',
+            institutionType: institutionType || existingSchool.institutionType || 'school',
             board: board || 'CBSE',
-            classes: classes || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            // Preserve existing classes/subjects if not explicitly provided in request
+            classes: classes || existingSchool.classes || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             sections: sections || ['A', 'B', 'C', 'D'],
-            subjects: subjects || ['Math', 'Science'],
-            backgroundImage: backgroundImage || null,
+            subjects: subjects || existingSchool.subjects || ['Math', 'Science'],
+            backgroundImage: backgroundImage || existingSchool.backgroundImage || null,
             updatedAt: new Date().toISOString()
         };
 
