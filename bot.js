@@ -136,7 +136,7 @@ const demoSchools = {
         secondaryColor: '#f59e0b',
         gradientFrom: '#0d9488',
         gradientTo: '#14b8a6',
-        appName: 'PharmaMitra',
+        appName: 'VidyaMitra',
         institutionType: 'college',
         board: 'PCI',  // Pharmacy Council of India
         classes: ['B.Pharm 1st Year', 'B.Pharm 2nd Year', 'B.Pharm 3rd Year', 'B.Pharm 4th Year', 'M.Pharm 1st Year', 'M.Pharm 2nd Year', 'D.Pharm 1st Year', 'D.Pharm 2nd Year'],
@@ -5462,8 +5462,8 @@ app.get('/', (req, res) => {
         <div class="logo">VidyaMitra</div>
         <div class="nav-links">
             <a href="#students">For Students</a>
-            <a href="#teachers">For Teachers</a>
-            <a href="#schools">For Schools</a>
+            <a href="#teachers">For Educators</a>
+            <a href="#institutions">For Institutions</a>
             <a href="#pricing">Pricing</a>
             <a href="#training">Training</a>
             <a href="/contact" class="nav-cta">Get Started Free</a>
@@ -5475,13 +5475,13 @@ app.get('/', (req, res) => {
 
     <!-- Hero -->
     <section class="hero">
-        <h1>India's AI Platform for Schools</h1>
-        <p>24/7 homework help for students. Time-saving tools for teachers. Built for CBSE, ICSE & State boards.</p>
+        <h1>India's AI Platform for Education</h1>
+        <p>24/7 learning assistance for students. Time-saving tools for educators. Built for Schools, Colleges & Professional Institutions.</p>
         <div class="hero-buttons">
             <a href="/contact" class="btn-primary">Start Free Trial</a>
             <a href="/contact" class="btn-secondary">Book a Demo</a>
         </div>
-        <p class="trust-badge">✓ Used by 1000+ students across 10+ schools</p>
+        <p class="trust-badge">✓ Trusted by 1000+ students across Schools & Colleges</p>
     </section>
 
     <!-- For Students -->
@@ -5532,12 +5532,12 @@ app.get('/', (req, res) => {
         </div>
     </section>
 
-    <!-- For Teachers -->
+    <!-- For Educators -->
     <section id="teachers" class="section">
         <div class="container">
             <div class="section-header">
-                <h2>For Teachers</h2>
-                <p>Save 10+ hours every week</p>
+                <h2>For Educators</h2>
+                <p>Save 10+ hours every week on administrative tasks</p>
             </div>
             <div class="cards-grid">
                 <div class="card">
@@ -5588,52 +5588,52 @@ app.get('/', (req, res) => {
         </div>
     </section>
 
-    <!-- For Schools -->
-    <section id="schools" class="section section-alt">
+    <!-- For Institutions -->
+    <section id="institutions" class="section section-alt">
         <div class="container">
             <div class="section-header">
-                <h2>For Schools</h2>
-                <p>Complete AI solution for your school</p>
+                <h2>For Institutions</h2>
+                <p>Complete AI solution for Schools & Colleges</p>
             </div>
             <div class="cards-grid">
                 <div class="card">
                     <div class="card-icon">🏫</div>
                     <h3>One Platform</h3>
-                    <p>Tools for students AND teachers under one roof.</p>
+                    <p>Tools for students AND educators under one roof.</p>
                 </div>
                 <div class="card">
                     <div class="card-icon">🇮🇳</div>
                     <h3>Indian Curriculum</h3>
-                    <p>Built for CBSE, ICSE, and State boards.</p>
+                    <p>CBSE, ICSE, State boards, PCI, University courses.</p>
                 </div>
                 <div class="card">
                     <div class="card-icon">📱</div>
                     <h3>WhatsApp Delivery</h3>
-                    <p>Parents already use it. Zero adoption friction.</p>
+                    <p>Students already use it. Zero adoption friction.</p>
                 </div>
                 <div class="card">
                     <div class="card-icon">🎓</div>
-                    <h3>Teacher Training</h3>
+                    <h3>Faculty Training</h3>
                     <p>We train your staff. They become AI experts.</p>
                 </div>
                 <div class="card">
                     <div class="card-icon">📈</div>
-                    <h3>Progress Reports</h3>
-                    <p>Management dashboards for tracking adoption.</p>
+                    <h3>Analytics Dashboard</h3>
+                    <p>Management dashboards for tracking performance.</p>
                 </div>
                 <div class="card">
                     <div class="card-icon">🔒</div>
                     <h3>Safe & Secure</h3>
-                    <p>Student data privacy. No inappropriate content.</p>
+                    <p>Student data privacy. Institutional compliance.</p>
                 </div>
             </div>
             <div style="max-width: 600px; margin: 32px auto 0;">
                 <div class="outcomes">
-                    <h4>School Outcomes</h4>
+                    <h4>Institutional Outcomes</h4>
                     <ul>
-                        <li>Parents see school as tech-forward</li>
-                        <li>Reduced teacher burnout</li>
-                        <li>Better student results</li>
+                        <li>Seen as tech-forward institution</li>
+                        <li>Reduced faculty administrative load</li>
+                        <li>Better student results & placements</li>
                         <li>Competitive advantage in admissions</li>
                     </ul>
                 </div>
@@ -5835,8 +5835,8 @@ app.get('/', (req, res) => {
             <div class="footer-col">
                 <h4>Product</h4>
                 <a href="#students">For Students</a>
-                <a href="#teachers">For Teachers</a>
-                <a href="#schools">For Schools</a>
+                <a href="#teachers">For Educators</a>
+                <a href="#institutions">For Institutions</a>
                 <a href="#pricing">Pricing</a>
             </div>
             <div class="footer-col">
