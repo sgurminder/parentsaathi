@@ -199,6 +199,41 @@ const app = express();
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.json({ limit: '5mb' })); // Increased for base64 logo uploads
 
+// Serve static files from public directory
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
+
+// PWA manifest and service worker routes
+app.get('/manifest.json', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
+app.get('/sw.js', (req, res) => {
+    res.setHeader('Content-Type', 'application/javascript');
+    res.sendFile(path.join(__dirname, 'public', 'sw.js'));
+});
+
+// Dynamic PWA icon generation (returns SVG, browsers handle scaling)
+app.get('/api/icon', (req, res) => {
+    const size = parseInt(req.query.size) || 192;
+    const maskable = req.query.maskable === 'true';
+
+    // For maskable icons, we need more padding (safe area is 80% of the icon)
+    const padding = maskable ? size * 0.1 : 0;
+    const innerSize = size - (padding * 2);
+    const radius = maskable ? size * 0.2 : size * 0.16;
+
+    const svg = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 \${size} \${size}" width="\${size}" height="\${size}">
+  <rect width="\${size}" height="\${size}" rx="\${radius}" fill="#059669"/>
+  <text x="\${size/2}" y="\${size * 0.65}" font-family="Arial, sans-serif" font-size="\${innerSize * 0.6}" font-weight="bold" text-anchor="middle" fill="white">V</text>
+  <text x="\${size/2}" y="\${size * 0.85}" font-family="Arial, sans-serif" font-size="\${innerSize * 0.12}" text-anchor="middle" fill="white" opacity="0.9">VidyaMitra</text>
+</svg>\`;
+
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.send(svg);
+});
+
 // =====================================================
 // CONFIGURATION
 // =====================================================
@@ -4198,6 +4233,52 @@ app.get('/contact', (req, res) => {
 // Get available demo schools
 app.get('/api/schools', (req, res) => {
     res.json(Object.values(demoSchools));
+});
+
+// Get all registered schools (from KV + demo)
+app.get('/api/schools/all', async (req, res) => {
+    try {
+        // Get all school keys from KV
+        const keys = await db.kv.keys('school:*');
+        const kvSchools = [];
+
+        for (const key of keys) {
+            const school = await db.kv.get(key);
+            if (school && school.name) {
+                const id = key.replace('school:', '');
+                kvSchools.push({
+                    id,
+                    name: school.name,
+                    shortName: school.shortName || school.name,
+                    logo: school.logo || null,
+                    logoEmoji: school.logoEmoji || '🎓',
+                    primaryColor: school.primaryColor || '#1e3a8a',
+                    institutionType: school.institutionType || 'school'
+                });
+            }
+        }
+
+        // Combine with demo schools (avoid duplicates)
+        const allSchools = [...kvSchools];
+        for (const [id, school] of Object.entries(demoSchools)) {
+            if (!kvSchools.find(s => s.id === id)) {
+                allSchools.push({
+                    id,
+                    name: school.name,
+                    shortName: school.shortName || school.name,
+                    logo: school.logo || null,
+                    logoEmoji: school.logoEmoji || '🎓',
+                    primaryColor: school.primaryColor || '#1e3a8a',
+                    institutionType: school.institutionType || 'school'
+                });
+            }
+        }
+
+        res.json({ success: true, schools: allSchools });
+    } catch (error) {
+        console.error('Error fetching schools:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch schools' });
+    }
 });
 
 // Question Generation API
@@ -15727,6 +15808,689 @@ app.get('/presentation/:school', async (req, res) => {
     </script>
 </body>
 </html>`);
+});
+
+// =====================================================
+// PWA STUDENT APP - /app route with school selection
+// =====================================================
+
+app.get('/app', async (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#059669">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VidyaMitra">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <title>VidyaMitra - AI Learning Assistant</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            color: white;
+        }
+
+        /* School Selection Screen */
+        .school-select-screen {
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .school-select-header {
+            text-align: center;
+            padding: 40px 0 30px;
+        }
+        .school-select-header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .school-select-header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .school-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 100px;
+        }
+        .school-card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .school-card:hover, .school-card:active {
+            border-color: #059669;
+            background: #1e3a3a;
+        }
+        .school-logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            background: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .school-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .school-info h3 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+        .school-info p {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .school-type-badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            background: #059669;
+            border-radius: 20px;
+            margin-top: 6px;
+            display: inline-block;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+        }
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #334155;
+            border-top-color: #059669;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Main App */
+        .app-container {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .app-container.active {
+            display: flex;
+        }
+        .app-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e293b;
+        }
+        .app-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .app-header-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            overflow: hidden;
+        }
+        .app-header-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .app-header-title h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .app-header-title p {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        .change-school-btn {
+            background: #1e293b;
+            border: none;
+            color: #94a3b8;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Chat Area */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .message {
+            max-width: 85%;
+            margin-bottom: 12px;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .message.user {
+            background: #059669;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .message.bot {
+            background: #1e293b;
+            border-bottom-left-radius: 4px;
+        }
+        .message pre {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 16px;
+            background: #1e293b;
+            border-radius: 16px;
+            width: fit-content;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #64748b;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-6px); }
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 16px;
+            border-top: 1px solid #1e293b;
+            background: #0f172a;
+        }
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .input-wrapper textarea {
+            flex: 1;
+            background: #1e293b;
+            border: none;
+            border-radius: 24px;
+            padding: 12px 20px;
+            color: white;
+            font-size: 16px;
+            resize: none;
+            max-height: 120px;
+            font-family: inherit;
+        }
+        .input-wrapper textarea::placeholder {
+            color: #64748b;
+        }
+        .input-wrapper textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #059669;
+        }
+        .send-btn {
+            width: 48px;
+            height: 48px;
+            background: #059669;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .send-btn:disabled {
+            background: #334155;
+            cursor: not-allowed;
+        }
+        .send-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Install Prompt */
+        .install-prompt {
+            position: fixed;
+            bottom: 80px;
+            left: 16px;
+            right: 16px;
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 16px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        .install-prompt.show {
+            display: flex;
+        }
+        .install-prompt-text {
+            flex: 1;
+        }
+        .install-prompt-text h4 {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .install-prompt-text p {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .install-btn {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .dismiss-btn {
+            background: none;
+            border: none;
+            color: #64748b;
+            padding: 8px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Hide screens */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- School Selection Screen -->
+    <div id="schoolSelectScreen" class="school-select-screen">
+        <div class="school-select-header">
+            <h1>VidyaMitra</h1>
+            <p>Select your school or college</p>
+        </div>
+        <div class="school-list" id="schoolList">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading schools...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="appContainer" class="app-container">
+        <div class="app-header">
+            <div class="app-header-left">
+                <div class="app-header-logo" id="appLogo">🎓</div>
+                <div class="app-header-title">
+                    <h2 id="appSchoolName">VidyaMitra</h2>
+                    <p>AI Learning Assistant</p>
+                </div>
+            </div>
+            <button class="change-school-btn" onclick="changeSchool()">Change</button>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div class="message bot">
+                Hello! I'm your AI learning assistant. Ask me anything about your subjects - I'm here to help you learn! 📚
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea
+                    id="messageInput"
+                    placeholder="Ask a question..."
+                    rows="1"
+                    onkeydown="handleKeyDown(event)"
+                    oninput="autoResize(this)"
+                ></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Install Prompt -->
+    <div class="install-prompt" id="installPrompt">
+        <div class="install-prompt-text">
+            <h4>Install VidyaMitra</h4>
+            <p>Add to home screen for quick access</p>
+        </div>
+        <button class="install-btn" onclick="installApp()">Install</button>
+        <button class="dismiss-btn" onclick="dismissInstall()">×</button>
+    </div>
+
+    <script>
+        // State
+        let currentSchool = null;
+        let conversationHistory = [];
+        let deferredPrompt = null;
+
+        // Check for saved school on load
+        window.addEventListener('load', async () => {
+            const savedSchool = localStorage.getItem('vidyamitra_school');
+            if (savedSchool) {
+                try {
+                    currentSchool = JSON.parse(savedSchool);
+                    showApp();
+                } catch (e) {
+                    loadSchools();
+                }
+            } else {
+                loadSchools();
+            }
+
+            // Register service worker
+            if ('serviceWorker' in navigator) {
+                try {
+                    await navigator.serviceWorker.register('/sw.js');
+                    console.log('Service worker registered');
+                } catch (e) {
+                    console.log('Service worker registration failed:', e);
+                }
+            }
+        });
+
+        // Install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show install prompt after a delay
+            setTimeout(() => {
+                if (!window.matchMedia('(display-mode: standalone)').matches) {
+                    document.getElementById('installPrompt').classList.add('show');
+                }
+            }, 30000); // Show after 30 seconds
+        });
+
+        async function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                document.getElementById('installPrompt').classList.remove('show');
+            }
+        }
+
+        function dismissInstall() {
+            document.getElementById('installPrompt').classList.remove('show');
+        }
+
+        // Load schools
+        async function loadSchools() {
+            try {
+                const response = await fetch('/api/schools/all');
+                const data = await response.json();
+
+                if (data.success && data.schools.length > 0) {
+                    renderSchools(data.schools);
+                } else {
+                    document.getElementById('schoolList').innerHTML =
+                        '<div class="loading"><p>No schools found. Please contact support.</p></div>';
+                }
+            } catch (error) {
+                document.getElementById('schoolList').innerHTML =
+                    '<div class="loading"><p>Error loading schools. Please try again.</p></div>';
+            }
+        }
+
+        function renderSchools(schools) {
+            const html = schools.map(school => \`
+                <div class="school-card" onclick="selectSchool('\${school.id}', '\${escapeHtml(school.name)}', '\${escapeHtml(school.shortName || school.name)}', '\${school.logo || ''}', '\${school.logoEmoji || '🎓'}', '\${school.primaryColor || '#059669'}', '\${school.institutionType || 'school'}')">
+                    <div class="school-logo" style="background: \${school.primaryColor || '#334155'}20">
+                        \${school.logo ? '<img src="' + school.logo + '" alt="">' : school.logoEmoji || '🎓'}
+                    </div>
+                    <div class="school-info">
+                        <h3>\${escapeHtml(school.name)}</h3>
+                        <p>\${escapeHtml(school.shortName || school.name)}</p>
+                        <span class="school-type-badge">\${school.institutionType === 'college' ? 'College' : 'School'}</span>
+                    </div>
+                </div>
+            \`).join('');
+
+            document.getElementById('schoolList').innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function selectSchool(id, name, shortName, logo, logoEmoji, primaryColor, institutionType) {
+            currentSchool = { id, name, shortName, logo, logoEmoji, primaryColor, institutionType };
+            localStorage.setItem('vidyamitra_school', JSON.stringify(currentSchool));
+            showApp();
+        }
+
+        function showApp() {
+            document.getElementById('schoolSelectScreen').classList.add('hidden');
+            document.getElementById('appContainer').classList.add('active');
+
+            // Update header with school info
+            document.getElementById('appSchoolName').textContent = currentSchool.shortName || currentSchool.name;
+            const logoEl = document.getElementById('appLogo');
+            logoEl.style.background = (currentSchool.primaryColor || '#059669') + '20';
+            if (currentSchool.logo) {
+                logoEl.innerHTML = '<img src="' + currentSchool.logo + '" alt="">';
+            } else {
+                logoEl.textContent = currentSchool.logoEmoji || '🎓';
+            }
+
+            // Update theme color
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', currentSchool.primaryColor || '#059669');
+        }
+
+        function changeSchool() {
+            localStorage.removeItem('vidyamitra_school');
+            currentSchool = null;
+            conversationHistory = [];
+            document.getElementById('chatArea').innerHTML = '<div class="message bot">Hello! I\\'m your AI learning assistant. Ask me anything about your subjects - I\\'m here to help you learn! 📚</div>';
+            document.getElementById('appContainer').classList.remove('active');
+            document.getElementById('schoolSelectScreen').classList.remove('hidden');
+            loadSchools();
+        }
+
+        // Chat functions
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, 'user');
+            input.value = '';
+            input.style.height = 'auto';
+
+            // Show typing indicator
+            const chatArea = document.getElementById('chatArea');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<span></span><span></span><span></span>';
+            chatArea.appendChild(typingDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            // Disable send button
+            document.getElementById('sendBtn').disabled = true;
+
+            try {
+                const response = await fetch('/api/pwa/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message,
+                        schoolId: currentSchool.id,
+                        history: conversationHistory.slice(-10)
+                    })
+                });
+
+                const data = await response.json();
+
+                // Remove typing indicator
+                document.getElementById('typingIndicator')?.remove();
+
+                if (data.success) {
+                    addMessage(data.response, 'bot');
+                    conversationHistory.push(
+                        { role: 'user', content: message },
+                        { role: 'assistant', content: data.response }
+                    );
+                } else {
+                    addMessage('Sorry, I encountered an error. Please try again.', 'bot');
+                }
+            } catch (error) {
+                document.getElementById('typingIndicator')?.remove();
+                addMessage('Connection error. Please check your internet and try again.', 'bot');
+            }
+
+            document.getElementById('sendBtn').disabled = false;
+        }
+
+        function addMessage(text, type) {
+            const chatArea = document.getElementById('chatArea');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message ' + type;
+            msgDiv.innerHTML = formatMessage(text);
+            chatArea.appendChild(msgDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            // Render math if KaTeX is available
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(msgDiv, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\\\[', right: '\\\\]', display: true},
+                        {left: '\\\\(', right: '\\\\)', display: false}
+                    ]
+                });
+            }
+        }
+
+        function formatMessage(text) {
+            // Basic markdown-like formatting
+            return text
+                .replace(/\\n/g, '<br>')
+                .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')
+                .replace(/\\*(.+?)\\*/g, '<em>$1</em>')
+                .replace(/\`\`\`([\\s\\S]*?)\`\`\`/g, '<pre>$1</pre>')
+                .replace(/\`(.+?)\`/g, '<code>$1</code>');
+        }
+    </script>
+</body>
+</html>`);
+});
+
+// PWA Chat API
+app.post('/api/pwa/chat', async (req, res) => {
+    try {
+        const { message, schoolId, history = [] } = req.body;
+
+        if (!message || !schoolId) {
+            return res.status(400).json({ success: false, error: 'Message and schoolId required' });
+        }
+
+        // Get school config
+        const school = await getSchoolByIdAsync(schoolId);
+        if (!school) {
+            return res.status(404).json({ success: false, error: 'School not found' });
+        }
+
+        // Build system prompt
+        const systemPrompt = \`You are VidyaMitra, an AI learning assistant for \${school.name}.
+You help students understand their subjects and answer academic questions.
+
+Guidelines:
+- Be helpful, encouraging, and patient
+- Explain concepts clearly with examples
+- For math, use LaTeX notation: $inline$ or $$display$$
+- If asked about non-academic topics, politely redirect to studies
+- Keep responses concise but informative
+- Use emojis sparingly to keep it friendly
+
+Institution: \${school.name}
+Type: \${school.institutionType || 'school'}\`;
+
+        // Call OpenAI
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...history.slice(-10),
+            { role: 'user', content: message }
+        ];
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages,
+            max_tokens: 1000,
+            temperature: 0.7
+        });
+
+        const response = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+
+        res.json({ success: true, response });
+    } catch (error) {
+        console.error('PWA Chat error:', error);
+        res.status(500).json({ success: false, error: 'Failed to process message' });
+    }
 });
 
 // =====================================================
