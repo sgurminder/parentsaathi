@@ -14951,10 +14951,11 @@ app.get('/presentation/:school', async (req, res) => {
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 60px;
+            padding: 60px 60px 120px 60px;
             text-align: center;
             opacity: 0;
             transition: opacity 0.5s ease;
+            overflow-y: auto;
         }
 
         .slide.active {
@@ -15221,38 +15222,6 @@ app.get('/presentation/:school', async (req, res) => {
             color: #94a3b8;
         }
 
-        .benefit-row {
-            display: flex;
-            gap: 40px;
-            margin: 20px 0;
-            max-width: 1000px;
-        }
-
-        .benefit-item {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            gap: 15px;
-            text-align: left;
-        }
-
-        .benefit-item .check {
-            background: ${primaryColor};
-            color: white;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            margin-top: 5px;
-        }
-
-        .benefit-item p {
-            font-size: 1.2rem;
-        }
-
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -15356,8 +15325,8 @@ app.get('/presentation/:school', async (req, res) => {
                 </div>
                 <div class="feature-card">
                     <div class="icon">📱</div>
-                    <h4>WhatsApp Groups</h4>
-                    <p>Flooded with homework questions at night</p>
+                    <h4>After-Hours Questions</h4>
+                    <p>Parents and students messaging at night</p>
                 </div>
             </div>
         </div>
@@ -15381,7 +15350,7 @@ app.get('/presentation/:school', async (req, res) => {
                 <div style="text-align: left; max-width: 400px;">
                     <h3 style="color: ${primaryColor}; margin-bottom: 20px;">Key Difference</h3>
                     <ul style="font-size: 1.2rem; line-height: 2;">
-                        <li>Works on <strong>WhatsApp</strong> - No app download</li>
+                        <li><strong>Simple web app</strong> - Works on any phone</li>
                         <li>Answers in <strong>YOUR teaching style</strong></li>
                         <li>Follows <strong>YOUR curriculum</strong></li>
                         <li>Available <strong>24/7</strong> for students</li>
@@ -15493,52 +15462,36 @@ app.get('/presentation/:school', async (req, res) => {
         <!-- Slide 7: What Changes for Students -->
         <div class="slide" data-slide="7">
             <h2>What Students Experience</h2>
-            <div class="benefit-row">
-                <div class="benefit-item">
-                    <div class="check">✓</div>
-                    <div>
-                        <p><strong>Instant Help</strong></p>
-                        <p style="font-size: 1rem; color: #94a3b8;">No waiting - get answers immediately on WhatsApp</p>
-                    </div>
+            <div class="feature-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="feature-card">
+                    <div class="icon">⚡</div>
+                    <h4>Instant Help</h4>
+                    <p>No waiting - get answers immediately in the app</p>
                 </div>
-                <div class="benefit-item">
-                    <div class="check">✓</div>
-                    <div>
-                        <p><strong>Your Voice</strong></p>
-                        <p style="font-size: 1rem; color: #94a3b8;">Explanations match exactly how you teach in class</p>
-                    </div>
+                <div class="feature-card">
+                    <div class="icon">🎯</div>
+                    <h4>Your Voice</h4>
+                    <p>Explanations match exactly how you teach in class</p>
                 </div>
-            </div>
-            <div class="benefit-row">
-                <div class="benefit-item">
-                    <div class="check">✓</div>
-                    <div>
-                        <p><strong>Safe Learning</strong></p>
-                        <p style="font-size: 1rem; color: #94a3b8;">AI only answers curriculum topics, blocks distractions</p>
-                    </div>
+                <div class="feature-card">
+                    <div class="icon">🛡️</div>
+                    <h4>Safe Learning</h4>
+                    <p>AI only answers curriculum topics, blocks distractions</p>
                 </div>
-                <div class="benefit-item">
-                    <div class="check">✓</div>
-                    <div>
-                        <p><strong>Practice Tests</strong></p>
-                        <p style="font-size: 1rem; color: #94a3b8;">Take assessments and see results instantly</p>
-                    </div>
+                <div class="feature-card">
+                    <div class="icon">📝</div>
+                    <h4>Practice Tests</h4>
+                    <p>Take assessments and see results instantly</p>
                 </div>
-            </div>
-            <div class="benefit-row">
-                <div class="benefit-item">
-                    <div class="check">✓</div>
-                    <div>
-                        <p><strong>No App Download</strong></p>
-                        <p style="font-size: 1rem; color: #94a3b8;">Works right in WhatsApp they already use</p>
-                    </div>
+                <div class="feature-card">
+                    <div class="icon">📱</div>
+                    <h4>Easy Access</h4>
+                    <p>Simple web app - works on any phone</p>
                 </div>
-                <div class="benefit-item">
-                    <div class="check">✓</div>
-                    <div>
-                        <p><strong>Encouragement</strong></p>
-                        <p style="font-size: 1rem; color: #94a3b8;">AI motivates shy students to ask questions</p>
-                    </div>
+                <div class="feature-card">
+                    <div class="icon">💪</div>
+                    <h4>Encouragement</h4>
+                    <p>AI motivates shy students to ask questions</p>
                 </div>
             </div>
         </div>
@@ -15583,7 +15536,7 @@ app.get('/presentation/:school', async (req, res) => {
                 <div class="feature-card pulse">
                     <div class="icon">⏱️</div>
                     <h4 style="font-size: 2rem;">70%</h4>
-                    <p>Reduction in repetitive WhatsApp questions</p>
+                    <p>Reduction in repetitive student questions</p>
                 </div>
                 <div class="feature-card pulse">
                     <div class="icon">📝</div>
@@ -15653,7 +15606,7 @@ app.get('/presentation/:school', async (req, res) => {
             </div>
             <div class="highlight-box" style="margin-top: 40px;">
                 <h3>Support Available</h3>
-                <p>WhatsApp helpline for any questions</p>
+                <p>Dedicated helpline for any questions</p>
                 <p>Video tutorials for every feature</p>
                 <p>School coordinator for hands-on help</p>
             </div>
