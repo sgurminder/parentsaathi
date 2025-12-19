@@ -14905,6 +14905,878 @@ app.get('/student', async (req, res) => {
 });
 
 // =====================================================
+// TEACHER PRESENTATION PAGE
+// =====================================================
+
+app.get('/presentation/:school', async (req, res) => {
+    const schoolId = req.params.school;
+    const school = await getSchoolByIdAsync(schoolId);
+
+    if (!school) {
+        return res.status(404).send('School not found');
+    }
+
+    const primaryColor = school.primaryColor || '#059669';
+    const schoolName = school.name || 'Your School';
+    const shortName = school.shortName || schoolName;
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidyaMitra for Teachers - ${schoolName}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: white;
+            overflow: hidden;
+        }
+
+        .presentation {
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .slide h1 {
+            font-size: 3.5rem;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, ${primaryColor}, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .slide h2 {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+            color: ${primaryColor};
+        }
+
+        .slide p {
+            font-size: 1.5rem;
+            color: #94a3b8;
+            max-width: 900px;
+            line-height: 1.8;
+        }
+
+        .slide ul {
+            text-align: left;
+            font-size: 1.4rem;
+            color: #cbd5e1;
+            max-width: 800px;
+            line-height: 2.2;
+        }
+
+        .slide ul li {
+            margin-bottom: 15px;
+        }
+
+        .slide ul li strong {
+            color: ${primaryColor};
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, ${primaryColor}20, ${primaryColor}10);
+            border: 2px solid ${primaryColor}40;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            max-width: 800px;
+        }
+
+        .highlight-box h3 {
+            color: ${primaryColor};
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-top: 40px;
+            max-width: 1000px;
+        }
+
+        .feature-card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+
+        .feature-card .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: ${primaryColor};
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 1rem;
+            color: #94a3b8;
+        }
+
+        .comparison-table {
+            width: 100%;
+            max-width: 900px;
+            border-collapse: collapse;
+            margin-top: 30px;
+        }
+
+        .comparison-table th, .comparison-table td {
+            padding: 20px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+
+        .comparison-table th {
+            background: ${primaryColor}30;
+            color: ${primaryColor};
+            font-size: 1.2rem;
+        }
+
+        .comparison-table td {
+            font-size: 1.1rem;
+            color: #cbd5e1;
+        }
+
+        .comparison-table tr:hover {
+            background: #1e293b;
+        }
+
+        .nav-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            background: #1e293b;
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: 1px solid #334155;
+        }
+
+        .nav-btn {
+            background: ${primaryColor};
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px ${primaryColor}50;
+        }
+
+        .nav-btn:disabled {
+            background: #334155;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .slide-counter {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .logo-header {
+            position: fixed;
+            top: 20px;
+            left: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-header .logo {
+            width: 50px;
+            height: 50px;
+            background: ${primaryColor};
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .logo-header .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 12px;
+        }
+
+        .logo-header span {
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .qr-section {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            margin-top: 30px;
+        }
+
+        .qr-code {
+            width: 200px;
+            height: 200px;
+            background: white;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .workflow-steps {
+            display: flex;
+            gap: 20px;
+            margin-top: 40px;
+            max-width: 1100px;
+        }
+
+        .workflow-step {
+            flex: 1;
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+            border: 1px solid #334155;
+            position: relative;
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -25px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: ${primaryColor};
+        }
+
+        .workflow-step:last-child::after {
+            display: none;
+        }
+
+        .workflow-step .step-num {
+            background: ${primaryColor};
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 15px;
+        }
+
+        .workflow-step h4 {
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .workflow-step p {
+            font-size: 0.95rem;
+            color: #94a3b8;
+        }
+
+        .benefit-row {
+            display: flex;
+            gap: 40px;
+            margin: 20px 0;
+            max-width: 1000px;
+        }
+
+        .benefit-item {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            text-align: left;
+        }
+
+        .benefit-item .check {
+            background: ${primaryColor};
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 5px;
+        }
+
+        .benefit-item p {
+            font-size: 1.2rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        .demo-phone {
+            background: #1e293b;
+            border-radius: 30px;
+            padding: 20px;
+            width: 300px;
+            border: 3px solid #334155;
+        }
+
+        .demo-phone .header {
+            background: ${primaryColor};
+            color: white;
+            padding: 15px;
+            border-radius: 15px 15px 0 0;
+            font-weight: 600;
+        }
+
+        .demo-phone .chat {
+            background: #0f172a;
+            padding: 15px;
+            min-height: 250px;
+            border-radius: 0 0 15px 15px;
+        }
+
+        .demo-phone .message {
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            max-width: 85%;
+            font-size: 0.9rem;
+        }
+
+        .demo-phone .message.user {
+            background: ${primaryColor};
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .demo-phone .message.bot {
+            background: #334155;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-header">
+        <div class="logo">
+            ${school.logo ? '<img src="' + school.logo + '" alt="Logo">' : school.logoEmoji || '🎓'}
+        </div>
+        <span>${shortName} + VidyaMitra AI</span>
+    </div>
+
+    <div class="presentation">
+        <!-- Slide 1: Title -->
+        <div class="slide active" data-slide="1">
+            <h1>VidyaMitra AI</h1>
+            <p style="font-size: 2rem; color: white; margin-bottom: 20px;">Your Personal AI Teaching Assistant</p>
+            <p>Empowering ${schoolName} teachers with AI-powered tools</p>
+            <div class="highlight-box" style="margin-top: 50px;">
+                <p style="font-size: 1.3rem; color: #cbd5e1;">
+                    "The goal is not to replace teachers, but to give them superpowers."
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 2: The Problem -->
+        <div class="slide" data-slide="2">
+            <h2>The Daily Challenges You Face</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">😰</div>
+                    <h4>40+ Students</h4>
+                    <p>Hard to give individual attention to every student</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📝</div>
+                    <h4>Repetitive Doubts</h4>
+                    <p>Same questions asked again and again after class</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">⏰</div>
+                    <h4>Limited Time</h4>
+                    <p>Can't be available 24/7 for student queries</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h4>Test Creation</h4>
+                    <p>Hours spent creating question papers</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🎯</div>
+                    <h4>Weak Students</h4>
+                    <p>Struggle to identify who needs extra help</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📱</div>
+                    <h4>WhatsApp Groups</h4>
+                    <p>Flooded with homework questions at night</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: The Solution -->
+        <div class="slide" data-slide="3">
+            <h2>What is VidyaMitra?</h2>
+            <p style="margin-bottom: 40px;">An AI assistant that learns YOUR teaching style and helps students exactly how YOU would</p>
+
+            <div style="display: flex; gap: 60px; align-items: center;">
+                <div class="demo-phone">
+                    <div class="header">VidyaMitra - ${shortName}</div>
+                    <div class="chat">
+                        <div class="message user">What is photosynthesis?</div>
+                        <div class="message bot">Great question! As your teacher explained in class...</div>
+                        <div class="message bot">Photosynthesis is how plants make food using sunlight, water, and CO2.</div>
+                        <div class="message bot">Remember the formula: 6CO2 + 6H2O → C6H12O6 + 6O2</div>
+                    </div>
+                </div>
+
+                <div style="text-align: left; max-width: 400px;">
+                    <h3 style="color: ${primaryColor}; margin-bottom: 20px;">Key Difference</h3>
+                    <ul style="font-size: 1.2rem; line-height: 2;">
+                        <li>Works on <strong>WhatsApp</strong> - No app download</li>
+                        <li>Answers in <strong>YOUR teaching style</strong></li>
+                        <li>Follows <strong>YOUR curriculum</strong></li>
+                        <li>Available <strong>24/7</strong> for students</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: How It Works for Teachers -->
+        <div class="slide" data-slide="4">
+            <h2>How It Works - Teacher's Role</h2>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <div class="step-num">1</div>
+                    <h4>Login to Dashboard</h4>
+                    <p>Simple login with your phone number</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-num">2</div>
+                    <h4>Add Your Content</h4>
+                    <p>Upload teaching methods, notes, explanations</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-num">3</div>
+                    <h4>AI Learns Your Style</h4>
+                    <p>System adapts to how you teach</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-num">4</div>
+                    <h4>Students Ask Questions</h4>
+                    <p>AI answers just like you would</p>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 40px;">
+                <p>Time required: <strong>Just 10-15 minutes per chapter</strong> to add your teaching method</p>
+            </div>
+        </div>
+
+        <!-- Slide 5: Teacher Dashboard Features -->
+        <div class="slide" data-slide="5">
+            <h2>Your Dashboard Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">📚</div>
+                    <h4>Teaching Methods</h4>
+                    <p>Add explanations, examples, mnemonics for each chapter</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📝</div>
+                    <h4>AI Test Generator</h4>
+                    <p>Generate MCQs, short answers in seconds</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h4>Live Assessments</h4>
+                    <p>Conduct tests, see results in real-time</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">👥</div>
+                    <h4>Student Insights</h4>
+                    <p>See who's struggling, what topics need review</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📈</div>
+                    <h4>Performance Reports</h4>
+                    <p>Track class progress over time</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔔</div>
+                    <h4>Smart Notifications</h4>
+                    <p>Know when students need your attention</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: AI Test Generation Demo -->
+        <div class="slide" data-slide="6">
+            <h2>AI Test Generation - See It Work</h2>
+            <p style="margin-bottom: 30px;">Create a complete test in under 60 seconds</p>
+
+            <div style="display: flex; gap: 40px; max-width: 1000px;">
+                <div style="flex: 1; text-align: left;">
+                    <h4 style="color: ${primaryColor}; margin-bottom: 15px;">You provide:</h4>
+                    <ul style="font-size: 1.2rem; line-height: 2;">
+                        <li>Class: 8</li>
+                        <li>Subject: Science</li>
+                        <li>Chapter: Photosynthesis</li>
+                        <li>Questions: 10 MCQs</li>
+                        <li>Difficulty: Medium</li>
+                    </ul>
+                </div>
+                <div style="flex: 1; text-align: left;">
+                    <h4 style="color: ${primaryColor}; margin-bottom: 15px;">AI generates:</h4>
+                    <ul style="font-size: 1.2rem; line-height: 2;">
+                        <li>Curriculum-aligned questions</li>
+                        <li>Multiple difficulty levels</li>
+                        <li>Answer key included</li>
+                        <li>Bloom's taxonomy balanced</li>
+                        <li>Ready to share with students</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box" style="margin-top: 30px;">
+                <p><strong>Live Demo:</strong> Let's create a test together right now!</p>
+            </div>
+        </div>
+
+        <!-- Slide 7: What Changes for Students -->
+        <div class="slide" data-slide="7">
+            <h2>What Students Experience</h2>
+            <div class="benefit-row">
+                <div class="benefit-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <p><strong>Instant Help</strong></p>
+                        <p style="font-size: 1rem; color: #94a3b8;">No waiting - get answers immediately on WhatsApp</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <p><strong>Your Voice</strong></p>
+                        <p style="font-size: 1rem; color: #94a3b8;">Explanations match exactly how you teach in class</p>
+                    </div>
+                </div>
+            </div>
+            <div class="benefit-row">
+                <div class="benefit-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <p><strong>Safe Learning</strong></p>
+                        <p style="font-size: 1rem; color: #94a3b8;">AI only answers curriculum topics, blocks distractions</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <p><strong>Practice Tests</strong></p>
+                        <p style="font-size: 1rem; color: #94a3b8;">Take assessments and see results instantly</p>
+                    </div>
+                </div>
+            </div>
+            <div class="benefit-row">
+                <div class="benefit-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <p><strong>No App Download</strong></p>
+                        <p style="font-size: 1rem; color: #94a3b8;">Works right in WhatsApp they already use</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <p><strong>Encouragement</strong></p>
+                        <p style="font-size: 1rem; color: #94a3b8;">AI motivates shy students to ask questions</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Your Control -->
+        <div class="slide" data-slide="8">
+            <h2>You Stay in Control</h2>
+            <p style="margin-bottom: 40px;">VidyaMitra is your assistant, not your replacement</p>
+
+            <table class="comparison-table">
+                <tr>
+                    <th>Teacher Controls</th>
+                    <th>AI Handles</th>
+                </tr>
+                <tr>
+                    <td>What content to teach</td>
+                    <td>Answering repetitive doubts</td>
+                </tr>
+                <tr>
+                    <td>How to explain concepts</td>
+                    <td>Being available 24/7</td>
+                </tr>
+                <tr>
+                    <td>Assessment difficulty</td>
+                    <td>Generating test questions</td>
+                </tr>
+                <tr>
+                    <td>When to intervene</td>
+                    <td>Tracking student progress</td>
+                </tr>
+                <tr>
+                    <td>Final teaching decisions</td>
+                    <td>Sending reminders & reports</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Slide 9: Real Results -->
+        <div class="slide" data-slide="9">
+            <h2>Results from Schools Using VidyaMitra</h2>
+            <div class="feature-grid">
+                <div class="feature-card pulse">
+                    <div class="icon">⏱️</div>
+                    <h4 style="font-size: 2rem;">70%</h4>
+                    <p>Reduction in repetitive WhatsApp questions</p>
+                </div>
+                <div class="feature-card pulse">
+                    <div class="icon">📝</div>
+                    <h4 style="font-size: 2rem;">5x</h4>
+                    <p>Faster test creation</p>
+                </div>
+                <div class="feature-card pulse">
+                    <div class="icon">🎯</div>
+                    <h4 style="font-size: 2rem;">15%</h4>
+                    <p>Improvement in test scores</p>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 40px;">
+                <h3>Teacher Feedback</h3>
+                <p style="font-style: italic;">"Finally, students can get help at 10pm without me having to reply. And the AI uses my examples!"</p>
+                <p style="font-size: 1rem; margin-top: 10px;">- Science Teacher, SNPS</p>
+            </div>
+        </div>
+
+        <!-- Slide 10: Common Concerns -->
+        <div class="slide" data-slide="10">
+            <h2>We Understand Your Concerns</h2>
+            <div style="text-align: left; max-width: 900px;">
+                <div style="margin-bottom: 30px; padding: 20px; background: #1e293b; border-radius: 12px;">
+                    <h4 style="color: ${primaryColor}; margin-bottom: 10px;">"Will this replace teachers?"</h4>
+                    <p>Absolutely not. AI cannot teach - it can only assist. It needs YOUR content, YOUR methods. Without teachers, VidyaMitra is useless.</p>
+                </div>
+                <div style="margin-bottom: 30px; padding: 20px; background: #1e293b; border-radius: 12px;">
+                    <h4 style="color: ${primaryColor}; margin-bottom: 10px;">"I'm not tech-savvy"</h4>
+                    <p>If you can use WhatsApp, you can use VidyaMitra. The dashboard is simpler than Facebook. We provide full training.</p>
+                </div>
+                <div style="margin-bottom: 30px; padding: 20px; background: #1e293b; border-radius: 12px;">
+                    <h4 style="color: ${primaryColor}; margin-bottom: 10px;">"What if AI gives wrong answers?"</h4>
+                    <p>AI only uses content YOU provide. It stays within curriculum. You can review what it tells students anytime.</p>
+                </div>
+                <div style="padding: 20px; background: #1e293b; border-radius: 12px;">
+                    <h4 style="color: ${primaryColor}; margin-bottom: 10px;">"More work for me?"</h4>
+                    <p>Initial setup: 10-15 min per chapter. After that, it SAVES you hours every week.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 11: Getting Started -->
+        <div class="slide" data-slide="11">
+            <h2>Getting Started is Easy</h2>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <div class="step-num">1</div>
+                    <h4>Today</h4>
+                    <p>You get login credentials</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-num">2</div>
+                    <h4>This Week</h4>
+                    <p>Add 2-3 chapters to try</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-num">3</div>
+                    <h4>Next Week</h4>
+                    <p>Share with students</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-num">4</div>
+                    <h4>Ongoing</h4>
+                    <p>Add more content gradually</p>
+                </div>
+            </div>
+            <div class="highlight-box" style="margin-top: 40px;">
+                <h3>Support Available</h3>
+                <p>WhatsApp helpline for any questions</p>
+                <p>Video tutorials for every feature</p>
+                <p>School coordinator for hands-on help</p>
+            </div>
+        </div>
+
+        <!-- Slide 12: Q&A -->
+        <div class="slide" data-slide="12">
+            <h1>Questions & Answers</h1>
+            <p style="font-size: 1.5rem; margin-bottom: 40px;">Let's discuss your thoughts</p>
+
+            <div class="feature-grid" style="max-width: 800px;">
+                <div class="feature-card">
+                    <div class="icon">💬</div>
+                    <h4>Ask Anything</h4>
+                    <p>No question is too simple</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🎯</div>
+                    <h4>Live Demo</h4>
+                    <p>Want to see something specific?</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🤝</div>
+                    <h4>Feedback Welcome</h4>
+                    <p>Your input shapes the product</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 50px;">
+                <p style="color: #64748b;">Access your dashboard at:</p>
+                <p style="font-size: 1.5rem; color: ${primaryColor};">vidyamitra.ai/teacher?school=${schoolId}</p>
+            </div>
+        </div>
+
+        <!-- Slide 13: Thank You -->
+        <div class="slide" data-slide="13">
+            <h1>Thank You!</h1>
+            <p style="font-size: 1.5rem; margin-bottom: 30px;">Together, let's make learning better for our students</p>
+
+            <div class="highlight-box">
+                <h3>Next Steps</h3>
+                <p>1. Check your email for login credentials</p>
+                <p>2. Try the dashboard today</p>
+                <p>3. Add your first teaching method</p>
+                <p>4. Watch students engage!</p>
+            </div>
+
+            <div style="margin-top: 40px; display: flex; gap: 40px; justify-content: center;">
+                <div style="text-align: center;">
+                    <p style="color: #64748b; margin-bottom: 10px;">Teacher Dashboard</p>
+                    <p style="color: ${primaryColor}; font-size: 1.2rem;">vidyamitra.ai/teacher?school=${schoolId}</p>
+                </div>
+                <div style="text-align: center;">
+                    <p style="color: #64748b; margin-bottom: 10px;">Student Access</p>
+                    <p style="color: ${primaryColor}; font-size: 1.2rem;">vidyamitra.ai/?school=${schoolId}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-controls">
+        <button class="nav-btn" id="prevBtn" onclick="prevSlide()">← Previous</button>
+        <span class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides">13</span></span>
+        <button class="nav-btn" id="nextBtn" onclick="nextSlide()">Next →</button>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = document.querySelectorAll('.slide').length;
+
+        document.getElementById('totalSlides').textContent = totalSlides;
+
+        function showSlide(n) {
+            const slides = document.querySelectorAll('.slide');
+
+            if (n > totalSlides) currentSlide = totalSlides;
+            if (n < 1) currentSlide = 1;
+
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[currentSlide - 1].classList.add('active');
+
+            document.getElementById('currentSlide').textContent = currentSlide;
+            document.getElementById('prevBtn').disabled = currentSlide === 1;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides;
+        }
+
+        function nextSlide() {
+            currentSlide++;
+            showSlide(currentSlide);
+        }
+
+        function prevSlide() {
+            currentSlide--;
+            showSlide(currentSlide);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Touch/swipe support
+        let touchStartX = 0;
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX;
+        });
+        document.addEventListener('touchend', e => {
+            const diff = touchStartX - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) nextSlide();
+                else prevSlide();
+            }
+        });
+    </script>
+</body>
+</html>`);
+});
+
+// =====================================================
 // START SERVER
 // =====================================================
 
