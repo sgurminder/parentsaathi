@@ -223,11 +223,11 @@ app.get('/api/icon', (req, res) => {
     const innerSize = size - (padding * 2);
     const radius = maskable ? size * 0.2 : size * 0.16;
 
-    const svg = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 \${size} \${size}" width="\${size}" height="\${size}">
-  <rect width="\${size}" height="\${size}" rx="\${radius}" fill="#059669"/>
-  <text x="\${size/2}" y="\${size * 0.65}" font-family="Arial, sans-serif" font-size="\${innerSize * 0.6}" font-weight="bold" text-anchor="middle" fill="white">V</text>
-  <text x="\${size/2}" y="\${size * 0.85}" font-family="Arial, sans-serif" font-size="\${innerSize * 0.12}" text-anchor="middle" fill="white" opacity="0.9">VidyaMitra</text>
-</svg>\`;
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' +
+        '<rect width="' + size + '" height="' + size + '" rx="' + radius + '" fill="#059669"/>' +
+        '<text x="' + (size/2) + '" y="' + (size * 0.65) + '" font-family="Arial, sans-serif" font-size="' + (innerSize * 0.6) + '" font-weight="bold" text-anchor="middle" fill="white">V</text>' +
+        '<text x="' + (size/2) + '" y="' + (size * 0.85) + '" font-family="Arial, sans-serif" font-size="' + (innerSize * 0.12) + '" text-anchor="middle" fill="white" opacity="0.9">VidyaMitra</text>' +
+        '</svg>';
 
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'public, max-age=31536000');
